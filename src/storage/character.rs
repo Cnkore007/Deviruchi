@@ -3,6 +3,7 @@ use crate::storage::Database;
 use crate::error::Result;
 use crate::storage::chrono_now;
 use crate::protocol::map_packets::CharInfo;
+use crate::game::storage::data::Storage;
 
 impl Database {
     pub fn create_character(
@@ -178,6 +179,67 @@ impl Database {
             rename: 0,
             map_name: char.last_map.clone(),
         }
+    }
+
+    /// 加载角色仓库
+    pub fn load_storage(&self, char_id: u32, max_size: u16) -> Result<Storage> {
+        let items: Vec<(u16, u16, u16, bool, u8, [u16; 4])> = self.query(
+            "SELECT slot_index, item_id, amount, identified, refine,
+                    card0, card1, card2, card3
+             FROM storage WHERE char_id = ?1 ORDER BY slot_index",
+            params![char_id],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)? as u16,
+                    row.get::<_, i64>(1)? as u16,
+                    row.get::<_, i64>(2)? as u16,
+                    row.get::<_, i64>(3)? != 0,
+                    row.get::<_, i64>(4)? as u8,
+                    [
+                        row.get::<_, i64>(5)? as u16,
+                        row.get::<_, i64>(6)? as u16,
+                        row.get::<_, i64>(7)? as u16,
+                        row.get::<_, i64>(8)? as u16,
+                    ],
+                ))
+            },
+        )?;
+
+        Ok(Storage::from_db_format(char_id, max_size, items))
+    }
+
+    /// 保存角色仓库
+    pub fn save_storage(&self, storage: &Storage) -> Result<()> {
+        let char_id = storage.char_id();
+
+        // 先删除该角色的所有仓库物品
+        self.execute_with_params(
+            "DELETE FROM storage WHERE char_id = ?1",
+            params![char_id],
+        )?;
+
+        // 插入当前物品
+        for slot in storage.slots().iter().filter(|s| !s.is_empty()) {
+            self.execute_with_params(
+                "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine,
+                                     card0, card1, card2, card3)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    char_id as i64,
+                    slot.index as i64,
+                    slot.item_id as i64,
+                    slot.amount as i64,
+                    slot.identified as i64,
+                    slot.refine as i64,
+                    slot.cards[0] as i64,
+                    slot.cards[1] as i64,
+                    slot.cards[2] as i64,
+                    slot.cards[3] as i64,
+                ],
+            )?;
+        }
+
+        Ok(())
     }
 }
 

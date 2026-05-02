@@ -100,6 +100,25 @@ pub fn init_schema(db: &Database) -> Result<()> {
         )",
     )?;
 
+    // 仓库表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS storage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            char_id INTEGER NOT NULL,
+            slot_index INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 1,
+            identified INTEGER NOT NULL DEFAULT 1,
+            refine INTEGER NOT NULL DEFAULT 0,
+            card0 INTEGER DEFAULT 0,
+            card1 INTEGER DEFAULT 0,
+            card2 INTEGER DEFAULT 0,
+            card3 INTEGER DEFAULT 0,
+            UNIQUE(char_id, slot_index),
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
     // 公会表
     db.execute(
         "CREATE TABLE IF NOT EXISTS guilds (
