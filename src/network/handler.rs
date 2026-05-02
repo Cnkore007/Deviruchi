@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use crate::storage::Database;
 use crate::network::{Session, SessionManager, PacketId};
+use crate::game::token::TokenStore;
 
 pub struct PacketHandler {
     login_server: Arc<crate::game::login::LoginServer>,
@@ -8,7 +9,11 @@ pub struct PacketHandler {
 }
 
 impl PacketHandler {
-    pub fn new(db: Arc<Database>, session_manager: Arc<SessionManager>) -> Self {
+    pub fn new(
+        db: Arc<Database>,
+        session_manager: Arc<SessionManager>,
+        token_store: Arc<TokenStore>,
+    ) -> Self {
         Self {
             login_server: Arc::new(crate::game::login::LoginServer::new(
                 db.clone(),
@@ -17,6 +22,7 @@ impl PacketHandler {
             char_server: Arc::new(crate::game::char::CharServer::new(
                 db,
                 session_manager,
+                token_store,
             )),
         }
     }

@@ -13,12 +13,14 @@ use std::sync::Arc;
 use crate::cli::Cli;
 use crate::storage::{Database, init_schema};
 use crate::network::{SessionManager, GameServer, PacketHandler};
+use crate::game::token::TokenStore;
 
 pub struct Core {
     cli: Cli,
     config: Config,
     db: Option<Arc<Database>>,
     session_manager: Arc<SessionManager>,
+    token_store: Arc<TokenStore>,
 }
 
 impl Core {
@@ -29,6 +31,7 @@ impl Core {
             config,
             db: None,
             session_manager: Arc::new(SessionManager::new()),
+            token_store: Arc::new(TokenStore::new()),
         }
     }
 
@@ -48,9 +51,10 @@ impl Core {
 
         // 初始化会话管理
         let session_manager = self.session_manager.clone();
+        let token_store = self.token_store.clone();
 
         // 创建 PacketHandler
-        let packet_handler = Arc::new(PacketHandler::new(db, session_manager.clone()));
+        let packet_handler = Arc::new(PacketHandler::new(db, session_manager.clone(), token_store));
 
         tracing::info!("服务器初始化完成");
         tracing::info!("运行模式: {}", self.cli.mode);

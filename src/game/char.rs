@@ -3,24 +3,41 @@
 use std::sync::Arc;
 use tracing::{info, warn, error};
 
-use crate::protocol::map_packets::{SCCharList, CHEnter, CHMakeChar, CharInfo};
+use crate::protocol::map_packets::{SCCharList, CHEnter, CHMakeChar, CharInfo, HCNotifyZoneServer};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
 use crate::network::session::{SessionManager, Session};
+use crate::game::token::TokenStore;
 
 /// 角色服务器
 pub struct CharServer {
     db: Arc<Database>,
     #[allow(dead_code)]
     session_manager: Arc<SessionManager>,
+    token_store: Arc<TokenStore>,
+    map_ip: String,
+    map_port: u16,
 }
 
 impl CharServer {
-    pub fn new(db: Arc<Database>, session_manager: Arc<SessionManager>) -> Self {
+    pub fn new(
+        db: Arc<Database>,
+        session_manager: Arc<SessionManager>,
+        token_store: Arc<TokenStore>,
+    ) -> Self {
         Self {
             db,
             session_manager,
+            token_store,
+            map_ip: "127.0.0.1".to_string(),
+            map_port: 6121,
         }
+    }
+
+    pub fn with_map_server(mut self, ip: &str, port: u16) -> Self {
+        self.map_ip = ip.to_string();
+        self.map_port = port;
+        self
     }
 
     /// 根据 packet_id 分发处理
@@ -121,10 +138,20 @@ impl CharServer {
         // 设置 session.char_id
         session.char_id = Some(enter.char_id);
 
-        info!("Character selected: char_id={}", enter.char_id);
+        // Generate one-time token for Char→Map transition
+        let token = self.token_store.create(account_id, enter.char_id);
 
-        // 返回空包表示成功，后续 map server 会处理地图连接
-        Some(vec![0])
+        info!(
+            "Character selected: char_id={}, token generated for map {}:{}",
+            enter.char_id, self.map_ip, self.map_port
+        );
+
+        // Return HCNotifyZoneServer with map server info
+        Some(HCNotifyZoneServer {
+            map_ip: self.map_ip.clone(),
+            map_port: self.map_port,
+            token,
+        }.to_packet())
     }
 
     /// 查找空槽位 (0-8)

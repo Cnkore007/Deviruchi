@@ -1,5 +1,6 @@
 pub mod battle;
 pub mod char;
+pub mod game_loop;
 pub mod item;
 pub mod login;
 pub mod map;
@@ -11,6 +12,7 @@ pub mod token;
 
 pub use battle::BattleHandler;
 pub use char::CharServer;
+pub use game_loop::GameLoop;
 pub use item::ItemHandler;
 pub use map::MapState;
 pub use mob::{MobSpawnManager, MobAI};
