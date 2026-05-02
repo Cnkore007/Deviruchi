@@ -1,7 +1,7 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension, Row};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use anyhow::Result;
+use crate::error::Result;
 
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -33,24 +33,43 @@ impl Database {
         Ok(conn.execute(sql, params)?)
     }
 
-    pub fn query<T, F>(&self, sql: &str, f: F) -> Result<Vec<T>>
+    pub fn query<T, P, F>(&self, sql: &str, params: P, mut f: F) -> Result<Vec<T>>
     where
-        F: FnMut(&rusqlite::Row<'_>) -> Result<T, rusqlite::Error>,
+        P: rusqlite::Params,
+        F: FnMut(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
     {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(sql)?;
-        let rows = stmt.query_map([], f)?;
+        let rows = stmt.query_map(params, |row| f(row))?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| e.into())
     }
 
-    pub fn query_row<T, F>(&self, sql: &str, f: F) -> Result<T>
+    pub fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> Result<T>
     where
-        F: FnMut(&rusqlite::Row<'_>) -> Result<T, rusqlite::Error>,
+        P: rusqlite::Params,
+        F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
     {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(sql)?;
-        stmt.query_row([], f).map_err(|e| e.into())
+        stmt.query_row(params, f).map_err(|e| e.into())
+    }
+
+    pub fn query_row_optional<T, P, F>(&self, sql: &str, params: P, f: F) -> Result<Option<T>>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
+    {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(sql)?;
+        stmt.query_row(params, f)
+            .optional()
+            .map_err(|e| e.into())
+    }
+
+    pub fn last_insert_rowid(&self) -> Result<u32> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn.last_insert_rowid() as u32)
     }
 }
 
