@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Framed;
+use tokio::sync::mpsc;
 use tracing::{info, error, warn};
 use futures_util::{SinkExt, StreamExt};
 use crate::network::{PacketCodec, Session, SessionManager, PacketHandler};
@@ -57,22 +58,40 @@ impl GameServer {
 
         let mut framed = Framed::new(stream, PacketCodec);
 
-        while let Some(result) = framed.next().await {
-            match result {
-                Ok(packet) => {
-                    info!("Received packet: id=0x{:04X}, len={}", packet.header.packet_id, packet.header.length);
+        // Create a channel for receiving push packets
+        // In a full implementation, this would be connected to the ChannelBus
+        let (push_tx, mut push_rx) = mpsc::unbounded_channel::<Vec<u8>>();
 
-                    // 处理数据包
-                    if let Some(response) = packet_handler.handle(&mut session, packet.header.packet_id, &packet.data) {
-                        framed.send(response.into()).await?;
+        loop {
+            tokio::select! {
+                // Handle incoming packets from client
+                result = framed.next() => {
+                    match result {
+                        Some(Ok(packet)) => {
+                            info!("Received packet: id=0x{:04X}, len={}", packet.header.packet_id, packet.header.length);
+
+                            if let Some(response) = packet_handler.handle(&mut session, packet.header.packet_id, &packet.data) {
+                                framed.send(response.into()).await?;
+                            }
+
+                            session_manager.update(&session_id, session.clone());
+                        }
+                        Some(Err(e)) => {
+                            warn!("Packet error: {}", e);
+                            break;
+                        }
+                        None => break,
                     }
-
-                    // 更新 session
-                    session_manager.update(&session_id, session.clone());
                 }
-                Err(e) => {
-                    warn!("Packet error: {}", e);
-                    break;
+                // Handle push packets from ChannelBus
+                push_data = push_rx.recv() => {
+                    if let Some(data) = push_data {
+                        if !data.is_empty() {
+                            if let Err(e) = framed.send(data.into()).await {
+                                warn!("Failed to send push packet: {}", e);
+                            }
+                        }
+                    }
                 }
             }
         }
