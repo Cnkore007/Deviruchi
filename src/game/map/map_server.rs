@@ -11,7 +11,10 @@ use crate::game::party::PartyManager;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZUseItem, CZRequestPickupItem, CZContactNpc};
 use crate::protocol::party_packets::{CZMakeParty, CZReqPartyInvite, CZReqPartyJoin, CZPartyChat, CZChatMessage};
+use crate::protocol::storage_packets::*;
 use crate::protocol::packet_builder::Packed;
+use crate::network::packet::id::*;
+use crate::game::storage::{StorageManager, Storage};
 
 pub struct MapServer {
     pub db: Arc<crate::storage::Database>,
@@ -20,6 +23,7 @@ pub struct MapServer {
     pub channel_bus: Arc<ChannelBus>,
     pub drop_manager: Arc<DropManager>,
     pub party_manager: Arc<PartyManager>,
+    pub storage_manager: Arc<StorageManager>,
     pub death_drop_items: bool,
 }
 
@@ -31,6 +35,7 @@ impl MapServer {
         channel_bus: Arc<ChannelBus>,
         drop_manager: Arc<DropManager>,
         party_manager: Arc<PartyManager>,
+        storage_manager: Arc<StorageManager>,
         death_drop_items: bool,
     ) -> Self {
         Self {
@@ -40,6 +45,7 @@ impl MapServer {
             channel_bus,
             drop_manager,
             party_manager,
+            storage_manager,
             death_drop_items,
         }
     }
@@ -60,6 +66,9 @@ impl MapServer {
             0x0103 => self.handle_party_leave(session),
             0x0109 => self.handle_party_chat(data, session),
             0x010C => self.handle_chat(data, session),
+            CZ_REQ_STORAGE_OPEN => self.handle_storage_open(session),
+            CZ_REQ_STORAGE_CLOSE => self.handle_storage_close(session),
+            CZ_REQ_STORAGE_MOVE_ITEM => self.handle_storage_move_item(data, session),
             _ => None,
         }
     }
@@ -302,6 +311,93 @@ impl MapServer {
 
         None
     }
+
+    /// Handle storage open request (0x0213)
+    fn handle_storage_open(&self, session: &Session) -> Option<Vec<u8>> {
+        let char_id = session.char_id?;
+
+        // Get or create storage
+        let storage = self.storage_manager.get_or_create(char_id, 100);
+        let storage = storage.read();
+
+        // Build item list
+        let items: Vec<_> = storage.slots()
+            .iter()
+            .filter(|s| !s.is_empty())
+            .map(|s| StorageItem {
+                index: s.index,
+                item_id: s.item_id,
+                amount: s.amount,
+                identified: s.identified,
+            })
+            .collect();
+
+        // Send storage items packet
+        let items_packet = ZCStorageItems {
+            count: items.len() as u16,
+            items,
+        }.to_packet();
+
+        Some(items_packet)
+    }
+
+    /// Handle storage close request (0x0214)
+    fn handle_storage_close(&self, session: &Session) -> Option<Vec<u8>> {
+        // Save storage to database
+        if let Some(char_id) = session.char_id {
+            if let Some(storage) = self.storage_manager.get(char_id) {
+                let storage = storage.read();
+                if let Err(e) = self.db.save_storage(&storage) {
+                    tracing::error!("Failed to save storage for char {}: {}", char_id, e);
+                }
+            }
+        }
+
+        Some(ZCStorageClose.to_packet())
+    }
+
+    /// Handle storage move item (0x0215)
+    fn handle_storage_move_item(&self, data: &[u8], session: &Session) -> Option<Vec<u8>> {
+        let req = CZReqStorageMoveItem::from_packet(data)?;
+        let char_id = session.char_id?;
+
+        let storage = self.storage_manager.get_or_create(char_id, 100);
+
+        if req.is_to_storage {
+            // Simplified: just add to storage
+            // In real implementation, this should:
+            // 1. Remove from inventory
+            // 2. Add to storage
+            // For now, just simulate
+            let mut s = storage.write();
+            if s.add_item(req.from_index as u16, req.amount) {
+                // Find the slot
+                for slot in s.slots() {
+                    if slot.item_id == req.from_index as u16 {
+                        return Some(ZCStorageItemAdd {
+                            index: slot.index,
+                            item_id: slot.item_id,
+                            amount: slot.amount,
+                            identified: slot.identified,
+                        }.to_packet());
+                    }
+                }
+            }
+        } else {
+            // From storage
+            let mut s = storage.write();
+            if s.remove_item(req.from_index, req.amount) {
+                // Simplified: just acknowledge
+                // In real implementation, add to inventory
+                return Some(ZCStorageItemRemove {
+                    index: req.from_index,
+                    amount: req.amount,
+                }.to_packet());
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -318,6 +414,7 @@ mod tests {
             Arc::new(ChannelBus::new()),
             Arc::new(DropManager::new()),
             Arc::new(PartyManager::new()),
+            Arc::new(StorageManager::new()),
             false,
         );
         let mut session = Session::new();
