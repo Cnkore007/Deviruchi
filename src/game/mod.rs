@@ -5,6 +5,7 @@ pub mod login;
 pub mod map;
 pub mod mob;
 pub mod npc;
+pub mod party;
 pub mod skill;
 pub mod token;
 
@@ -14,5 +15,6 @@ pub use item::ItemHandler;
 pub use map::MapState;
 pub use mob::{MobSpawnManager, MobAI};
 pub use npc::NpcHandler;
+pub use party::PartyManager;
 pub use skill::SkillHandler;
 pub use token::TokenStore;
