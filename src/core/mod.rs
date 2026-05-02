@@ -14,6 +14,8 @@ use crate::cli::Cli;
 use crate::storage::{Database, init_schema};
 use crate::network::{SessionManager, GameServer, PacketHandler};
 use crate::game::token::TokenStore;
+use crate::game::map::{MapState, ChannelBus, DropManager};
+use crate::game::party::PartyManager;
 
 pub struct Core {
     cli: Cli,
@@ -21,6 +23,10 @@ pub struct Core {
     db: Option<Arc<Database>>,
     session_manager: Arc<SessionManager>,
     token_store: Arc<TokenStore>,
+    map_state: Arc<MapState>,
+    channel_bus: Arc<ChannelBus>,
+    drop_manager: Arc<DropManager>,
+    party_manager: Arc<PartyManager>,
 }
 
 impl Core {
@@ -32,6 +38,10 @@ impl Core {
             db: None,
             session_manager: Arc::new(SessionManager::new()),
             token_store: Arc::new(TokenStore::new()),
+            map_state: Arc::new(MapState::new()),
+            channel_bus: Arc::new(ChannelBus::new()),
+            drop_manager: Arc::new(DropManager::new()),
+            party_manager: Arc::new(PartyManager::new()),
         }
     }
 
@@ -52,9 +62,21 @@ impl Core {
         // 初始化会话管理
         let session_manager = self.session_manager.clone();
         let token_store = self.token_store.clone();
+        let map_state = self.map_state.clone();
+        let channel_bus = self.channel_bus.clone();
+        let drop_manager = self.drop_manager.clone();
+        let party_manager = self.party_manager.clone();
 
         // 创建 PacketHandler
-        let packet_handler = Arc::new(PacketHandler::new(db, session_manager.clone(), token_store));
+        let packet_handler = Arc::new(PacketHandler::new(
+            db,
+            session_manager.clone(),
+            token_store,
+            map_state,
+            channel_bus,
+            drop_manager,
+            party_manager,
+        ));
 
         tracing::info!("服务器初始化完成");
         tracing::info!("运行模式: {}", self.cli.mode);
