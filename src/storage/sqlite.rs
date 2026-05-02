@@ -67,9 +67,9 @@ impl Database {
             .map_err(|e| e.into())
     }
 
-    pub fn last_insert_rowid(&self) -> Result<u32> {
+    pub fn last_insert_rowid(&self) -> Result<u64> {
         let conn = self.conn.lock().unwrap();
-        Ok(conn.last_insert_rowid() as u32)
+        Ok(conn.last_insert_rowid() as u64)
     }
 }
 
@@ -83,3 +83,10 @@ impl Clone for Database {
 
 unsafe impl Send for Database {}
 unsafe impl Sync for Database {}
+
+pub fn chrono_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}

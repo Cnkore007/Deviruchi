@@ -1,6 +1,7 @@
 use rusqlite::params;
 use crate::storage::Database;
 use crate::error::Result;
+use crate::storage::chrono_now;
 
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -24,7 +25,7 @@ impl Database {
              VALUES (?1, ?2, ?3, ?4)",
             params![user_id, password_hash, sex, created_at],
         )?;
-        Ok(self.last_insert_rowid()?)
+        Ok(self.last_insert_rowid()? as u32)
     }
 
     pub fn get_account_by_userid(&self, user_id: &str) -> Result<Option<Account>> {
@@ -81,11 +82,4 @@ impl Database {
             },
         )
     }
-}
-
-fn chrono_now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64
 }

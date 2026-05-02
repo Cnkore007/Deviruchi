@@ -1,6 +1,7 @@
 use rusqlite::params;
 use crate::storage::Database;
 use crate::error::Result;
+use crate::storage::chrono_now;
 use crate::protocol::map_packets::CharInfo;
 
 impl Database {
@@ -34,7 +35,7 @@ impl Database {
                 hair, hair_color, now
             ],
         )?;
-        Ok(self.last_insert_rowid()?)
+        Ok(self.last_insert_rowid()? as u32)
     }
 
     pub fn get_characters_by_account(&self, account_id: u32) -> Result<Vec<Character>> {
@@ -215,11 +216,4 @@ pub struct Character {
     pub delete_timer: u32,
     pub created_at: i64,
     pub updated_at: i64,
-}
-
-fn chrono_now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64
 }
