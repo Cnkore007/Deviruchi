@@ -13,7 +13,7 @@ impl BattleHandler {
     /// 普通攻击
     pub fn normal_attack(&self, attacker: &Player, defender: &Mob) -> AttackResult {
         let hit_chance = BattleFormula::hit_rate(attacker, defender);
-        if rand_chance(hit_chance) {
+        if !rand_chance(hit_chance) {
             return AttackResult::Miss;
         }
 
