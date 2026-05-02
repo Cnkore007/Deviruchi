@@ -7,3 +7,4 @@ pub mod skill;
 pub mod item;
 pub mod mob;
 pub mod npc;
+pub mod battle;
