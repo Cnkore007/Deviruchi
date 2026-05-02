@@ -9,7 +9,8 @@ fn test_ca_login_pack() {
         password: "testpass".to_string(),
     };
     let bytes = packet.to_packet();
-    assert!(bytes.len() >= 4);
+    // Header (2+2=4 bytes) + version (4) + username (24) + password (24) = 56
+    assert_eq!(bytes.len(), 4 + 4 + 24 + 24);
     assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 0x0064);
 }
 

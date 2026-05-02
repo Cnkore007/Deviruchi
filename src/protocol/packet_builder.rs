@@ -80,6 +80,9 @@ pub fn parse_string(buf: &[u8], offset: &mut usize) -> Option<String> {
 }
 
 pub fn parse_fixed_string(buf: &[u8], offset: &mut usize, len: usize) -> Option<String> {
+    if *offset >= buf.len() {
+        return None;
+    }
     let end = (*offset + len).min(buf.len());
     let s = String::from_utf8(buf[*offset..end].to_vec()).ok()?;
     *offset = end;
