@@ -1,13 +1,22 @@
 use std::collections::HashMap;
 
+/// 最大堆叠数量
+const MAX_STACK_SIZE: u16 = 30000;
+
 /// 仓库格子
 #[derive(Debug, Clone)]
 pub struct StorageSlot {
+    /// 格子索引
     pub index: u16,
+    /// 物品ID
     pub item_id: u16,
+    /// 物品数量
     pub amount: u16,
+    /// 是否已鉴定
     pub identified: bool,
+    /// 精炼等级
     pub refine: u8,
+    /// 卡片插槽 [0-3]
     pub cards: [u16; 4],
 }
 
@@ -71,7 +80,7 @@ impl Storage {
 
     pub fn add_item(&mut self, item_id: u16, amount: u16) -> bool {
         for slot in &mut self.slots {
-            if slot.item_id == item_id && slot.amount + amount <= 30000 {
+            if slot.item_id == item_id && slot.amount + amount <= MAX_STACK_SIZE {
                 slot.amount += amount;
                 return true;
             }
@@ -118,17 +127,23 @@ impl Storage {
             return true;
         }
 
+        // Check if items can be merged first (no mutable borrow yet)
         let from_slot = self.slots[from_index as usize].clone();
-        let to_slot = self.slots[to_index as usize].clone();
+        let to_slot = &self.slots[to_index as usize];
 
-        if from_slot.item_id == to_slot.item_id && from_slot.item_id != 0 {
+        let should_merge = from_slot.item_id == to_slot.item_id
+            && from_slot.item_id != 0
+            && from_slot.amount + to_slot.amount <= MAX_STACK_SIZE;
+
+        if should_merge {
             let total = from_slot.amount + to_slot.amount;
-            if total <= 30000 {
-                self.slots[to_index as usize].amount = total;
-                self.slots[from_index as usize] = StorageSlot::empty(from_index);
-                return true;
-            }
+            self.slots[to_index as usize].amount = total;
+            self.slots[from_index as usize] = StorageSlot::empty(from_index);
+            return true;
         }
+
+        // Perform swap - clone to_slot since we need it for the swap
+        let to_slot = to_slot.clone();
 
         self.slots[to_index as usize] = StorageSlot {
             index: to_index,

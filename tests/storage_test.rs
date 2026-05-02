@@ -49,3 +49,83 @@ fn test_storage_remove_item() {
     let slot = storage.get_slot(0).unwrap();
     assert_eq!(slot.amount, 5);
 }
+
+#[test]
+fn test_storage_move_item() {
+    let mut storage = Storage::new(100);
+    storage.add_item(501, 10);
+
+    // Move from slot 0 to slot 10
+    assert!(storage.move_item(0, 10));
+
+    let slot0 = storage.get_slot(0).unwrap();
+    assert!(slot0.is_empty());
+
+    let slot10 = storage.get_slot(10).unwrap();
+    assert_eq!(slot10.item_id, 501);
+    assert_eq!(slot10.amount, 10);
+}
+
+#[test]
+fn test_storage_move_item_merge() {
+    let mut storage = Storage::new(100);
+
+    // Manually set up two slots with the same item for testing merge
+    {
+        let slot0 = storage.get_slot_mut(0).unwrap();
+        slot0.item_id = 501;
+        slot0.amount = 10;
+        slot0.identified = true;
+    }
+    {
+        let slot5 = storage.get_slot_mut(5).unwrap();
+        slot5.item_id = 501;
+        slot5.amount = 20;
+        slot5.identified = true;
+    }
+
+    // Move from slot 5 to slot 0 - should merge
+    assert!(storage.move_item(5, 0));
+
+    let slot0 = storage.get_slot(0).unwrap();
+    let slot5 = storage.get_slot(5).unwrap();
+    assert_eq!(slot0.amount, 30);
+    assert!(slot5.is_empty());
+}
+
+#[test]
+fn test_storage_add_to_full() {
+    let mut storage = Storage::new(2);
+    assert!(storage.add_item(501, 10));
+    assert!(storage.add_item(502, 10));
+    assert!(!storage.add_item(503, 10)); // Should fail - full
+}
+
+#[test]
+fn test_storage_stack_limit() {
+    let mut storage = Storage::new(100);
+    assert!(storage.add_item(501, 30000));
+    assert!(storage.add_item(501, 1)); // Should create new stack
+    assert_eq!(storage.used_count(), 2);
+}
+
+#[test]
+fn test_storage_remove_more_than_available() {
+    let mut storage = Storage::new(100);
+    assert!(storage.add_item(501, 10));
+    assert!(!storage.remove_item(0, 20)); // Cannot remove more than available
+
+    let slot = storage.get_slot(0).unwrap();
+    assert_eq!(slot.amount, 10); // Amount unchanged
+}
+
+#[test]
+fn test_storage_remove_all() {
+    let mut storage = Storage::new(100);
+    assert!(storage.add_item(501, 10));
+    assert!(storage.remove_item(0, 10)); // Remove all
+
+    let slot = storage.get_slot(0).unwrap();
+    assert!(slot.is_empty());
+    assert_eq!(slot.item_id, 0);
+}
