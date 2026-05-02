@@ -77,4 +77,14 @@ pub mod id {
     pub const PACKET_CZ_REQUEST_MOVE: PacketId = 0x0085;
     pub const PACKET_ZC_MOVE: PacketId = 0x0086;
     pub const PACKET_CZ_USE_SKILL: PacketId = 0x0112;
+
+    // 仓库相关
+    pub const CZ_REQ_STORAGE_OPEN: PacketId = 0x0213;
+    pub const CZ_REQ_STORAGE_CLOSE: PacketId = 0x0214;
+    pub const CZ_REQ_STORAGE_MOVE_ITEM: PacketId = 0x0215;
+    pub const ZC_STORAGE_OPEN: PacketId = 0x01F3;
+    pub const ZC_STORAGE_CLOSE: PacketId = 0x01F4;
+    pub const ZC_STORAGE_ITEMS: PacketId = 0x01F5;
+    pub const ZC_STORAGE_ITEM_ADD: PacketId = 0x01F6;
+    pub const ZC_STORAGE_ITEM_REMOVE: PacketId = 0x01F7;
 }
