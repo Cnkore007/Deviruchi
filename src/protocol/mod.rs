@@ -6,5 +6,6 @@ pub mod char_packets;
 pub mod map_packets;
 pub mod party_packets;
 pub mod storage_packets;
+pub mod trade_packets;
 
 pub use packet_builder::{PacketBuilder, Packed, parse_string, parse_fixed_string};

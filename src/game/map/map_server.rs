@@ -8,6 +8,7 @@ use crate::game::map::MapState;
 use crate::game::map::channel::{ChannelBus, GameEvent, ChatType};
 use crate::game::map::drop_item::DropManager;
 use crate::game::party::PartyManager;
+use crate::game::trade::TradeManager;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZUseItem, CZRequestPickupItem, CZContactNpc};
 use crate::protocol::party_packets::{CZMakeParty, CZReqPartyInvite, CZReqPartyJoin, CZPartyChat, CZChatMessage};
@@ -24,6 +25,7 @@ pub struct MapServer {
     pub drop_manager: Arc<DropManager>,
     pub party_manager: Arc<PartyManager>,
     pub storage_manager: Arc<StorageManager>,
+    pub trade_manager: Arc<TradeManager>,
     pub death_drop_items: bool,
 }
 
@@ -36,6 +38,7 @@ impl MapServer {
         drop_manager: Arc<DropManager>,
         party_manager: Arc<PartyManager>,
         storage_manager: Arc<StorageManager>,
+        trade_manager: Arc<TradeManager>,
         death_drop_items: bool,
     ) -> Self {
         Self {
@@ -46,6 +49,7 @@ impl MapServer {
             drop_manager,
             party_manager,
             storage_manager,
+            trade_manager,
             death_drop_items,
         }
     }
@@ -69,6 +73,11 @@ impl MapServer {
             CZ_REQ_STORAGE_OPEN => self.handle_storage_open(session),
             CZ_REQ_STORAGE_CLOSE => self.handle_storage_close(session),
             CZ_REQ_STORAGE_MOVE_ITEM => self.handle_storage_move_item(data, session),
+            CZ_TRADE_REQUEST => self.handle_trade_request(data, session),
+            CZ_TRADE_ACK => self.handle_trade_ack(data, session),
+            CZ_TRADE_ADD_ITEM => self.handle_trade_add_item(data, session),
+            CZ_TRADE_ADD_ZENY => self.handle_trade_add_zeny(data, session),
+            CZ_TRADE_LOCK => self.handle_trade_lock(session),
             _ => None,
         }
     }
@@ -398,6 +407,87 @@ impl MapServer {
 
         None
     }
+
+    /// Handle trade request (0x00E4)
+    fn handle_trade_request(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::CZTradeRequest;
+        use crate::protocol::trade_packets::ZCTradeRequest;
+
+        let player_id = session.player_id?;
+        let pkt = CZTradeRequest::from_packet(data)?;
+
+        // Get requester info
+        let player = self.map_state.get_player(&player_id)?;
+        let requester_name = player.name.clone();
+
+        // Create trade request notification for target
+        let notify = ZCTradeRequest {
+            requester_id: pkt.target_account_id,
+            requester_name,
+        }.to_packet();
+
+        Some(notify)
+    }
+
+    /// Handle trade acknowledge (accept/reject) (0x00E6)
+    fn handle_trade_ack(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::{CZTradeAck, ZCTradeAck};
+
+        let _player_id = session.player_id?;
+        let pkt = CZTradeAck::from_packet(data)?;
+
+        // Send acknowledgement response
+        let response = ZCTradeAck {
+            accept: pkt.accept,
+        }.to_packet();
+
+        Some(response)
+    }
+
+    /// Handle trade add item (0x00B0)
+    fn handle_trade_add_item(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::{CZTradeAddItem, ZCTradeAddItem};
+
+        let _player_id = session.player_id?;
+        let pkt = CZTradeAddItem::from_packet(data)?;
+
+        // Notify partner about added item
+        let notify = ZCTradeAddItem {
+            amount: pkt.amount,
+            item_id: 0, // Would be resolved from inventory
+            identified: true,
+            damaged: false,
+            refine: 0,
+            cards: [0; 4],
+        }.to_packet();
+
+        Some(notify)
+    }
+
+    /// Handle trade add zeny (0x00B1)
+    fn handle_trade_add_zeny(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::{CZTradeAddZeny, ZCTradeAddZeny};
+
+        let _player_id = session.player_id?;
+        let pkt = CZTradeAddZeny::from_packet(data)?;
+
+        // Notify partner about added zeny
+        let notify = ZCTradeAddZeny {
+            amount: pkt.amount,
+        }.to_packet();
+
+        Some(notify)
+    }
+
+    /// Handle trade lock (0x00EF)
+    fn handle_trade_lock(&self, _session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::ZCTradeLock;
+
+        // Notify partner that player has locked
+        let notify = ZCTradeLock.to_packet();
+
+        Some(notify)
+    }
 }
 
 #[cfg(test)]
@@ -406,6 +496,8 @@ mod tests {
 
     #[test]
     fn test_map_server_handles_unknown_packet() {
+        use crate::game::trade::TradeManager;
+
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
         let server = MapServer::new(
             db,
@@ -415,6 +507,7 @@ mod tests {
             Arc::new(DropManager::new()),
             Arc::new(PartyManager::new()),
             Arc::new(StorageManager::new()),
+            Arc::new(TradeManager::new()),
             false,
         );
         let mut session = Session::new();

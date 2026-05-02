@@ -24,4 +24,5 @@ pub use party::PartyManager;
 pub use skill::SkillHandler;
 pub use storage::{Storage, StorageSlot};
 pub use token::TokenStore;
+pub use trade::TradeManager;
 pub use zeny::ZenyManager;
