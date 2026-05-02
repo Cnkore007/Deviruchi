@@ -37,6 +37,7 @@ macro_rules! impl_put {
 impl_put!(u8, put_u8);
 impl_put!(u16, put_u16);
 impl_put!(u32, put_u32);
+impl_put!(i16, put_i16);
 impl_put!(i32, put_i32);
 impl_put!(i64, put_i64);
 
