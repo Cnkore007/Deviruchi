@@ -1,0 +1,380 @@
+//! 地图传送系统 - 透明传送核心数据结构
+//!
+//! 实现边缘触发式地图传送，当玩家走到地图边缘时自动传送到相邻地图
+
+use std::collections::HashMap;
+
+/// 地图边缘类型 - 定义触发传送的边界条件
+#[derive(Debug, Clone, PartialEq)]
+pub enum MapEdge {
+    /// 北边缘 - 当 y <= threshold 时触发传送到北侧邻居
+    North { y_threshold: u16 },
+    /// 南边缘 - 当 y >= threshold 时触发传送到南侧邻居
+    South { y_threshold: u16 },
+    /// 东边缘 - 当 x >= threshold 时触发传送到东侧邻居
+    East { x_threshold: u16 },
+    /// 西边缘 - 当 x <= threshold 时触发传送到西侧邻居
+    West { x_threshold: u16 },
+}
+
+impl MapEdge {
+    /// 检查给定坐标是否触发该边缘的传送
+    pub fn is_triggered(&self, x: u16, y: u16) -> bool {
+        match self {
+            MapEdge::North { y_threshold } => y <= *y_threshold,
+            MapEdge::South { y_threshold } => y >= *y_threshold,
+            MapEdge::East { x_threshold } => x >= *x_threshold,
+            MapEdge::West { x_threshold } => x <= *x_threshold,
+        }
+    }
+}
+
+/// 地图邻接关系 - 定义两个地图之间的连接
+#[derive(Debug, Clone)]
+pub struct MapAdjacency {
+    /// 源地图名称
+    pub from_map: String,
+    /// 触发传送的边缘
+    pub edge: MapEdge,
+    /// 目标地图名称
+    pub to_map: String,
+    /// 进入目标地图时的坐标偏移
+    pub entry_offset: (i16, i16),
+}
+
+/// 传送动作 - 传送检查的结果
+#[derive(Debug, Clone, PartialEq)]
+pub struct TeleportAction {
+    /// 源地图名称
+    pub from_map: String,
+    /// 目标地图名称
+    pub to_map: String,
+    /// 源坐标
+    pub from_pos: (u16, u16),
+    /// 目标坐标（已应用 entry_offset）
+    pub to_pos: (u16, u16),
+}
+
+/// 存储点 - 角色可以保存的位置
+#[derive(Debug, Clone, PartialEq)]
+pub struct SavePoint {
+    /// 地图名称
+    pub map_name: String,
+    /// X坐标
+    pub x: u16,
+    /// Y坐标
+    pub y: u16,
+}
+
+/// 传送管理器 - 管理地图邻接关系和传送逻辑
+#[derive(Debug)]
+pub struct TeleportManager {
+    /// 所有邻接关系列表
+    adjacencies: Vec<MapAdjacency>,
+    /// 从地图名到邻接关系索引的快速查找表
+    adjacency_map: HashMap<String, Vec<usize>>,
+}
+
+impl TeleportManager {
+    /// 创建空的传送管理器
+    pub fn new() -> Self {
+        Self {
+            adjacencies: Vec::new(),
+            adjacency_map: HashMap::new(),
+        }
+    }
+
+    /// 添加地图邻接关系
+    pub fn add_adjacency(&mut self, adj: MapAdjacency) {
+        let index = self.adjacencies.len();
+        self.adjacencies.push(adj);
+
+        // 更新快速查找表
+        let from_map = &self.adjacencies[index].from_map;
+        self.adjacency_map
+            .entry(from_map.clone())
+            .or_default()
+            .push(index);
+    }
+
+    /// 检查指定位置是否触发传送
+    ///
+    /// 如果触发传送，返回 Some(TeleportAction)，否则返回 None
+    pub fn check_warp_trigger(&self, map_name: &str, x: u16, y: u16) -> Option<TeleportAction> {
+        let indices = self.adjacency_map.get(map_name)?;
+
+        for &index in indices {
+            let adj = &self.adjacencies[index];
+            if adj.edge.is_triggered(x, y) {
+                // 计算目标坐标（应用偏移）
+                let to_x = x as i16 + adj.entry_offset.0;
+                let to_y = y as i16 + adj.entry_offset.1;
+
+                // 确保坐标非负
+                let to_x = to_x.max(0) as u16;
+                let to_y = to_y.max(0) as u16;
+
+                return Some(TeleportAction {
+                    from_map: map_name.to_string(),
+                    to_map: adj.to_map.clone(),
+                    from_pos: (x, y),
+                    to_pos: (to_x, to_y),
+                });
+            }
+        }
+
+        None
+    }
+
+    /// 获取默认的邻接关系配置
+    ///
+    /// new_1-1.gat <-> prontera.gat 的标准连接
+    pub fn get_default_adjacencies() -> Vec<MapAdjacency> {
+        vec![
+            // new_1-1 的北边缘 -> prontera 的南边缘 (y=299)
+            MapAdjacency {
+                from_map: "new_1-1.gat".to_string(),
+                edge: MapEdge::North { y_threshold: 0 },
+                to_map: "prontera.gat".to_string(),
+                entry_offset: (0, 299), // prontera 高度约300，从南边缘进入
+            },
+            // new_1-1 的南边缘 -> prontera 的北边缘 (y=0)
+            MapAdjacency {
+                from_map: "new_1-1.gat".to_string(),
+                edge: MapEdge::South { y_threshold: 199 }, // new_1-1 高度约200
+                to_map: "prontera.gat".to_string(),
+                entry_offset: (0, -199), // 进入 prontera 的北边缘
+            },
+            // prontera 的南边缘 -> new_1-1 的北边缘
+            MapAdjacency {
+                from_map: "prontera.gat".to_string(),
+                edge: MapEdge::South { y_threshold: 299 },
+                to_map: "new_1-1.gat".to_string(),
+                entry_offset: (0, -299), // 进入 new_1-1 的北边缘
+            },
+            // prontera 的北边缘 -> new_1-1 的南边缘
+            MapAdjacency {
+                from_map: "prontera.gat".to_string(),
+                edge: MapEdge::North { y_threshold: 0 },
+                to_map: "new_1-1.gat".to_string(),
+                entry_offset: (0, 199), // 进入 new_1-1 的南边缘
+            },
+        ]
+    }
+}
+
+impl Default for TeleportManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_edge_trigger_north() {
+        let edge = MapEdge::North { y_threshold: 5 };
+        assert!(edge.is_triggered(10, 0)); // y=0 <= 5
+        assert!(edge.is_triggered(10, 5)); // y=5 <= 5
+        assert!(!edge.is_triggered(10, 6)); // y=6 > 5
+        assert!(!edge.is_triggered(10, 100)); // y=100 > 5
+    }
+
+    #[test]
+    fn test_map_edge_trigger_south() {
+        let edge = MapEdge::South { y_threshold: 195 };
+        assert!(!edge.is_triggered(10, 0)); // y=0 < 195
+        assert!(edge.is_triggered(10, 195)); // y=195 >= 195
+        assert!(edge.is_triggered(10, 199)); // y=199 >= 195
+    }
+
+    #[test]
+    fn test_map_edge_trigger_east() {
+        let edge = MapEdge::East { x_threshold: 250 };
+        assert!(!edge.is_triggered(100, 10)); // x=100 < 250
+        assert!(edge.is_triggered(250, 10)); // x=250 >= 250
+        assert!(edge.is_triggered(300, 10)); // x=300 >= 250
+    }
+
+    #[test]
+    fn test_map_edge_trigger_west() {
+        let edge = MapEdge::West { x_threshold: 5 };
+        assert!(edge.is_triggered(0, 10)); // x=0 <= 5
+        assert!(edge.is_triggered(5, 10)); // x=5 <= 5
+        assert!(!edge.is_triggered(6, 10)); // x=6 > 5
+    }
+
+    #[test]
+    fn test_teleport_manager_new() {
+        let manager = TeleportManager::new();
+        assert!(manager.adjacencies.is_empty());
+        assert!(manager.adjacency_map.is_empty());
+    }
+
+    #[test]
+    fn test_add_adjacency() {
+        let mut manager = TeleportManager::new();
+        let adj = MapAdjacency {
+            from_map: "test_map.gat".to_string(),
+            edge: MapEdge::North { y_threshold: 0 },
+            to_map: "other_map.gat".to_string(),
+            entry_offset: (0, 100),
+        };
+        manager.add_adjacency(adj);
+
+        assert_eq!(manager.adjacencies.len(), 1);
+        assert!(manager.adjacency_map.contains_key("test_map.gat"));
+    }
+
+    #[test]
+    fn test_check_warp_trigger_north() {
+        let mut manager = TeleportManager::new();
+        let adj = MapAdjacency {
+            from_map: "new_1-1.gat".to_string(),
+            edge: MapEdge::North { y_threshold: 0 },
+            to_map: "prontera.gat".to_string(),
+            entry_offset: (0, 299),
+        };
+        manager.add_adjacency(adj);
+
+        // 触发传送 - y=0 在北边缘
+        let result = manager.check_warp_trigger("new_1-1.gat", 50, 0);
+        assert!(result.is_some());
+
+        let action = result.unwrap();
+        assert_eq!(action.from_map, "new_1-1.gat");
+        assert_eq!(action.to_map, "prontera.gat");
+        assert_eq!(action.from_pos, (50, 0));
+        assert_eq!(action.to_pos, (50, 299));
+    }
+
+    #[test]
+    fn test_check_warp_trigger_no_trigger() {
+        let mut manager = TeleportManager::new();
+        let adj = MapAdjacency {
+            from_map: "new_1-1.gat".to_string(),
+            edge: MapEdge::North { y_threshold: 0 },
+            to_map: "prontera.gat".to_string(),
+            entry_offset: (0, 299),
+        };
+        manager.add_adjacency(adj);
+
+        // 不触发传送 - y=50 不在北边缘
+        let result = manager.check_warp_trigger("new_1-1.gat", 50, 50);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_warp_trigger_unknown_map() {
+        let manager = TeleportManager::new();
+        let result = manager.check_warp_trigger("unknown.gat", 50, 50);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_warp_trigger_south() {
+        let mut manager = TeleportManager::new();
+        let adj = MapAdjacency {
+            from_map: "new_1-1.gat".to_string(),
+            edge: MapEdge::South { y_threshold: 199 },
+            to_map: "prontera.gat".to_string(),
+            entry_offset: (0, -199),
+        };
+        manager.add_adjacency(adj);
+
+        // 触发传送 - y=199 在南边缘
+        let result = manager.check_warp_trigger("new_1-1.gat", 50, 199);
+        assert!(result.is_some());
+
+        let action = result.unwrap();
+        assert_eq!(action.to_pos, (50, 0)); // 199 + (-199) = 0
+    }
+
+    #[test]
+    fn test_check_warp_trigger_with_negative_offset() {
+        let mut manager = TeleportManager::new();
+        let adj = MapAdjacency {
+            from_map: "test.gat".to_string(),
+            edge: MapEdge::West { x_threshold: 0 },
+            to_map: "other.gat".to_string(),
+            entry_offset: (-100, 0),
+        };
+        manager.add_adjacency(adj);
+
+        let result = manager.check_warp_trigger("test.gat", 0, 50);
+        assert!(result.is_some());
+
+        let action = result.unwrap();
+        // x=0 + (-100) = -100，但会被 clamp 到 0
+        assert_eq!(action.to_pos, (0, 50));
+    }
+
+    #[test]
+    fn test_default_adjacencies() {
+        let defaults = TeleportManager::get_default_adjacencies();
+        assert_eq!(defaults.len(), 4);
+
+        // 验证 new_1-1.gat -> prontera.gat 的北边缘
+        let north = defaults
+            .iter()
+            .find(|a| a.from_map == "new_1-1.gat" && matches!(a.edge, MapEdge::North { .. }));
+        assert!(north.is_some());
+        let north = north.unwrap();
+        assert_eq!(north.to_map, "prontera.gat");
+        assert_eq!(north.entry_offset, (0, 299));
+
+        // 验证 new_1-1.gat -> prontera.gat 的南边缘
+        let south = defaults
+            .iter()
+            .find(|a| a.from_map == "new_1-1.gat" && matches!(a.edge, MapEdge::South { .. }));
+        assert!(south.is_some());
+        let south = south.unwrap();
+        assert_eq!(south.to_map, "prontera.gat");
+        assert_eq!(south.entry_offset, (0, -199));
+
+        // 验证 prontera.gat -> new_1-1.gat 的南边缘
+        let prontera_south = defaults
+            .iter()
+            .find(|a| a.from_map == "prontera.gat" && matches!(a.edge, MapEdge::South { .. }));
+        assert!(prontera_south.is_some());
+        assert_eq!(prontera_south.unwrap().to_map, "new_1-1.gat");
+
+        // 验证 prontera.gat -> new_1-1.gat 的北边缘
+        let prontera_north = defaults
+            .iter()
+            .find(|a| a.from_map == "prontera.gat" && matches!(a.edge, MapEdge::North { .. }));
+        assert!(prontera_north.is_some());
+        assert_eq!(prontera_north.unwrap().to_map, "new_1-1.gat");
+    }
+
+    #[test]
+    fn test_save_point_creation() {
+        let save_point = SavePoint {
+            map_name: "prontera.gat".to_string(),
+            x: 150,
+            y: 180,
+        };
+        assert_eq!(save_point.map_name, "prontera.gat");
+        assert_eq!(save_point.x, 150);
+        assert_eq!(save_point.y, 180);
+    }
+
+    #[test]
+    fn test_teleport_action_equality() {
+        let action1 = TeleportAction {
+            from_map: "a.gat".to_string(),
+            to_map: "b.gat".to_string(),
+            from_pos: (10, 20),
+            to_pos: (30, 40),
+        };
+        let action2 = TeleportAction {
+            from_map: "a.gat".to_string(),
+            to_map: "b.gat".to_string(),
+            from_pos: (10, 20),
+            to_pos: (30, 40),
+        };
+        assert_eq!(action1, action2);
+    }
+}
