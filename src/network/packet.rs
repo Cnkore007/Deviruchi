@@ -87,4 +87,18 @@ pub mod id {
     pub const ZC_STORAGE_ITEMS: PacketId = 0x01F5;
     pub const ZC_STORAGE_ITEM_ADD: PacketId = 0x01F6;
     pub const ZC_STORAGE_ITEM_REMOVE: PacketId = 0x01F7;
+
+    // 交易相关
+    pub const CZ_TRADE_REQUEST: PacketId = 0x00E4;
+    pub const CZ_TRADE_ACK: PacketId = 0x00E6;
+    pub const CZ_TRADE_ADD_ITEM: PacketId = 0x00B0;
+    pub const CZ_TRADE_ADD_ZENY: PacketId = 0x00B1;
+    pub const CZ_TRADE_LOCK: PacketId = 0x00EF;
+    pub const ZC_TRADE_REQUEST: PacketId = 0x00E5;
+    pub const ZC_TRADE_ACK: PacketId = 0x00E7;
+    pub const ZC_TRADE_ADD_ITEM: PacketId = 0x00E8;
+    pub const ZC_TRADE_ADD_ZENY: PacketId = 0x00E9;
+    pub const ZC_TRADE_LOCK: PacketId = 0x00EC;
+    pub const ZC_TRADE_COMMIT: PacketId = 0x00F0;
+    pub const ZC_TRADE_CANCEL: PacketId = 0x00F1;
 }
