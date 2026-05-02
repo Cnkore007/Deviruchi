@@ -23,6 +23,7 @@ pub struct Player {
     pub dex: RwLock<u16>,
     pub luk: RwLock<u16>,
     pub walk_speed: RwLock<u16>,
+    pub zeny: RwLock<u32>,
 }
 
 impl Clone for Player {
@@ -48,6 +49,7 @@ impl Clone for Player {
             dex: RwLock::new(*self.dex.read()),
             luk: RwLock::new(*self.luk.read()),
             walk_speed: RwLock::new(*self.walk_speed.read()),
+            zeny: RwLock::new(*self.zeny.read()),
         }
     }
 }
@@ -76,6 +78,7 @@ impl Player {
             dex: RwLock::new(char.dex),
             luk: RwLock::new(char.luk),
             walk_speed: RwLock::new(150),
+            zeny: RwLock::new(0),
         }
     }
 
@@ -88,5 +91,17 @@ impl Player {
     /// 获取当前位置
     pub fn get_position(&self) -> (u16, u16) {
         (*self.pos_x.read(), *self.pos_y.read())
+    }
+
+    /// 受到伤害，返回是否死亡
+    pub fn take_damage(&self, damage: u32) -> bool {
+        let current_hp = *self.hp.read();
+        if current_hp <= damage {
+            *self.hp.write() = 0;
+            true
+        } else {
+            *self.hp.write() = current_hp - damage;
+            false
+        }
     }
 }
