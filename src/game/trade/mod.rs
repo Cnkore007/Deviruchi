@@ -1,3 +1,5 @@
+pub mod data;
+
 use std::collections::HashMap;
 use uuid::Uuid;
 use parking_lot::RwLock;
