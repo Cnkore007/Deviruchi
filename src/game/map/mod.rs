@@ -16,4 +16,4 @@ pub use drop_item::{DropItem, DropManager};
 pub use map_server::MapServer;
 pub use player::Player;
 pub use map_state::MapState;
-pub use teleport::{TeleportManager, MapAdjacency, MapEdge, TeleportAction, SavePoint};
+pub use teleport::{TeleportManager, MapAdjacency, MapEdge, TeleportAction, SavePoint, WarpService, WarpError};

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use parking_lot::RwLock;
 use tracing::warn;
 use crate::storage::Database;
 use crate::network::{Session, SessionManager, PacketId};
@@ -8,6 +9,7 @@ use crate::game::map::{MapState, ChannelBus, DropManager, MapServer};
 use crate::game::party::PartyManager;
 use crate::game::storage::StorageManager;
 use crate::game::trade::TradeManager;
+use crate::game::map::teleport::{TeleportManager, WarpService};
 
 pub struct PacketHandler {
     login_server: Arc<crate::game::login::LoginServer>,
@@ -28,6 +30,10 @@ impl PacketHandler {
         let storage_manager = Arc::new(StorageManager::new());
         let trade_manager = Arc::new(TradeManager::new());
 
+        // Create teleport manager and warp service
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let warp_service = Arc::new(WarpService::new(teleport_manager.clone(), db.clone()));
+
         let map_server = Arc::new(MapServer::new(
             db.clone(),
             token_store.clone(),
@@ -37,6 +43,8 @@ impl PacketHandler {
             party_manager,
             storage_manager,
             trade_manager,
+            teleport_manager,
+            warp_service,
             false, // death_drop_items
         ));
 

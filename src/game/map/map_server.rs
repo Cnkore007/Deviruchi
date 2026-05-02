@@ -1,6 +1,7 @@
 //! MapServer - 地图服务器核心，处理客户端数据包
 
 use std::sync::Arc;
+use parking_lot::RwLock;
 use uuid::Uuid;
 use crate::network::session::Session;
 use crate::game::token::TokenStore;
@@ -9,6 +10,7 @@ use crate::game::map::channel::{ChannelBus, GameEvent, ChatType};
 use crate::game::map::drop_item::DropManager;
 use crate::game::party::PartyManager;
 use crate::game::trade::TradeManager;
+use crate::game::map::teleport::{TeleportManager, WarpService, TeleportAction};
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZUseItem, CZRequestPickupItem, CZContactNpc};
 use crate::protocol::party_packets::{CZMakeParty, CZReqPartyInvite, CZReqPartyJoin, CZPartyChat, CZChatMessage};
@@ -26,6 +28,8 @@ pub struct MapServer {
     pub party_manager: Arc<PartyManager>,
     pub storage_manager: Arc<StorageManager>,
     pub trade_manager: Arc<TradeManager>,
+    pub teleport_manager: Arc<RwLock<TeleportManager>>,
+    pub warp_service: Arc<WarpService>,
     pub death_drop_items: bool,
 }
 
@@ -39,6 +43,8 @@ impl MapServer {
         party_manager: Arc<PartyManager>,
         storage_manager: Arc<StorageManager>,
         trade_manager: Arc<TradeManager>,
+        teleport_manager: Arc<RwLock<TeleportManager>>,
+        warp_service: Arc<WarpService>,
         death_drop_items: bool,
     ) -> Self {
         Self {
@@ -50,6 +56,8 @@ impl MapServer {
             party_manager,
             storage_manager,
             trade_manager,
+            teleport_manager,
+            warp_service,
             death_drop_items,
         }
     }
@@ -139,6 +147,17 @@ impl MapServer {
         // Update channel position
         let channel_name = format!("map:{}", player.map_name);
         self.channel_bus.update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
+
+        // Check for warp trigger
+        if let Some(warp_action) = self.warp_service.handle_move_with_warp_on_map(
+            session,
+            &player.map_name,
+            move_pkt.pos_x,
+            move_pkt.pos_y,
+        ) {
+            // Execute the warp
+            let _ = self.warp_service.execute_warp(session, warp_action);
+        }
 
         None
     }
@@ -497,8 +516,12 @@ mod tests {
     #[test]
     fn test_map_server_handles_unknown_packet() {
         use crate::game::trade::TradeManager;
+        use crate::game::map::teleport::{TeleportManager, WarpService};
 
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let warp_service = Arc::new(WarpService::new(teleport_manager.clone(), db.clone()));
+
         let server = MapServer::new(
             db,
             Arc::new(TokenStore::new()),
@@ -508,6 +531,8 @@ mod tests {
             Arc::new(PartyManager::new()),
             Arc::new(StorageManager::new()),
             Arc::new(TradeManager::new()),
+            teleport_manager,
+            warp_service,
             false,
         );
         let mut session = Session::new();
