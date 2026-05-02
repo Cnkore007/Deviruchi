@@ -8,7 +8,10 @@ pub mod mob;
 pub mod npc;
 pub mod party;
 pub mod skill;
+pub mod storage;
 pub mod token;
+pub mod trade;
+pub mod zeny;
 
 pub use battle::BattleHandler;
 pub use char::CharServer;
@@ -19,4 +22,6 @@ pub use mob::{MobSpawnManager, MobAI};
 pub use npc::NpcHandler;
 pub use party::PartyManager;
 pub use skill::SkillHandler;
+pub use storage::{Storage, StorageSlot};
 pub use token::TokenStore;
+pub use zeny::ZenyManager;

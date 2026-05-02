@@ -1,31 +1,51 @@
-use deviruchi::storage::{Database, init_schema};
+use deviruchi::game::storage::{Storage, StorageSlot};
 
 #[test]
-fn test_create_and_get_account() {
-    let db = Database::open_memory().unwrap();
-    init_schema(&db).unwrap();
-
-    let account_id = db.create_account("testuser", "hash123", 0).unwrap();
-    assert!(account_id > 0);
-
-    let account = db.get_account_by_userid("testuser").unwrap().unwrap();
-    assert_eq!(account.user_id, "testuser");
-    assert_eq!(account.sex, 0);
+fn test_storage_slot_empty() {
+    let slot = StorageSlot::empty(0);
+    assert!(slot.is_empty());
+    assert_eq!(slot.index, 0);
 }
 
 #[test]
-fn test_create_and_get_character() {
-    let db = Database::open_memory().unwrap();
-    init_schema(&db).unwrap();
+fn test_storage_slot_with_item() {
+    let slot = StorageSlot {
+        index: 0,
+        item_id: 501,
+        amount: 10,
+        identified: true,
+        refine: 0,
+        cards: [0; 4],
+    };
+    assert!(!slot.is_empty());
+    assert_eq!(slot.item_id, 501);
+    assert_eq!(slot.amount, 10);
+}
 
-    let account_id = db.create_account("testuser", "hash123", 0).unwrap();
+#[test]
+fn test_storage_new() {
+    let storage = Storage::new(100);
+    assert_eq!(storage.len(), 100);
+    assert!(storage.get_slot(0).is_some());
+    assert!(storage.get_slot(0).unwrap().is_empty());
+}
 
-    let char_id = db.create_character(
-        account_id, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0
-    ).unwrap();
-    assert!(char_id > 0);
+#[test]
+fn test_storage_add_item() {
+    let mut storage = Storage::new(100);
+    assert!(storage.add_item(501, 10));
 
-    let characters = db.get_characters_by_account(account_id).unwrap();
-    assert_eq!(characters.len(), 1);
-    assert_eq!(characters[0].name, "TestChar");
+    let slot = storage.find_item_slot(501).unwrap();
+    assert_eq!(slot.item_id, 501);
+    assert_eq!(slot.amount, 10);
+}
+
+#[test]
+fn test_storage_remove_item() {
+    let mut storage = Storage::new(100);
+    assert!(storage.add_item(501, 10));
+    assert!(storage.remove_item(0, 5));
+
+    let slot = storage.get_slot(0).unwrap();
+    assert_eq!(slot.amount, 5);
 }
