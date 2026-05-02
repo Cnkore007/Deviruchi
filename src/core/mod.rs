@@ -1,5 +1,14 @@
 //! 核心游戏逻辑模块
 
+pub mod config;
+pub mod logging;
+pub mod panic;
+pub mod timer;
+pub mod version;
+
+pub use config::Config;
+pub use version::{VERSION, NAME};
+
 use crate::cli::Cli;
 
 /// 游戏服务器核心

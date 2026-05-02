@@ -1,0 +1,17 @@
+[server]
+name = "Deviruchi"
+mode = "all"
+standalone = true
+
+[database]
+path = "deviruchi.db"
+
+[network]
+login_port = 6900
+char_port = 6000
+map_port = 6121
+max_connections = 10000
+
+[game]
+max_players = 5000
+timeout_seconds = 300
