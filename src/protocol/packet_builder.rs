@@ -39,9 +39,24 @@ impl_put!(u16, put_u16);
 impl_put!(u32, put_u32);
 impl_put!(i32, put_i32);
 impl_put!(i64, put_i64);
-impl_put!(&str, put_str);
 
 impl PacketBuilderCtx {
+    pub fn put_str(mut self, s: &str) -> Self {
+        self.data.put_slice(s.as_bytes());
+        self
+    }
+
+    pub fn put_fixed_str(mut self, s: &str, len: usize) -> Self {
+        let bytes = s.as_bytes();
+        let write_len = bytes.len().min(len - 1);
+        self.data.put_slice(&bytes[..write_len]);
+        // Pad with null bytes
+        for _ in write_len..len {
+            self.data.put_u8(0);
+        }
+        self
+    }
+
     pub fn put_slice(mut self, slice: &[u8]) -> Self {
         self.data.put_slice(slice);
         self
