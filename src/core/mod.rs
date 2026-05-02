@@ -8,6 +8,7 @@ pub mod version;
 
 pub use config::Config;
 pub use version::{VERSION, NAME};
+pub use panic::PanicHandler;
 
 use crate::cli::Cli;
 
