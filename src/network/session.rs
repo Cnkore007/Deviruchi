@@ -3,6 +3,13 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum SessionStage {
+    Login,
+    Char,
+    Map,
+}
+
 #[derive(Clone)]
 pub struct Session {
     pub id: Uuid,
@@ -11,6 +18,8 @@ pub struct Session {
     pub authenticated: bool,
     pub version: u32,
     pub client_type: u8,
+    pub stage: SessionStage,
+    pub player_id: Option<Uuid>,
 }
 
 impl Session {
@@ -22,6 +31,8 @@ impl Session {
             authenticated: false,
             version: 0,
             client_type: 0,
+            stage: SessionStage::Login,
+            player_id: None,
         }
     }
 
@@ -71,5 +82,31 @@ impl SessionManager {
 impl Default for SessionManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_session_starts_at_login_stage() {
+        let session = Session::new();
+        assert_eq!(session.stage, SessionStage::Login);
+    }
+
+    #[test]
+    fn player_id_is_none_by_default() {
+        let session = Session::new();
+        assert!(session.player_id.is_none());
+    }
+
+    #[test]
+    fn session_stage_can_be_set_to_char_and_map() {
+        let mut session = Session::new();
+        session.stage = SessionStage::Char;
+        assert_eq!(session.stage, SessionStage::Char);
+        session.stage = SessionStage::Map;
+        assert_eq!(session.stage, SessionStage::Map);
     }
 }
