@@ -29,7 +29,8 @@ pub struct Item {
     pub id: u16,
     pub name: &'static str,
     pub type_: ItemType,
-    pub price: u32,
+    pub buy_price: u32,
+    pub sell_price: u32,
     pub weight: u16,
     pub flags: u32,
     pub hp_restore: u16,      // HP恢复量
@@ -59,7 +60,8 @@ impl Item {
             id,
             name: "Unknown",
             type_: ItemType::Etc,
-            price: 0,
+            buy_price: 0,
+            sell_price: 0,
             weight: 0,
             flags: 0,
             hp_restore: 0,
@@ -93,7 +95,12 @@ impl ItemDatabase {
         let mut db = Self {
             items: std::collections::HashMap::new(),
         };
-        db.init_default_items();
+        // 尝试从YAML加载，失败则使用默认物品
+        if let Ok(yaml_items) = super::yaml_loader::ItemDbLoader::load_from_yaml("db/item_db.yml") {
+            db.items = yaml_items;
+        } else {
+            db.init_default_items();
+        }
         db
     }
 
@@ -103,7 +110,8 @@ impl ItemDatabase {
             id: 501,
             name: "Red Potion",
             type_: ItemType::Heal,
-            price: 50,
+            buy_price: 50,
+            sell_price: 25,
             weight: 7,
             flags: 0,
             hp_restore: 120,
@@ -117,7 +125,8 @@ impl ItemDatabase {
             id: 502,
             name: "Yellow Potion",
             type_: ItemType::Heal,
-            price: 40,
+            buy_price: 40,
+            sell_price: 20,
             weight: 5,
             flags: 0,
             hp_restore: 60,
@@ -131,7 +140,8 @@ impl ItemDatabase {
             id: 503,
             name: "Blue Potion",
             type_: ItemType::Heal,
-            price: 50,
+            buy_price: 50,
+            sell_price: 25,
             weight: 7,
             flags: 0,
             hp_restore: 0,
@@ -145,7 +155,8 @@ impl ItemDatabase {
             id: 1201,
             name: "Dagger",
             type_: ItemType::Weapon,
-            price: 1000,
+            buy_price: 1000,
+            sell_price: 500,
             weight: 50,
             flags: 0,
             hp_restore: 0,
@@ -160,7 +171,8 @@ impl ItemDatabase {
             id: 1202,
             name: "Main Gauche",
             type_: ItemType::Weapon,
-            price: 2500,
+            buy_price: 2500,
+            sell_price: 1250,
             weight: 60,
             flags: 0,
             hp_restore: 0,
@@ -175,12 +187,13 @@ impl ItemDatabase {
             id: 1501,
             name: "Clothes",
             type_: ItemType::Armor,
-            price: 500,
+            buy_price: 500,
+            sell_price: 250,
             weight: 40,
             flags: 0,
             hp_restore: 0,
             sp_restore: 0,
-            equip_mask: 0x0010,  // 身体
+            equip_mask: 0x0008,  // 身体
             defense: 2,
             ..Default::default()
         });

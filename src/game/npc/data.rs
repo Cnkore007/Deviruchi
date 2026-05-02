@@ -77,8 +77,8 @@ impl Npc {
         npc
     }
 
-    pub fn add_shop_item(&self, item_id: u16, price: u32) {
-        self.shop_items.write().push(ShopItem { item_id, price });
+    pub fn add_shop_item(&self, item_id: u16, buy_price: u32, sell_price: u32) {
+        self.shop_items.write().push(ShopItem { item_id, buy_price, sell_price });
     }
 
     pub fn add_skill(&self, skill_id: u16, sp_cost: u16, price: u32) {
@@ -90,7 +90,8 @@ impl Npc {
 #[derive(Debug, Clone, Copy)]
 pub struct ShopItem {
     pub item_id: u16,
-    pub price: u32,
+    pub buy_price: u32,   // NPC卖给玩家的价格
+    pub sell_price: u32,  // NPC收购价格
 }
 
 /// NPC技能
@@ -118,9 +119,9 @@ impl NpcDatabase {
         let mut npc = Npc::shop(1, "Poring Merchant", 50, 100, "new_1-1.gat");
         npc.display_name = "波利商人".to_string();
         npc.sprite_id = 124;
-        npc.add_shop_item(501, 50);   // Red Potion
-        npc.add_shop_item(502, 40);   // Yellow Potion
-        npc.add_shop_item(503, 50);   // Blue Potion
+        npc.add_shop_item(501, 50, 25);   // Red Potion
+        npc.add_shop_item(502, 40, 20);   // Yellow Potion
+        npc.add_shop_item(503, 50, 25);   // Blue Potion
         npc
     }
 

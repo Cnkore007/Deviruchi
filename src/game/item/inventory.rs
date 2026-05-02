@@ -34,6 +34,7 @@ pub struct Inventory {
     max_size: u8,
     slots: Vec<InventorySlot>,
     item_db: Arc<ItemDatabase>,
+    total_weight: u32,
 }
 
 impl Inventory {
@@ -46,15 +47,21 @@ impl Inventory {
             max_size,
             slots,
             item_db,
+            total_weight: 0,
         }
     }
 
     /// 添加物品
     pub fn add_item(&mut self, item_id: u16, amount: u16) -> bool {
+        if amount == 0 || amount > 300 {
+            return false;
+        }
+
         // 先找相同物品的空位
         for slot in &mut self.slots {
             if slot.item_id == item_id && slot.amount + amount <= 300 {
                 slot.amount += amount;
+                self.update_weight();
                 return true;
             }
         }
@@ -65,6 +72,7 @@ impl Inventory {
                 slot.item_id = item_id;
                 slot.amount = amount;
                 slot.identified = true;
+                self.update_weight();
                 return true;
             }
         }
@@ -84,6 +92,7 @@ impl Inventory {
             if slot.amount == 0 {
                 slot.item_id = 0;
             }
+            self.update_weight();
             return true;
         }
 
@@ -91,7 +100,7 @@ impl Inventory {
     }
 
     /// 使用物品
-    pub fn use_item(&mut self, index: u8) -> Option<&Item> {
+    pub fn use_item(&mut self, index: u8) -> Option<Item> {
         if index >= self.max_size {
             return None;
         }
@@ -101,7 +110,7 @@ impl Inventory {
             return None;
         }
 
-        let item = self.item_db.get(slot.item_id)?;
+        let item = self.item_db.get(slot.item_id)?.clone();
         if !matches!(item.type_, super::data::ItemType::Heal) {
             return None;
         }
@@ -111,6 +120,7 @@ impl Inventory {
         if slot.amount == 0 {
             slot.item_id = 0;
         }
+        self.update_weight();
 
         Some(item)
     }
@@ -123,5 +133,118 @@ impl Inventory {
     /// 获取所有格子
     pub fn slots(&self) -> &[InventorySlot] {
         &self.slots
+    }
+
+    /// 计算总重量
+    pub fn calc_weight(&self) -> u32 {
+        self.slots.iter()
+            .filter(|s| !s.is_empty())
+            .filter_map(|s| {
+                self.item_db.get(s.item_id).map(|item| {
+                    (item.weight as u32) * (s.amount as u32)
+                })
+            })
+            .sum()
+    }
+
+    /// 获取总重量
+    pub fn total_weight(&self) -> u32 {
+        self.total_weight
+    }
+
+    /// 检查能否添加物品（重量限制）
+    pub fn can_carry_weight(&self, item_id: u16, amount: u16, max_weight: u32) -> bool {
+        let item = match self.item_db.get(item_id) {
+            Some(i) => i,
+            None => return false,
+        };
+        let add_weight = (item.weight as u32) * (amount as u32);
+        self.total_weight + add_weight <= max_weight
+    }
+
+    /// 更新重量
+    pub fn update_weight(&mut self) {
+        self.total_weight = self.calc_weight();
+    }
+
+    /// 获取物品重量
+    pub fn get_item_weight(&self, item_id: u16) -> u16 {
+        self.item_db.get(item_id)
+            .map(|i| i.weight)
+            .unwrap_or(0)
+    }
+
+    /// 获取物品数据库引用
+    pub fn get_database(&self) -> &ItemDatabase {
+        &self.item_db
+    }
+
+    /// 检查能否添加物品（仅检查空间，不检查重量）
+    pub fn can_add_item(&self, item_id: u16, amount: u16) -> bool {
+        if amount == 0 || amount > 300 {
+            return false;
+        }
+
+        // 先找相同物品的空位
+        for slot in &self.slots {
+            if slot.item_id == item_id && slot.amount + amount <= 300 {
+                return true;
+            }
+        }
+        // 找空位
+        for slot in &self.slots {
+            if slot.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_inventory_new_has_zero_weight() {
+        let db = Arc::new(ItemDatabase::new());
+        let inv = Inventory::new(10, db);
+        assert_eq!(inv.total_weight(), 0);
+    }
+
+    #[test]
+    fn test_add_item_updates_weight() {
+        let db = Arc::new(ItemDatabase::new());
+        let mut inv = Inventory::new(10, db);
+        // Red Potion (501) weight = 7
+        inv.add_item(501, 5);
+        assert_eq!(inv.total_weight(), 35); // 7 * 5
+    }
+
+    #[test]
+    fn test_remove_item_updates_weight() {
+        let db = Arc::new(ItemDatabase::new());
+        let mut inv = Inventory::new(10, db);
+        inv.add_item(501, 5);  // weight = 35
+        inv.remove_item(0, 2); // remove 2
+        assert_eq!(inv.total_weight(), 21); // 7 * 3
+    }
+
+    #[test]
+    fn test_can_carry_weight() {
+        let db = Arc::new(ItemDatabase::new());
+        let inv = Inventory::new(10, db);
+        // Red Potion weight = 7, max_weight = 100
+        assert!(inv.can_carry_weight(501, 10, 100)); // 70 <= 100
+        assert!(!inv.can_carry_weight(501, 20, 100)); // 140 > 100
+    }
+
+    #[test]
+    fn test_get_item_weight() {
+        let db = Arc::new(ItemDatabase::new());
+        let inv = Inventory::new(10, db);
+        assert_eq!(inv.get_item_weight(501), 7); // Red Potion
+        assert_eq!(inv.get_item_weight(9999), 0); // Non-existent
     }
 }

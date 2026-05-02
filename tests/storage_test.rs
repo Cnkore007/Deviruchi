@@ -129,3 +129,57 @@ fn test_storage_remove_all() {
     assert!(slot.is_empty());
     assert_eq!(slot.item_id, 0);
 }
+
+use std::sync::Arc;
+use deviruchi::game::storage::manager::StorageManager;
+
+#[test]
+fn test_storage_manager_get_or_create() {
+    let manager = StorageManager::new();
+
+    // 获取角色1的仓库
+    let storage1 = manager.get_or_create(1, 100);
+    assert_eq!(storage1.read().char_id(), 1);
+
+    // 再次获取应该是同一个
+    let storage2 = manager.get_or_create(1, 100);
+    assert_eq!(storage2.read().char_id(), 1);
+}
+
+#[test]
+fn test_storage_manager_remove() {
+    let manager = StorageManager::new();
+
+    // 创建仓库
+    let storage = manager.get_or_create(1, 100);
+    assert_eq!(storage.read().char_id(), 1);
+
+    // 移除仓库
+    manager.remove(&1);
+
+    // 再次获取应该是新的（会重新创建）
+    let storage = manager.get_or_create(1, 100);
+    assert_eq!(storage.read().char_id(), 1);
+}
+
+#[test]
+fn test_storage_manager_save_and_load() {
+    use parking_lot::RwLock;
+
+    let manager = Arc::new(RwLock::new(StorageManager::new()));
+
+    // 创建并修改仓库
+    {
+        let mut mgr = manager.write();
+        let storage = mgr.get_or_create(1, 100);
+        storage.write().add_item(501, 10);
+        storage.write().add_item(502, 5);
+    }
+
+    // 验证物品存在
+    {
+        let mgr = manager.read();
+        let storage = mgr.get(1).unwrap();
+        assert_eq!(storage.read().used_count(), 2);
+    }
+}

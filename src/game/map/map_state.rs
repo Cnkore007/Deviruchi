@@ -94,6 +94,7 @@ impl Default for MapState {
 mod tests {
     use super::*;
     use parking_lot::RwLock;
+    use crate::game::item::Equipment;
 
     fn create_test_player(x: u16, y: u16, map: &str) -> Player {
         Player {
@@ -118,6 +119,9 @@ mod tests {
             luk: RwLock::new(1),
             walk_speed: RwLock::new(150),
             zeny: RwLock::new(0),
+            current_weight: RwLock::new(0),
+            max_weight: RwLock::new(20000 + 200),
+            equipment: RwLock::new(Equipment::new()),
         }
     }
 

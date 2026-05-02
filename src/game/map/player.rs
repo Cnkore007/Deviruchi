@@ -1,6 +1,7 @@
 use parking_lot::RwLock;
 use uuid::Uuid;
 use crate::storage::Character;
+use crate::game::item::Equipment;
 
 pub struct Player {
     pub id: Uuid,
@@ -24,6 +25,9 @@ pub struct Player {
     pub luk: RwLock<u16>,
     pub walk_speed: RwLock<u16>,
     pub zeny: RwLock<u32>,
+    pub current_weight: RwLock<u32>,
+    pub max_weight: RwLock<u32>,
+    pub equipment: RwLock<Equipment>,
 }
 
 impl Clone for Player {
@@ -50,6 +54,9 @@ impl Clone for Player {
             luk: RwLock::new(*self.luk.read()),
             walk_speed: RwLock::new(*self.walk_speed.read()),
             zeny: RwLock::new(*self.zeny.read()),
+            current_weight: RwLock::new(*self.current_weight.read()),
+            max_weight: RwLock::new(*self.max_weight.read()),
+            equipment: RwLock::new(self.equipment.read().clone()),
         }
     }
 }
@@ -78,7 +85,10 @@ impl Player {
             dex: RwLock::new(char.dex),
             luk: RwLock::new(char.luk),
             walk_speed: RwLock::new(150),
-            zeny: RwLock::new(0),
+            zeny: RwLock::new(char.zeny as u32),
+            current_weight: RwLock::new(0),
+            max_weight: RwLock::new(20000 + (char.str as u32) * 200),
+            equipment: RwLock::new(Equipment::new()),
         }
     }
 
@@ -103,5 +113,31 @@ impl Player {
             *self.hp.write() = current_hp - damage;
             false
         }
+    }
+
+    /// 计算最大负重 (基础20000 + STR*200, 单位0.1)
+    pub fn calc_max_weight(&self) -> u32 {
+        let str = *self.str.read();
+        20000 + (str as u32) * 200
+    }
+
+    /// 更新最大负重
+    pub fn update_max_weight(&self) {
+        let new_max = self.calc_max_weight();
+        *self.max_weight.write() = new_max;
+    }
+
+    /// 检查是否超重(50%)
+    pub fn is_overweight(&self) -> bool {
+        let current = *self.current_weight.read();
+        let max = *self.max_weight.read();
+        current > max * 50 / 100
+    }
+
+    /// 检查是否严重超重(90%)
+    pub fn is_overweight_90(&self) -> bool {
+        let current = *self.current_weight.read();
+        let max = *self.max_weight.read();
+        current > max * 90 / 100
     }
 }

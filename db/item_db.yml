@@ -1,0 +1,54 @@
+# db/item_db.yml
+- Id: 501
+  Name: Red Potion
+  Type: Heal
+  BuyPrice: 50
+  SellPrice: 25
+  Weight: 7
+  HpRestore: 120
+  SpRestore: 0
+
+- Id: 502
+  Name: Yellow Potion
+  Type: Heal
+  BuyPrice: 40
+  SellPrice: 20
+  Weight: 5
+  HpRestore: 60
+  SpRestore: 0
+
+- Id: 503
+  Name: Blue Potion
+  Type: Heal
+  BuyPrice: 50
+  SellPrice: 25
+  Weight: 7
+  HpRestore: 0
+  SpRestore: 40
+
+- Id: 1201
+  Name: Dagger
+  Type: Weapon
+  BuyPrice: 1000
+  SellPrice: 500
+  Weight: 50
+  Atk: 10
+  EquipMask: 0x0001
+
+- Id: 1202
+  Name: Main Gauche
+  Type: Weapon
+  BuyPrice: 2500
+  SellPrice: 1250
+  Weight: 60
+  Atk: 15
+  EquipMask: 0x0001
+
+- Id: 1501
+  Name: Clothes
+  Type: Armor
+  BuyPrice: 500
+  SellPrice: 250
+  Weight: 40
+  Defense: 2
+  EquipMask: 0x0008

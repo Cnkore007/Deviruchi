@@ -1,5 +1,7 @@
 use std::sync::Arc;
 use crate::game::map::Player;
+use crate::game::item::Inventory;
+use crate::game::zeny::ZenyManager;
 use super::data::Npc;
 
 /// NPC交互处理器
@@ -67,7 +69,14 @@ impl NpcHandler {
     }
 
     /// 购买物品
-    pub fn buy_item(&self, _player: &Player, npc_id: u32, item_id: u16, amount: u8) -> BuyResult {
+    pub fn buy_item(
+        &self,
+        player: &Player,
+        inventory: &mut Inventory,
+        npc_id: u32,
+        item_id: u16,
+        amount: u8
+    ) -> BuyResult {
         let npc = match self.get_npc(npc_id) {
             Some(n) => n,
             None => return BuyResult::NpcNotFound,
@@ -83,17 +92,81 @@ impl NpcHandler {
             None => return BuyResult::ItemNotFound,
         };
 
-        let total_price = shop_item.price * amount as u32;
+        let total_price = shop_item.buy_price * amount as u32;
 
-        // 检查金币 - Player 暂无 zeny 字段，跳过检查
-        // if player.zeny < total_price {
-        //     return BuyResult::NotEnoughZeny;
-        // }
+        // 检查金币
+        if !ZenyManager::can_spend(player, total_price) {
+            return BuyResult::NotEnoughZeny;
+        }
+
+        // 检查重量
+        let max_weight = *player.max_weight.read();
+        if !inventory.can_carry_weight(item_id, amount as u16, max_weight) {
+            return BuyResult::Overweight;
+        }
+
+        // 检查背包空间
+        if !inventory.can_add_item(item_id, amount as u16) {
+            return BuyResult::InventoryFull;
+        }
+
+        // 扣除金币
+        ZenyManager::sub(player, total_price);
+
+        // 添加物品
+        inventory.add_item(item_id, amount as u16);
 
         BuyResult::Success {
             item_id,
             amount,
-            remaining_zeny: 0,
+            remaining_zeny: ZenyManager::get(player),
+        }
+    }
+
+    /// 出售物品
+    pub fn sell_item(
+        &self,
+        player: &Player,
+        inventory: &mut Inventory,
+        inventory_index: u8,
+        amount: u8
+    ) -> SellResult {
+        // 获取物品
+        let slot = match inventory.slots().get(inventory_index as usize) {
+            Some(s) if !s.is_empty() => s.clone(),
+            _ => return SellResult::Failed(SellError::InvalidSlot),
+        };
+
+        if slot.amount < amount as u16 {
+            return SellResult::Failed(SellError::NotEnoughItems);
+        }
+
+        // 获取物品数据
+        let item = match inventory.get_database().get(slot.item_id) {
+            Some(i) => i,
+            None => return SellResult::Failed(SellError::InvalidItem),
+        };
+
+        let total_gold = item.sell_price * amount as u32;
+
+        // 检查是否会超过Zeny上限
+        let current_zeny = ZenyManager::get(player);
+        if current_zeny + total_gold > crate::game::zeny::MAX_ZENY {
+            return SellResult::Failed(SellError::ZenyOverflow);
+        }
+
+        // 移除物品
+        if !inventory.remove_item(inventory_index, amount as u16) {
+            return SellResult::Failed(SellError::RemoveFailed);
+        }
+
+        // 增加Zeny
+        ZenyManager::add(player, total_gold);
+
+        SellResult::Success {
+            item_id: slot.item_id,
+            amount,
+            gained_zeny: total_gold,
         }
     }
 
@@ -140,6 +213,24 @@ pub enum BuyResult {
     ItemNotFound,
     NotEnoughZeny,
     InventoryFull,
+    Overweight,
+}
+
+/// 出售结果
+#[derive(Debug, Clone)]
+pub enum SellResult {
+    Success { item_id: u16, amount: u8, gained_zeny: u32 },
+    Failed(SellError),
+}
+
+/// 出售错误
+#[derive(Debug, Clone, Copy)]
+pub enum SellError {
+    InvalidSlot,
+    NotEnoughItems,
+    InvalidItem,
+    ZenyOverflow,
+    RemoveFailed,
 }
 
 /// 学习技能结果
