@@ -72,6 +72,53 @@ pub struct SavePoint {
     pub y: u16,
 }
 
+impl SavePoint {
+    /// 创建新的存储点
+    pub fn new(map_name: impl Into<String>, x: u16, y: u16) -> Self {
+        Self {
+            map_name: map_name.into(),
+            x,
+            y,
+        }
+    }
+}
+
+/// 存储点管理器 - 管理角色的存储点
+#[derive(Debug)]
+pub struct SavePointManager {
+    /// 角色ID到存储点的映射
+    save_points: HashMap<u32, SavePoint>,
+}
+
+impl SavePointManager {
+    /// 创建新的存储点管理器
+    pub fn new() -> Self {
+        Self {
+            save_points: HashMap::new(),
+        }
+    }
+
+    /// 设置角色的存储点
+    pub fn set_save_point(&mut self, char_id: u32, save_point: SavePoint) {
+        self.save_points.insert(char_id, save_point);
+    }
+
+    /// 获取角色的存储点
+    pub fn get_save_point(&self, char_id: u32) -> Option<&SavePoint> {
+        self.save_points.get(&char_id)
+    }
+
+    /// 检查角色是否有存储点
+    pub fn has_save_point(&self, char_id: u32) -> bool {
+        self.save_points.contains_key(&char_id)
+    }
+
+    /// 移除角色的存储点
+    pub fn remove_save_point(&mut self, char_id: u32) -> Option<SavePoint> {
+        self.save_points.remove(&char_id)
+    }
+}
+
 /// 传送管理器 - 管理地图邻接关系和传送逻辑
 #[derive(Debug)]
 pub struct TeleportManager {
@@ -247,16 +294,55 @@ impl std::error::Error for WarpError {}
 /// Service that executes warp operations
 pub struct WarpService {
     teleport_manager: Arc<RwLock<TeleportManager>>,
+    save_point_manager: Arc<RwLock<SavePointManager>>,
     db: Arc<Database>,
 }
 
 impl WarpService {
     /// Creates a new WarpService
-    pub fn new(teleport_manager: Arc<RwLock<TeleportManager>>, db: Arc<Database>) -> Self {
+    pub fn new(
+        teleport_manager: Arc<RwLock<TeleportManager>>,
+        save_point_manager: Arc<RwLock<SavePointManager>>,
+        db: Arc<Database>,
+    ) -> Self {
         Self {
             teleport_manager,
+            save_point_manager,
             db,
         }
+    }
+
+    /// 设置角色的存储点
+    pub fn set_save_point(&self, char_id: u32, map_name: &str, x: u16, y: u16) {
+        let mut manager = self.save_point_manager.write();
+        manager.set_save_point(char_id, SavePoint::new(map_name, x, y));
+    }
+
+    /// 获取角色的存储点
+    pub fn get_save_point(&self, char_id: u32) -> Option<SavePoint> {
+        let manager = self.save_point_manager.read();
+        manager.get_save_point(char_id).cloned()
+    }
+
+    /// 使用回城术 - 传送角色到存储点
+    pub fn use_return(&self, session: &mut Session) -> Result<TeleportAction, WarpError> {
+        let char_id = session.char_id.ok_or(WarpError::PlayerNotFound)?;
+
+        let save_point = self.get_save_point(char_id)
+            .ok_or_else(|| WarpError::InvalidTargetMap)?;
+
+        // Create teleport action to save point
+        let action = TeleportAction {
+            from_map: "current".to_string(), // Not used for return
+            to_map: save_point.map_name.clone(),
+            from_pos: (0, 0), // Not used for return
+            to_pos: (save_point.x, save_point.y),
+        };
+
+        // Execute the warp
+        self.execute_warp(session, action.clone())?;
+
+        Ok(action)
     }
 
     /// Executes a warp operation for a player
@@ -613,7 +699,8 @@ mod tests {
         let manager = Arc::new(RwLock::new(TeleportManager::new()));
         let db = Arc::new(Database::open_memory().unwrap());
 
-        let service = WarpService::new(manager, db);
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let service = WarpService::new(manager, save_point_manager, db);
         // Service should be created successfully
         let _ = service;
     }
@@ -623,7 +710,8 @@ mod tests {
         let manager = Arc::new(RwLock::new(TeleportManager::new()));
         let db = Arc::new(Database::open_memory().unwrap());
 
-        let service = WarpService::new(manager, db);
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let service = WarpService::new(manager, save_point_manager, db);
         let mut session = Session::new();
         // No player_id set
 
@@ -643,7 +731,8 @@ mod tests {
         let manager = Arc::new(RwLock::new(TeleportManager::new()));
         let db = Arc::new(Database::open_memory().unwrap());
 
-        let service = WarpService::new(manager, db);
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let service = WarpService::new(manager, save_point_manager, db);
         let mut session = Session::new();
         session.player_id = Some(Uuid::new_v4());
         session.char_id = Some(1);
@@ -676,7 +765,8 @@ mod tests {
             });
         }
 
-        let service = WarpService::new(manager, db);
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let service = WarpService::new(manager, save_point_manager, db);
         let mut session = Session::new();
         session.player_id = Some(Uuid::new_v4());
 
@@ -704,12 +794,116 @@ mod tests {
             });
         }
 
-        let service = WarpService::new(manager, db);
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let service = WarpService::new(manager, save_point_manager, db);
         let mut session = Session::new();
         session.player_id = Some(Uuid::new_v4());
 
         // Position not on edge - should not trigger
         let result = service.handle_move_with_warp_on_map(&mut session, "map1", 50, 50);
         assert!(result.is_none());
+    }
+
+    // Task 3 Tests - Save Point and Return functionality
+
+    #[test]
+    fn test_save_point_manager_new() {
+        let manager = SavePointManager::new();
+        assert!(manager.save_points.is_empty());
+    }
+
+    #[test]
+    fn test_save_point_manager_set_and_get() {
+        let mut manager = SavePointManager::new();
+        let save_point = SavePoint::new("prontera.gat", 150, 180);
+
+        manager.set_save_point(1, save_point.clone());
+
+        let retrieved = manager.get_save_point(1);
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().map_name, "prontera.gat");
+        assert_eq!(retrieved.unwrap().x, 150);
+        assert_eq!(retrieved.unwrap().y, 180);
+    }
+
+    #[test]
+    fn test_save_point_manager_has_save_point() {
+        let mut manager = SavePointManager::new();
+
+        assert!(!manager.has_save_point(1));
+
+        manager.set_save_point(1, SavePoint::new("map.gat", 100, 100));
+
+        assert!(manager.has_save_point(1));
+    }
+
+    #[test]
+    fn test_save_point_manager_remove() {
+        let mut manager = SavePointManager::new();
+        manager.set_save_point(1, SavePoint::new("map.gat", 100, 100));
+
+        let removed = manager.remove_save_point(1);
+        assert!(removed.is_some());
+        assert!(!manager.has_save_point(1));
+    }
+
+    #[test]
+    fn test_warp_service_set_and_get_save_point() {
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let db = Arc::new(Database::open_memory().unwrap());
+        let service = WarpService::new(teleport_manager, save_point_manager.clone(), db);
+
+        // Initially no save point
+        assert!(service.get_save_point(1).is_none());
+
+        // Set save point
+        service.set_save_point(1, "prontera.gat", 150, 180);
+
+        // Get save point
+        let save_point = service.get_save_point(1);
+        assert!(save_point.is_some());
+        let sp = save_point.unwrap();
+        assert_eq!(sp.map_name, "prontera.gat");
+        assert_eq!(sp.x, 150);
+        assert_eq!(sp.y, 180);
+    }
+
+    #[test]
+    fn test_use_return_without_save_point_fails() {
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let db = Arc::new(Database::open_memory().unwrap());
+        let service = WarpService::new(teleport_manager, save_point_manager, db);
+
+        let mut session = Session::new();
+        session.char_id = Some(1);
+
+        // Should fail because no save point is set
+        let result = service.use_return(&mut session);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_use_return_with_save_point_succeeds() {
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let db = Arc::new(Database::open_memory().unwrap());
+        let service = WarpService::new(teleport_manager, save_point_manager.clone(), db);
+
+        // Set up save point
+        service.set_save_point(1, "prontera.gat", 150, 180);
+
+        let mut session = Session::new();
+        session.player_id = Some(Uuid::new_v4());  // Need player_id for execute_warp
+        session.char_id = Some(1);
+
+        // Should succeed
+        let result = service.use_return(&mut session);
+        assert!(result.is_ok());
+
+        let action = result.unwrap();
+        assert_eq!(action.to_map, "prontera.gat");
+        assert_eq!(action.to_pos, (150, 180));
     }
 }

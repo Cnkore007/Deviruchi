@@ -516,11 +516,16 @@ mod tests {
     #[test]
     fn test_map_server_handles_unknown_packet() {
         use crate::game::trade::TradeManager;
-        use crate::game::map::teleport::{TeleportManager, WarpService};
+        use crate::game::map::teleport::{TeleportManager, WarpService, SavePointManager};
 
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
         let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
-        let warp_service = Arc::new(WarpService::new(teleport_manager.clone(), db.clone()));
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let warp_service = Arc::new(WarpService::new(
+            teleport_manager.clone(),
+            save_point_manager.clone(),
+            db.clone(),
+        ));
 
         let server = MapServer::new(
             db,
