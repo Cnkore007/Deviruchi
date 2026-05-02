@@ -28,7 +28,7 @@ impl SkillHandler {
         }
 
         // 检查HP
-        if *player.hp.read() <= skill.hp_cost {
+        if *player.hp.read() < skill.hp_cost {
             return SkillError::NotEnoughHP;
         }
 
