@@ -4,6 +4,6 @@ pub mod data;
 pub mod spawn;
 pub mod ai;
 
-pub use data::{Mob, MobAIState, MobType};
+pub use data::{Mob, MobAIState, MobType, MobDatabase};
 pub use spawn::MobSpawnManager;
 pub use ai::MobAI;
