@@ -9,15 +9,16 @@ pub mod version;
 pub use config::Config;
 pub use version::VERSION;
 
+use std::sync::Arc;
 use crate::cli::Cli;
 use crate::storage::{Database, init_schema};
-use crate::network::SessionManager;
+use crate::network::{SessionManager, GameServer, PacketHandler};
 
 pub struct Core {
     cli: Cli,
     config: Config,
-    db: Option<Database>,
-    session_manager: SessionManager,
+    db: Option<Arc<Database>>,
+    session_manager: Arc<SessionManager>,
 }
 
 impl Core {
@@ -27,7 +28,7 @@ impl Core {
             cli,
             config,
             db: None,
-            session_manager: SessionManager::new(),
+            session_manager: Arc::new(SessionManager::new()),
         }
     }
 
@@ -41,18 +42,48 @@ impl Core {
         tracing::info!("{} v{} 启动中...", crate::core::version::NAME, crate::core::VERSION);
 
         // 初始化数据库
-        if let Ok(db) = Database::open(&self.config.database.path) {
-            init_schema(&db)?;
-            self.db = Some(db);
-        }
+        let db = Arc::new(Database::open(&self.config.database.path)?);
+        init_schema(&db)?;
+        self.db = Some(db.clone());
+
+        // 初始化会话管理
+        let session_manager = self.session_manager.clone();
+
+        // 创建 PacketHandler
+        let packet_handler = Arc::new(PacketHandler::new(db, session_manager.clone()));
 
         tracing::info!("服务器初始化完成");
         tracing::info!("运行模式: {}", self.cli.mode);
 
-        // 保持运行
-        tokio::signal::ctrl_c().await?;
+        // 根据模式启动服务器
+        let mode = self.cli.mode.as_str();
+        let run_login = mode == "login" || mode == "all";
+        let run_char = mode == "char" || mode == "all";
+        let run_map = mode == "map" || mode == "all";
 
-        tracing::info!("服务器关闭中...");
+        if run_login {
+            let addr = format!("0.0.0.0:{}", self.config.network.login_port);
+            tracing::info!("启动 Login Server: {}", addr);
+            let server = GameServer::new(addr, session_manager.clone(), packet_handler.clone());
+            server.listen().await?;
+        }
+        if run_char {
+            let addr = format!("0.0.0.0:{}", self.config.network.char_port);
+            tracing::info!("启动 Char Server: {}", addr);
+            let server = GameServer::new(addr, session_manager.clone(), packet_handler.clone());
+            server.listen().await?;
+        }
+        if run_map {
+            let addr = format!("0.0.0.0:{}", self.config.network.map_port);
+            tracing::info!("启动 Map Server: {}", addr);
+            let server = GameServer::new(addr, session_manager.clone(), packet_handler.clone());
+            server.listen().await?;
+        }
+
+        if !run_login && !run_char && !run_map {
+            tracing::error!("未知运行模式: {}", mode);
+        }
+
         Ok(())
     }
 }

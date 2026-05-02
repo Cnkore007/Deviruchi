@@ -38,13 +38,12 @@ impl Decoder for PacketCodec {
     }
 }
 
-impl Encoder<Packet> for PacketCodec {
+impl Encoder<Vec<u8>> for PacketCodec {
     type Error = std::io::Error;
 
-    fn encode(&mut self, item: Packet, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let bytes = item.to_bytes();
-        dst.reserve(bytes.len());
-        dst.put_slice(&bytes);
+    fn encode(&mut self, item: Vec<u8>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        dst.reserve(item.len());
+        dst.put_slice(&item);
         Ok(())
     }
 }
