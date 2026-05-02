@@ -7,6 +7,7 @@ use crate::game::token::TokenStore;
 use crate::game::map::{MapState, ChannelBus, DropManager, MapServer};
 use crate::game::party::PartyManager;
 use crate::game::storage::StorageManager;
+use crate::game::trade::TradeManager;
 
 pub struct PacketHandler {
     login_server: Arc<crate::game::login::LoginServer>,
@@ -25,6 +26,7 @@ impl PacketHandler {
         party_manager: Arc<PartyManager>,
     ) -> Self {
         let storage_manager = Arc::new(StorageManager::new());
+        let trade_manager = Arc::new(TradeManager::new());
 
         let map_server = Arc::new(MapServer::new(
             db.clone(),
@@ -34,6 +36,7 @@ impl PacketHandler {
             drop_manager,
             party_manager,
             storage_manager,
+            trade_manager,
             false, // death_drop_items
         ));
 
