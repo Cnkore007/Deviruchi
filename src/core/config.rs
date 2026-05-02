@@ -34,6 +34,7 @@ pub struct NetworkConfig {
 pub struct GameConfig {
     pub max_players: usize,
     pub timeout_seconds: u64,
+    pub death_drop_items: bool,
 }
 
 impl Default for Config {
@@ -56,6 +57,7 @@ impl Default for Config {
             game: GameConfig {
                 max_players: 5000,
                 timeout_seconds: 300,
+                death_drop_items: false,
             },
         }
     }
@@ -85,5 +87,23 @@ impl Config {
         let content = toml::to_string_pretty(self)?;
         std::fs::write(path, content)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_death_drop_items_is_false() {
+        let config = Config::default();
+        assert!(!config.game.death_drop_items);
+    }
+
+    #[test]
+    fn test_game_config_with_death_drop_items() {
+        let mut config = Config::default();
+        config.game.death_drop_items = true;
+        assert!(config.game.death_drop_items);
     }
 }
