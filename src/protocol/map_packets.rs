@@ -168,3 +168,154 @@ impl Packed for CHMakeChar {
         })
     }
 }
+
+/// Char Server 通知客户端连接 Map Server (0x0083)
+#[derive(Debug, Clone)]
+pub struct HCNotifyZoneServer {
+    pub map_ip: String,
+    pub map_port: u16,
+    pub token: String,
+}
+
+impl Packed for HCNotifyZoneServer {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0083)
+            .put_fixed_str(&self.map_ip, 16)
+            .put_u16(self.map_port)
+            .put_fixed_str(&self.token, 32)
+            .build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端请求攻击/动作 (0x0089)
+#[derive(Debug, Clone)]
+pub struct CZRequestAction {
+    pub account_id: u32,
+    pub target_id: u32,
+    pub action_type: u8,
+}
+
+impl Packed for CZRequestAction {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0089)
+            .put_u32(self.account_id)
+            .put_u32(self.target_id)
+            .put_u8(self.action_type)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 9 {
+            return None;
+        }
+        let account_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let target_id = u32::from_le_bytes([slice[4], slice[5], slice[6], slice[7]]);
+        let action_type = slice[8];
+        Some(Self { account_id, target_id, action_type })
+    }
+}
+
+/// 客户端使用物品 (0x009B)
+#[derive(Debug, Clone)]
+pub struct CZUseItem {
+    pub index: u16,
+    pub item_id: u32,
+}
+
+impl Packed for CZUseItem {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x009B)
+            .put_u16(self.index)
+            .put_u32(self.item_id)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 6 {
+            return None;
+        }
+        let index = u16::from_le_bytes([slice[0], slice[1]]);
+        let item_id = u32::from_le_bytes([slice[2], slice[3], slice[4], slice[5]]);
+        Some(Self { index, item_id })
+    }
+}
+
+/// 客户端拾取物品 (0x0090)
+#[derive(Debug, Clone)]
+pub struct CZRequestPickupItem {
+    pub x: u16,
+    pub y: u16,
+}
+
+impl Packed for CZRequestPickupItem {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0090)
+            .put_u16(self.x)
+            .put_u16(self.y)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let x = u16::from_le_bytes([slice[0], slice[1]]);
+        let y = u16::from_le_bytes([slice[2], slice[3]]);
+        Some(Self { x, y })
+    }
+}
+
+/// 客户端交互 NPC (0x0190)
+#[derive(Debug, Clone)]
+pub struct CZContactNpc {
+    pub npc_id: u32,
+    pub action: u8,
+}
+
+impl Packed for CZContactNpc {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0190)
+            .put_u32(self.npc_id)
+            .put_u8(self.action)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 5 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let action = slice[4];
+        Some(Self { npc_id, action })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hc_notify_zone_server_packet_id() {
+        let pkt = HCNotifyZoneServer {
+            map_ip: "127.0.0.1".to_string(),
+            map_port: 6121,
+            token: "test_token".to_string(),
+        };
+        let bytes = pkt.to_packet();
+        let packet_id = u16::from_le_bytes([bytes[2], bytes[3]]);
+        assert_eq!(packet_id, 0x0083);
+    }
+
+    #[test]
+    fn test_cz_request_action_parse() {
+        let data = vec![1, 0, 0, 0, 2, 0, 0, 0, 7];
+        let pkt = CZRequestAction::from_slice(&data).unwrap();
+        assert_eq!(pkt.account_id, 1);
+        assert_eq!(pkt.target_id, 2);
+        assert_eq!(pkt.action_type, 7);
+    }
+}
