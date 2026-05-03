@@ -1,5 +1,26 @@
 use parking_lot::RwLock;
 use uuid::Uuid;
+use std::time::Instant;
+
+/// 怪物掉落物品
+#[derive(Debug, Clone)]
+pub struct MobDrop {
+    pub item_id: u32,
+    pub min_amount: u16,
+    pub max_amount: u16,
+    /// 掉落概率（万分比，10000 = 100%）
+    pub chance: u32,
+}
+
+impl MobDrop {
+    pub fn new(item_id: u32, chance: u32) -> Self {
+        Self { item_id, min_amount: 1, max_amount: 1, chance }
+    }
+
+    pub fn with_amount(item_id: u32, min: u16, max: u16, chance: u32) -> Self {
+        Self { item_id, min_amount: min, max_amount: max, chance }
+    }
+}
 
 /// 怪物类型
 #[derive(Debug, Clone, Copy)]
@@ -61,6 +82,20 @@ pub struct Mob {
     // 刷新参数
     pub spawn_delay: u32,
     pub respawn_time: u32,
+
+    // 出生点
+    pub spawn_x: u16,
+    pub spawn_y: u16,
+    pub spawn_map: String,
+
+    // 死亡时间（用于重生计时）
+    pub death_time: RwLock<Option<Instant>>,
+
+    // 掉落与经验（运行时从 template 复制）
+    pub drops: Vec<MobDrop>,
+    pub base_exp: u64,
+    pub job_exp: u64,
+    pub drops_processed: RwLock<bool>,
 }
 
 impl Mob {
@@ -93,6 +128,14 @@ impl Mob {
             aggro_rate: 0,
             spawn_delay: 0,
             respawn_time: 60000,
+            spawn_x: x,
+            spawn_y: y,
+            spawn_map: map.to_string(),
+            death_time: RwLock::new(None),
+            drops: Vec::new(),
+            base_exp: 0,
+            job_exp: 0,
+            drops_processed: RwLock::new(false),
         }
     }
 
@@ -126,6 +169,14 @@ impl Mob {
             aggro_rate: template.aggro_rate,
             spawn_delay: template.spawn_delay,
             respawn_time: template.respawn_time,
+            spawn_x: x,
+            spawn_y: y,
+            spawn_map: map.to_string(),
+            death_time: RwLock::new(None),
+            drops: template.drops.clone(),
+            base_exp: template.base_exp,
+            job_exp: template.job_exp,
+            drops_processed: RwLock::new(false),
         }
     }
 
@@ -143,6 +194,7 @@ impl Mob {
         if current_hp <= damage {
             *self.hp.write() = 0;
             *self.ai_state.write() = MobAIState::Dead;
+            *self.death_time.write() = Some(Instant::now());
             true
         } else {
             *self.hp.write() = current_hp - damage;
@@ -152,6 +204,18 @@ impl Mob {
 
     pub fn is_dead(&self) -> bool {
         *self.hp.read() == 0
+    }
+
+    /// 重生：回到出生点并恢复满血
+    pub fn respawn(&self) {
+        *self.hp.write() = self.max_hp;
+        *self.sp.write() = self.max_sp;
+        *self.pos_x.write() = self.spawn_x;
+        *self.pos_y.write() = self.spawn_y;
+        *self.ai_state.write() = MobAIState::Idle;
+        *self.target_id.write() = None;
+        *self.death_time.write() = None;
+        *self.drops_processed.write() = false;
     }
 }
 
@@ -180,6 +244,13 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                drops: vec![
+                    MobDrop::new(909, 7000),   // Jellopy 70%
+                    MobDrop::new(1202, 500),   // Knife 5%
+                    MobDrop::new(938, 100),    // Sticky Mucus 1%
+                ],
+                base_exp: 2,
+                job_exp: 1,
             },
             1002 => MobTemplate {
                 name: "Lunatic".to_string(),
@@ -200,6 +271,12 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                drops: vec![
+                    MobDrop::new(910, 6000),    // Fluff 60%
+                    MobDrop::new(938, 200),     // Sticky Mucus 2%
+                ],
+                base_exp: 6,
+                job_exp: 4,
             },
             1003 => MobTemplate {
                 name: "Blue Poring".to_string(),
@@ -220,6 +297,12 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                drops: vec![
+                    MobDrop::new(909, 5000),    // Jellopy 50%
+                    MobDrop::new(947, 300),     // Scale Shell 3%
+                ],
+                base_exp: 4,
+                job_exp: 3,
             },
             1312 => MobTemplate {
                 name: "Fabre".to_string(),
@@ -240,6 +323,12 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                drops: vec![
+                    MobDrop::new(914, 5500),    // Fluff 55%
+                    MobDrop::new(949, 400),     // Feather 4%
+                ],
+                base_exp: 8,
+                job_exp: 5,
             },
             _ => MobTemplate::default(mob_id),
         }
@@ -267,6 +356,9 @@ pub struct MobTemplate {
     pub aggro_rate: i16,
     pub spawn_delay: u32,
     pub respawn_time: u32,
+    pub drops: Vec<MobDrop>,
+    pub base_exp: u64,
+    pub job_exp: u64,
 }
 
 impl MobTemplate {
@@ -290,6 +382,9 @@ impl MobTemplate {
             aggro_rate: 0,
             spawn_delay: 1000,
             respawn_time: 60000,
+            drops: Vec::new(),
+            base_exp: 10,
+            job_exp: 5,
         }
     }
 }

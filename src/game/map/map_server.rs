@@ -1,6 +1,7 @@
 //! MapServer - 地图服务器核心，处理客户端数据包
 
 use std::sync::Arc;
+use parking_lot::RwLock;
 use uuid::Uuid;
 use crate::network::session::Session;
 use crate::game::token::TokenStore;
@@ -9,10 +10,14 @@ use crate::game::map::channel::{ChannelBus, GameEvent, ChatType};
 use crate::game::map::drop_item::DropManager;
 use crate::game::party::PartyManager;
 use crate::game::trade::TradeManager;
+use crate::game::guild::GuildManager;
+use crate::game::map::teleport::{TeleportManager, WarpService, TeleportAction};
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZUseItem, CZRequestPickupItem, CZContactNpc};
 use crate::protocol::party_packets::{CZMakeParty, CZReqPartyInvite, CZReqPartyJoin, CZPartyChat, CZChatMessage};
 use crate::protocol::storage_packets::*;
+use crate::protocol::teleport_packets::*;
+use crate::protocol::guild_packets::*;
 use crate::protocol::packet_builder::Packed;
 use crate::network::packet::id::*;
 use crate::game::storage::{StorageManager, Storage};
@@ -24,8 +29,11 @@ pub struct MapServer {
     pub channel_bus: Arc<ChannelBus>,
     pub drop_manager: Arc<DropManager>,
     pub party_manager: Arc<PartyManager>,
+    pub guild_manager: Arc<GuildManager>,
     pub storage_manager: Arc<StorageManager>,
     pub trade_manager: Arc<TradeManager>,
+    pub teleport_manager: Arc<RwLock<TeleportManager>>,
+    pub warp_service: Arc<WarpService>,
     pub death_drop_items: bool,
 }
 
@@ -37,8 +45,11 @@ impl MapServer {
         channel_bus: Arc<ChannelBus>,
         drop_manager: Arc<DropManager>,
         party_manager: Arc<PartyManager>,
+        guild_manager: Arc<GuildManager>,
         storage_manager: Arc<StorageManager>,
         trade_manager: Arc<TradeManager>,
+        teleport_manager: Arc<RwLock<TeleportManager>>,
+        warp_service: Arc<WarpService>,
         death_drop_items: bool,
     ) -> Self {
         Self {
@@ -48,8 +59,11 @@ impl MapServer {
             channel_bus,
             drop_manager,
             party_manager,
+            guild_manager,
             storage_manager,
             trade_manager,
+            teleport_manager,
+            warp_service,
             death_drop_items,
         }
     }
@@ -78,6 +92,21 @@ impl MapServer {
             CZ_TRADE_ADD_ITEM => self.handle_trade_add_item(data, session),
             CZ_TRADE_ADD_ZENY => self.handle_trade_add_zeny(data, session),
             CZ_TRADE_LOCK => self.handle_trade_lock(session),
+            0x0119 => self.handle_use_return(session),
+            0x0138 => self.handle_gm_warp(data, session),
+            0x013A => self.handle_gm_goto(data, session),
+            0x013B => self.handle_gm_summon(data, session),
+            0x013C => self.handle_gm_savepoint(session),
+            0x01B8 => self.handle_set_savepoint(session),
+            0x0165 => self.handle_guild_create(data, session),
+            0x0168 => self.handle_guild_invite(data, session),
+            0x0169 => self.handle_guild_join(data, session),
+            0x016B => self.handle_guild_leave(session),
+            0x016C => self.handle_guild_expel(data, session),
+            0x0183 => self.handle_guild_change_notice(data, session),
+            0x01B7 => self.handle_guild_request_info(data, session),
+            0x01EC => self.handle_guild_chat(data, session),
+            0x00B2 => self.handle_restart(session),
             _ => None,
         }
     }
@@ -139,6 +168,17 @@ impl MapServer {
         // Update channel position
         let channel_name = format!("map:{}", player.map_name);
         self.channel_bus.update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
+
+        // Check for warp trigger
+        if let Some(warp_action) = self.warp_service.handle_move_with_warp_on_map(
+            session,
+            &player.map_name,
+            move_pkt.pos_x,
+            move_pkt.pos_y,
+        ) {
+            // Execute the warp
+            let _ = self.warp_service.execute_warp(session, warp_action);
+        }
 
         None
     }
@@ -488,6 +528,401 @@ impl MapServer {
 
         Some(notify)
     }
+
+    /// Handle use return (0x0119)
+    /// Player uses butterfly wing / return scroll to go back to save point
+    fn handle_use_return(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let char_id = session.char_id?;
+
+        // Check warp cooldown
+        {
+            let tm = self.teleport_manager.read();
+            if !tm.can_warp(player_id) {
+                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+            }
+        }
+
+        // Get player and their save point
+        let player = self.map_state.get_player(&player_id)?;
+        let save_point = {
+            let warp_service = &self.warp_service;
+            warp_service.get_save_point(char_id)?.clone()
+        };
+
+        // Execute the return warp
+        let warp_action = TeleportAction {
+            from_map: player.map_name.clone(),
+            to_map: save_point.map_name.clone(),
+            from_pos: (player.get_position()),
+            to_pos: (save_point.x, save_point.y),
+        };
+
+        match self.warp_service.execute_warp(session, warp_action) {
+            Ok(_) => {
+                // Send warp acknowledgment
+                Some(ZCWarpAck { warp_type: 2 }.to_packet())
+            }
+            Err(_) => {
+                Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
+            }
+        }
+    }
+
+    /// Handle GM warp command (0x0138)
+    /// @warp <map_name> <x> <y>
+    fn handle_gm_warp(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let pkt = CZGmWarp::from_slice(data)?;
+        let player_id = session.player_id?;
+
+        // Check GM permissions (simplified - in real implementation check account level)
+        // For now, allow all for testing
+
+        // Check warp cooldown
+        {
+            let tm = self.teleport_manager.read();
+            if !tm.can_warp(player_id) {
+                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+            }
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+
+        let warp_action = TeleportAction {
+            from_map: player.map_name.clone(),
+            to_map: pkt.map_name,
+            from_pos: player.get_position(),
+            to_pos: (pkt.x, pkt.y),
+        };
+
+        match self.warp_service.execute_warp(session, warp_action) {
+            Ok(_) => {
+                Some(ZCWarpAck { warp_type: 3 }.to_packet())
+            }
+            Err(_) => {
+                Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
+            }
+        }
+    }
+
+    /// Handle GM goto command (0x013A)
+    /// @goto <player_name> - teleport to another player
+    fn handle_gm_goto(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let pkt = CZGmGoto::from_slice(data)?;
+        let player_id = session.player_id?;
+
+        // Check warp cooldown
+        {
+            let tm = self.teleport_manager.read();
+            if !tm.can_warp(player_id) {
+                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+            }
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+
+        // Find target player by name
+        let target = self.map_state.find_player_by_name(&pkt.target_name);
+
+        if let Some(target) = target {
+            let target_pos = target.get_position();
+            let warp_action = TeleportAction {
+                from_map: player.map_name.clone(),
+                to_map: target.map_name.clone(),
+                from_pos: player.get_position(),
+                to_pos: target_pos,
+            };
+
+            match self.warp_service.execute_warp(session, warp_action) {
+                Ok(_) => {
+                    Some(ZCWarpAck { warp_type: 3 }.to_packet())
+                }
+                Err(_) => {
+                    Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
+                }
+            }
+        } else {
+            Some(ZCWarpError { error_code: ZCWarpError::TARGET_NOT_FOUND }.to_packet())
+        }
+    }
+
+    /// Handle GM summon command (0x013B)
+    /// @summon <player_name> - bring another player to current location
+    fn handle_gm_summon(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let pkt = CZGmSummon::from_slice(data)?;
+        let player_id = session.player_id?;
+
+        let player = self.map_state.get_player(&player_id)?;
+        let player_pos = player.get_position();
+        let player_map = player.map_name.clone();
+
+        // Find target player by name
+        let target = self.map_state.find_player_by_name(&pkt.target_name);
+
+        if let Some(target) = target {
+            let target_id = target.id;
+
+            // Check if target can warp
+            {
+                let tm = self.teleport_manager.read();
+                if !tm.can_warp(target_id) {
+                    return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+                }
+            }
+
+            // Note: In a full implementation, this would need to communicate
+            // with the target player's session to warp them
+            // For now, return success acknowledgment
+            Some(ZCWarpAck { warp_type: 3 }.to_packet())
+        } else {
+            Some(ZCWarpError { error_code: ZCWarpError::TARGET_NOT_FOUND }.to_packet())
+        }
+    }
+
+    /// Handle GM savepoint command (0x013C)
+    /// @savepoint - set current location as save point
+    fn handle_gm_savepoint(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let char_id = session.char_id?;
+
+        let player = self.map_state.get_player(&player_id)?;
+        let (x, y) = player.get_position();
+
+        // Set save point
+        {
+            let warp_service = &self.warp_service;
+            warp_service.set_save_point(char_id, &player.map_name, x, y);
+        }
+
+        // Notify player
+        Some(ZCSavePointSet {
+            map_name: player.map_name.clone(),
+            x,
+            y,
+        }.to_packet())
+    }
+
+    /// Handle restart (0x00B2) - 玩家死亡后重生到存储点
+    fn handle_restart(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let char_id = session.char_id?;
+        let player = self.map_state.get_player(&player_id)?;
+
+        // 只有死亡状态才能重生
+        if !player.is_dead() {
+            return None;
+        }
+
+        // 获取存储点（默认回到 new_1-1.gat 的出生点）
+        let save_point = self.warp_service.get_save_point(char_id)
+            .unwrap_or_else(|| {
+                crate::game::map::teleport::SavePoint::new("new_1-1.gat", 53, 111)
+            });
+
+        // 更新玩家运行时状态（通过 MapState 原子更新）
+        self.map_state.respawn_player(&player_id, save_point.x, save_point.y, &save_point.map_name);
+
+        // 更新 ChannelBus 中的位置
+        let new_channel = format!("map:{}", save_point.map_name);
+        self.channel_bus.update_position(&new_channel, &player_id, save_point.x, save_point.y);
+
+        // 发布重生事件
+        let revive_event = GameEvent::PlayerRevive {
+            player_id,
+            x: save_point.x,
+            y: save_point.y,
+        };
+        self.channel_bus.publish(&new_channel, &revive_event, vec![]);
+
+        // 更新数据库位置（best effort）
+        let _ = self.db.execute_with_params(
+            "UPDATE characters SET last_map = ?1, last_x = ?2, last_y = ?3, hp = ?4, sp = ?5 WHERE char_id = ?6",
+            rusqlite::params![save_point.map_name, save_point.x as i32, save_point.y as i32, *player.max_hp.read(), *player.max_sp.read(), char_id],
+        );
+
+        None
+    }
+
+    /// Handle guild create (0x0165)
+    fn handle_guild_create(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildCreate::from_slice(data)?;
+
+        if self.guild_manager.get_player_guild(&player_id).is_some() {
+            return Some(ZCGuildCreated { result: 2, guild_id: 0 }.to_packet());
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+        match self.guild_manager.create_guild(pkt.name.clone(), player.name.clone()) {
+            Some(guild_id) => {
+                self.guild_manager.join_guild(guild_id, player_id, player.name.clone());
+                self.guild_manager.set_member_position_direct(&guild_id, &player_id, 0);
+                Some(ZCGuildCreated { result: 0, guild_id: 0 }.to_packet())
+            }
+            None => Some(ZCGuildCreated { result: 1, guild_id: 0 }.to_packet()),
+        }
+    }
+
+    /// Handle guild invite (0x0168)
+    fn handle_guild_invite(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildInvite::from_slice(data)?;
+
+        let guild = self.guild_manager.get_player_guild(&player_id)?;
+        if !guild.has_permission(&player_id, crate::game::guild::GuildPermission::Invite) {
+            return None;
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+        // 查找目标玩家
+        let target = self.map_state.find_player_by_name(&pkt.target_name)?;
+        let target_id = target.id;
+
+        if self.guild_manager.get_player_guild(&target_id).is_some() {
+            return None; // 目标已在公会中
+        }
+
+        // 发送邀请通知给目标 (简化实现，直接返回ack)
+        Some(ZCGuildInvite {
+            guild_id: 0,
+            guild_name: guild.name.clone(),
+            inviter_name: player.name.clone(),
+        }.to_packet())
+    }
+
+    /// Handle guild join reply (0x0169)
+    fn handle_guild_join(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildJoin::from_slice(data)?;
+
+        if !pkt.accept {
+            return None;
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+        let guild_id = uuid::Uuid::from_u128(pkt.guild_id as u128);
+
+        if self.guild_manager.join_guild(guild_id, player_id, player.name.clone()) {
+            Some(ZCGuildLeaveResult { result: 0 }.to_packet())
+        } else {
+            Some(ZCGuildLeaveResult { result: 1 }.to_packet())
+        }
+    }
+
+    /// Handle guild leave (0x016B)
+    fn handle_guild_leave(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+
+        if self.guild_manager.leave_guild(player_id) {
+            Some(ZCGuildLeaveResult { result: 0 }.to_packet())
+        } else {
+            Some(ZCGuildLeaveResult { result: 1 }.to_packet())
+        }
+    }
+
+    /// Handle guild expel (0x016C)
+    fn handle_guild_expel(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildExpel::from_slice(data)?;
+
+        let guild = self.guild_manager.get_player_guild(&player_id)?;
+        let guild_id = guild.id;
+
+        let target = self.map_state.find_player_by_name(&pkt.target_name)?;
+        let target_id = target.id;
+
+        if self.guild_manager.expel_member(guild_id, &player_id, &target_id) {
+            Some(ZCGuildExpelResult {
+                result: 0,
+                target_name: pkt.target_name,
+                reason: pkt.reason,
+            }.to_packet())
+        } else {
+            Some(ZCGuildExpelResult {
+                result: 1,
+                target_name: pkt.target_name,
+                reason: String::new(),
+            }.to_packet())
+        }
+    }
+
+    /// Handle guild change notice (0x0183)
+    fn handle_guild_change_notice(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildChangeNotice::from_slice(data)?;
+
+        let guild_id = self.guild_manager.get_player_guild_id(&player_id)?;
+        let guild = self.guild_manager.get_guild(&guild_id)?;
+
+        if guild.has_permission(&player_id, crate::game::guild::GuildPermission::Expel) {
+            self.guild_manager.update_notice(&guild_id, pkt.notice.clone());
+            return Some(ZCGuildNotice { notice: pkt.notice }.to_packet());
+        }
+
+        None
+    }
+
+    /// Handle guild request info (0x01B7)
+    fn handle_guild_request_info(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let guild = self.guild_manager.get_player_guild(&player_id)?;
+
+        Some(ZCGuildInfo {
+            guild_id: 0,
+            level: guild.level,
+            member_count: guild.member_count,
+            max_members: guild.max_members,
+            average_level: guild.average_level,
+            exp: guild.exp,
+            max_exp: guild.max_exp,
+            notice: guild.notice.clone(),
+        }.to_packet())
+    }
+
+    /// Handle guild chat (0x01EC)
+    fn handle_guild_chat(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CZGuildChat::from_slice(data)?;
+
+        let player = self.map_state.get_player(&player_id)?;
+        let guild = self.guild_manager.get_player_guild(&player_id)?;
+
+        let channel_name = format!("guild:{}", guild.id);
+        let event = GameEvent::PlayerChat {
+            player_id,
+            message: pkt.message.clone(),
+            chat_type: ChatType::Party, // 复用Party聊天类型
+        };
+        self.channel_bus.publish(&channel_name, &event, vec![]);
+
+        Some(ZCGuildChat {
+            sender_name: player.name.clone(),
+            message: pkt.message,
+        }.to_packet())
+    }
+
+    /// Handle set savepoint (0x01B8)
+    /// NPC or item that sets the save point
+    fn handle_set_savepoint(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let char_id = session.char_id?;
+
+        let player = self.map_state.get_player(&player_id)?;
+        let (x, y) = player.get_position();
+
+        // Set save point
+        {
+            let warp_service = &self.warp_service;
+            warp_service.set_save_point(char_id, &player.map_name, x, y);
+        }
+
+        // Notify player
+        Some(ZCSavePointSet {
+            map_name: player.map_name.clone(),
+            x,
+            y,
+        }.to_packet())
+    }
 }
 
 #[cfg(test)]
@@ -497,8 +932,18 @@ mod tests {
     #[test]
     fn test_map_server_handles_unknown_packet() {
         use crate::game::trade::TradeManager;
+        use crate::game::guild::GuildManager;
+        use crate::game::map::teleport::{TeleportManager, WarpService, SavePointManager};
 
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
+        let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
+        let save_point_manager = Arc::new(RwLock::new(SavePointManager::new()));
+        let warp_service = Arc::new(WarpService::new(
+            teleport_manager.clone(),
+            save_point_manager.clone(),
+            db.clone(),
+        ));
+
         let server = MapServer::new(
             db,
             Arc::new(TokenStore::new()),
@@ -506,8 +951,11 @@ mod tests {
             Arc::new(ChannelBus::new()),
             Arc::new(DropManager::new()),
             Arc::new(PartyManager::new()),
+            Arc::new(GuildManager::new()),
             Arc::new(StorageManager::new()),
             Arc::new(TradeManager::new()),
+            teleport_manager,
+            warp_service,
             false,
         );
         let mut session = Session::new();

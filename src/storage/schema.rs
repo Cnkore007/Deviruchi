@@ -123,10 +123,17 @@ pub fn init_schema(db: &Database) -> Result<()> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS guilds (
             guild_id INTEGER PRIMARY KEY,
+            guild_uuid TEXT NOT NULL UNIQUE,
             name TEXT NOT NULL UNIQUE,
-            master INTEGER NOT NULL,
+            master_name TEXT NOT NULL DEFAULT '',
             guild_lv INTEGER DEFAULT 1,
             exp INTEGER DEFAULT 0,
+            max_exp INTEGER DEFAULT 1000,
+            member_count INTEGER DEFAULT 0,
+            max_members INTEGER DEFAULT 16,
+            average_level INTEGER DEFAULT 1,
+            notice TEXT DEFAULT '',
+            emblem_id INTEGER DEFAULT 0,
             emblem_data BLOB,
             created_at INTEGER NOT NULL
         )",
@@ -136,11 +143,34 @@ pub fn init_schema(db: &Database) -> Result<()> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS guild_members (
             guild_id INTEGER NOT NULL,
-            char_id INTEGER NOT NULL,
-            position INTEGER DEFAULT 0,
-            PRIMARY KEY (guild_id, char_id),
-            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id),
-            FOREIGN KEY (char_id) REFERENCES characters(char_id)
+            player_uuid TEXT NOT NULL,
+            char_id INTEGER NOT NULL DEFAULT 0,
+            name TEXT NOT NULL DEFAULT '',
+            position INTEGER DEFAULT 4,
+            level INTEGER DEFAULT 1,
+            job INTEGER DEFAULT 0,
+            contribution INTEGER DEFAULT 0,
+            online INTEGER DEFAULT 0,
+            map_name TEXT DEFAULT '',
+            joined_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (guild_id, player_uuid),
+            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id)
+        )",
+    )?;
+
+    // 公会职位表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS guild_positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            position_id INTEGER NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            can_invite INTEGER DEFAULT 0,
+            can_expel INTEGER DEFAULT 0,
+            can_use_storage INTEGER DEFAULT 0,
+            can_use_skill INTEGER DEFAULT 0,
+            UNIQUE(guild_id, position_id),
+            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
         )",
     )?;
 

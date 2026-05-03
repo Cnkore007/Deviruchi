@@ -7,5 +7,7 @@ pub mod map_packets;
 pub mod party_packets;
 pub mod storage_packets;
 pub mod trade_packets;
+pub mod teleport_packets;
+pub mod guild_packets;
 
 pub use packet_builder::{PacketBuilder, Packed, parse_string, parse_fixed_string};

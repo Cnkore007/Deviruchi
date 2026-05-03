@@ -78,6 +78,79 @@ impl MapState {
             .collect()
     }
 
+    /// 根据玩家名称查找玩家
+    pub fn find_player_by_name(&self, name: &str) -> Option<Player> {
+        let players = self.players.read();
+        players.values().find(|p| p.name == name).cloned()
+    }
+
+    /// 重生玩家：更新位置、地图、HP/SP、状态为 Alive
+    pub fn respawn_player(&self, player_id: &Uuid, x: u16, y: u16, new_map: &str) -> bool {
+        let mut players = self.players.write();
+        let Some(player) = players.get_mut(player_id) else {
+            return false;
+        };
+
+        let old_map = player.map_name.clone();
+        player.respawn(x, y);
+
+        // 如果地图改变，更新地图索引
+        if old_map != new_map {
+            player.map_name = new_map.to_string();
+            drop(players);
+            let mut by_map = self.players_by_map.write();
+            if let Some(list) = by_map.get_mut(&old_map) {
+                list.retain(|id| id != player_id);
+            }
+            by_map.entry(new_map.to_string()).or_default();
+            if let Some(list) = by_map.get_mut(new_map) {
+                if !list.contains(player_id) {
+                    list.push(*player_id);
+                }
+            }
+        }
+
+        true
+    }
+
+    /// 更新玩家的地图归属（玩家切换地图时调用）
+    pub fn update_player_map(&self, player_id: &Uuid, old_map: &str, new_map: &str) {
+        // 从旧地图移除
+        let mut by_map = self.players_by_map.write();
+        if let Some(players) = by_map.get_mut(old_map) {
+            players.retain(|id| id != player_id);
+        }
+        // 添加到新地图
+        by_map.entry(new_map.to_string()).or_default();
+        if let Some(players) = by_map.get_mut(new_map) {
+            if !players.contains(player_id) {
+                players.push(*player_id);
+            }
+        }
+    }
+
+    /// 给玩家增加基础经验（原地修改）
+    pub fn add_player_base_exp(&self, player_id: &Uuid, exp: u64) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.add_base_exp(exp);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 给玩家增加职业经验（原地修改）
+    pub fn add_player_job_exp(&self, player_id: &Uuid, exp: u64) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.add_job_exp(exp);
+            true
+        } else {
+            false
+        }
+    }
+
     /// 检查位置是否可通行（简化版本，始终返回 true）
     pub fn is_walkable(&self, _map_name: &str, _x: u16, _y: u16) -> bool {
         true // TODO: 实现实际碰撞检测
@@ -95,6 +168,7 @@ mod tests {
     use super::*;
     use parking_lot::RwLock;
     use crate::game::item::Equipment;
+    use crate::game::map::player::PlayerState;
 
     fn create_test_player(x: u16, y: u16, map: &str) -> Player {
         Player {
@@ -111,6 +185,9 @@ mod tests {
             max_sp: RwLock::new(100),
             base_level: RwLock::new(1),
             job_level: RwLock::new(1),
+            base_exp: RwLock::new(0),
+            job_exp: RwLock::new(0),
+            state: RwLock::new(PlayerState::Alive),
             str: RwLock::new(1),
             agi: RwLock::new(1),
             vit: RwLock::new(1),
