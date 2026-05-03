@@ -149,6 +149,7 @@ impl Player {
         *self.pos_x.write() = x;
         *self.pos_y.write() = y;
         *self.state.write() = PlayerState::Alive;
+        *self.is_sitting.write() = false;
     }
 
     /// 是否死亡
