@@ -22,6 +22,75 @@ impl MobDrop {
     }
 }
 
+/// 怪物路径管理器
+#[derive(Debug, Clone)]
+pub struct MobPathManager {
+    /// 是否正在追击
+    pub is_chasing: bool,
+    /// 追击目标坐标
+    pub target_pos: Option<(u16, u16)>,
+    /// 缓存的路径点列表（不含起点）
+    pub cached_path: Vec<(u16, u16)>,
+    /// 当前路径索引
+    pub current_step: usize,
+    /// 路径是否失效
+    pub path_invalid: bool,
+}
+
+impl MobPathManager {
+    pub fn new() -> Self {
+        Self {
+            is_chasing: false,
+            target_pos: None,
+            cached_path: Vec::new(),
+            current_step: 0,
+            path_invalid: false,
+        }
+    }
+
+    pub fn start_chase(&mut self, target: (u16, u16)) {
+        self.is_chasing = true;
+        self.target_pos = Some(target);
+        self.cached_path.clear();
+        self.current_step = 0;
+        self.path_invalid = false;
+    }
+
+    pub fn stop_chase(&mut self) {
+        self.is_chasing = false;
+        self.target_pos = None;
+        self.cached_path.clear();
+        self.current_step = 0;
+        self.path_invalid = false;
+    }
+
+    pub fn set_path(&mut self, path: Vec<(u16, u16)>) {
+        self.cached_path = path;
+        self.current_step = 0;
+        self.path_invalid = false;
+    }
+
+    pub fn invalidate(&mut self) {
+        self.path_invalid = true;
+    }
+
+    pub fn advance_step(&mut self) -> Option<(u16, u16)> {
+        if self.current_step < self.cached_path.len() {
+            let pos = self.cached_path[self.current_step];
+            self.current_step += 1;
+            Some(pos)
+        } else {
+            None
+        }
+    }
+}
+
+impl Default for MobPathManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// 怪物类型
 #[derive(Debug, Clone, Copy)]
 pub enum MobType {
@@ -96,6 +165,9 @@ pub struct Mob {
     pub base_exp: u64,
     pub job_exp: u64,
     pub drops_processed: RwLock<bool>,
+
+    // 路径管理
+    pub path_manager: RwLock<MobPathManager>,
 }
 
 impl Mob {
@@ -136,6 +208,7 @@ impl Mob {
             base_exp: 0,
             job_exp: 0,
             drops_processed: RwLock::new(false),
+            path_manager: RwLock::new(MobPathManager::new()),
         }
     }
 
@@ -177,6 +250,7 @@ impl Mob {
             base_exp: template.base_exp,
             job_exp: template.job_exp,
             drops_processed: RwLock::new(false),
+            path_manager: RwLock::new(MobPathManager::new()),
         }
     }
 
@@ -216,6 +290,7 @@ impl Mob {
         *self.target_id.write() = None;
         *self.death_time.write() = None;
         *self.drops_processed.write() = false;
+        *self.path_manager.write() = MobPathManager::new();
     }
 }
 
@@ -386,5 +461,70 @@ impl MobTemplate {
             base_exp: 10,
             job_exp: 5,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_manager_start_chase() {
+        let mut manager = MobPathManager::new();
+        assert!(!manager.is_chasing);
+        assert!(manager.cached_path.is_empty());
+
+        manager.start_chase((100, 200));
+
+        assert!(manager.is_chasing);
+        assert_eq!(manager.target_pos, Some((100, 200)));
+        assert!(manager.cached_path.is_empty());
+        assert_eq!(manager.current_step, 0);
+        assert!(!manager.path_invalid);
+    }
+
+    #[test]
+    fn test_path_manager_set_path() {
+        let mut manager = MobPathManager::new();
+        manager.start_chase((100, 200));
+
+        manager.set_path(vec![(10, 10), (11, 11), (12, 12)]);
+        assert_eq!(manager.cached_path.len(), 3);
+        assert_eq!(manager.current_step, 0);
+        assert!(!manager.path_invalid);
+    }
+
+    #[test]
+    fn test_path_manager_advance_step() {
+        let mut manager = MobPathManager::new();
+        manager.set_path(vec![(10, 10), (11, 11), (12, 12)]);
+
+        assert_eq!(manager.advance_step(), Some((10, 10)));
+        assert_eq!(manager.advance_step(), Some((11, 11)));
+        assert_eq!(manager.advance_step(), Some((12, 12)));
+        assert_eq!(manager.advance_step(), None);
+    }
+
+    #[test]
+    fn test_path_manager_invalidate() {
+        let mut manager = MobPathManager::new();
+        manager.set_path(vec![(10, 10)]);
+        assert!(!manager.path_invalid);
+
+        manager.invalidate();
+        assert!(manager.path_invalid);
+    }
+
+    #[test]
+    fn test_path_manager_stop_chase() {
+        let mut manager = MobPathManager::new();
+        manager.start_chase((100, 200));
+        manager.set_path(vec![(10, 10)]);
+
+        manager.stop_chase();
+
+        assert!(!manager.is_chasing);
+        assert_eq!(manager.target_pos, None);
+        assert!(manager.cached_path.is_empty());
     }
 }
