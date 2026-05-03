@@ -25,6 +25,7 @@ tokio-util = { version = "0.7", features = ["codec"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 rand = "0.8"
 futures-util = { version = "0.3", features = ["sink"] }
+pathfinding = "4"
 
 [lib]
 name = "deviruchi"
