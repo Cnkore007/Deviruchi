@@ -16,6 +16,7 @@ pub mod trade;
 pub mod zeny;
 pub mod guild;
 pub mod heal;
+pub mod script;
 
 pub use battle::BattleHandler;
 pub use char::CharServer;
@@ -35,3 +36,4 @@ pub use trade::TradeManager;
 pub use zeny::ZenyManager;
 pub use guild::{Guild, GuildManager, GuildMember, GuildPosition, GuildPermission};
 pub use heal::HealService;
+pub use script::{NpcScript, ScriptCommand, ScriptNode, parse_script};
