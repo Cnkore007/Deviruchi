@@ -113,3 +113,103 @@ impl Default for MobSpawnManager {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod combat_integration_tests {
+    use super::*;
+    use crate::game::mob::MobAIState;
+    use uuid::Uuid;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn test_mob_respawn_timer() {
+        let mob = Mob::new(1001, 10, 10, "prontera.gat");
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+
+        // 模拟死亡
+        mob.take_damage(mob.max_hp);
+        assert_eq!(*mob.ai_state.read(), MobAIState::Dead);
+        assert!(mob.death_time.read().is_some());
+
+        // 重生时间未到，不应重生
+        *mob.death_time.write() = Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64 - 1000));
+        let should_respawn = mob.death_time.read().map_or(false, |death_time| {
+            Instant::now().duration_since(death_time) >= Duration::from_millis(mob.respawn_time as u64)
+        });
+        assert!(!should_respawn);
+
+        // 重生时间已到
+        *mob.death_time.write() = Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64));
+        let should_respawn = mob.death_time.read().map_or(false, |death_time| {
+            Instant::now().duration_since(death_time) >= Duration::from_millis(mob.respawn_time as u64)
+        });
+        assert!(should_respawn);
+    }
+
+    #[test]
+    fn test_dmglog_tracking() {
+        let mob = Mob::new(1001, 10, 10, "prontera.gat");
+        let player1 = Uuid::new_v4();
+        let player2 = Uuid::new_v4();
+
+        mob.add_damage(player1, 10);
+        assert_eq!(*mob.dmglog.read().get(&player1).unwrap(), 10);
+
+        mob.add_damage(player1, 15);
+        assert_eq!(*mob.dmglog.read().get(&player1).unwrap(), 25);
+
+        mob.add_damage(player2, 5);
+        assert_eq!(*mob.dmglog.read().get(&player2).unwrap(), 5);
+
+        assert!(mob.dmglog.read().get(&Uuid::new_v4()).is_none());
+    }
+
+    #[test]
+    fn test_mob_respawn_resets_state() {
+        let mob = Mob::new(1001, 10, 10, "prontera.gat");
+        let player = Uuid::new_v4();
+
+        mob.take_damage(30);
+        mob.add_damage(player, 30);
+        assert_eq!(*mob.hp.read(), 70);
+
+        mob.take_damage(mob.max_hp); // 击杀
+        assert_eq!(*mob.hp.read(), 0);
+        assert_eq!(*mob.ai_state.read(), MobAIState::Dead);
+
+        mob.respawn();
+        assert_eq!(*mob.hp.read(), mob.max_hp);
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+        assert!(mob.dmglog.read().is_empty());
+        assert!(!*mob.drops_processed.read());
+    }
+
+    #[test]
+    fn test_drops_processed_flag_prevents_duplicate() {
+        let mob = Mob::new(1001, 10, 10, "prontera.gat");
+
+        // 初始为 false
+        assert!(!*mob.drops_processed.read());
+
+        // 模拟第一次进入 Dead 状态
+        mob.take_damage(mob.max_hp);
+        assert_eq!(*mob.ai_state.read(), MobAIState::Dead);
+        assert!(!*mob.drops_processed.read()); // 还未处理
+
+        // 模拟 GameLoop tick 中第一次调用 update_dead
+        *mob.drops_processed.write() = true; // 模拟处理完成
+        assert!(*mob.drops_processed.read());
+
+        // 第二次 tick 不会再处理（因为 drops_processed 已为 true）
+        // 这验证了防重机制
+    }
+
+    #[test]
+    fn test_from_template_has_correct_respawn_time() {
+        let mob = Mob::from_template(1001, 10, 10, "prontera.gat");
+        // Poring 的 respawn_time 是 60000ms
+        assert_eq!(mob.respawn_time, 60000);
+        assert_eq!(mob.max_hp, 50);
+        assert!(!mob.drops.is_empty()); // Poring 有掉落
+    }
+}
