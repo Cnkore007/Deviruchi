@@ -103,3 +103,91 @@ pub enum DialogueResponse {
     /// 对话关闭
     Closed,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::script::parse_script;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_simple_dialogue() {
+        let script = parse_script(r#"
+            mes "Hello!";
+            next;
+            mes "How are you?";
+            close;
+        "#);
+
+        let state = NpcDialogueState::new(
+            Uuid::new_v4(),
+            1,
+            script,
+        );
+
+        assert!(state.is_active());
+    }
+
+    #[test]
+    fn test_dialogue_process_mes() {
+        let script = parse_script(r#"mes "Welcome!";"#);
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
+
+        let response = state.process();
+        match response {
+            DialogueResponse::Message(msg) => assert_eq!(msg, "Welcome!"),
+            _ => panic!("Expected Message response"),
+        }
+    }
+
+    #[test]
+    fn test_dialogue_process_warp() {
+        let script = parse_script(r#"warp "prontera", 150, 183;"#);
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
+
+        let response = state.process();
+        match response {
+            DialogueResponse::Warp { map, x, y } => {
+                assert_eq!(map, "prontera");
+                assert_eq!(x, 150);
+                assert_eq!(y, 183);
+            }
+            _ => panic!("Expected Warp response"),
+        }
+    }
+
+    #[test]
+    fn test_dialogue_select() {
+        let script = parse_script(r#"select("Yes","No");"#);
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
+
+        let response = state.process();
+        match response {
+            DialogueResponse::Select(options) => {
+                assert_eq!(options.len(), 2);
+                assert_eq!(options[0], "Yes");
+                assert_eq!(options[1], "No");
+            }
+            _ => panic!("Expected Select response"),
+        }
+    }
+
+    #[test]
+    fn test_dialogue_close() {
+        let script = parse_script(r#"
+            mes "Goodbye!";
+            close;
+        "#);
+
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
+
+        // 处理 mes
+        let _ = state.process();
+        // 处理 close
+        let response = state.process();
+        match response {
+            DialogueResponse::Closed => {}
+            _ => panic!("Expected Closed response"),
+        }
+    }
+}
