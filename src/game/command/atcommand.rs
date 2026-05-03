@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use parking_lot::RwLock;
 use uuid::Uuid;
 
@@ -219,5 +220,130 @@ pub fn try_handle_command(
         Some(handler.execute(player, message, map_state))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_character() -> crate::storage::Character {
+        crate::storage::Character {
+            char_id: 1,
+            char_num: 0,
+            name: "TestPlayer".to_string(),
+            class: 0,
+            base_level: 1,
+            job_level: 1,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 1,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 100,
+            last_y: 100,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn test_atcommand_register() {
+        let handler = AtCommandHandler::new();
+        handler.register(CommandInfo {
+            name: "test",
+            aliases: vec!["t"],
+            min_level: 10,
+            description: "Test command",
+            usage: "@test",
+            handler: |_, _, _| CommandResult::Success("OK".to_string()),
+        });
+
+        assert!(handler.commands.read().contains_key("test"));
+        assert!(handler.commands.read().contains_key("t"));
+    }
+
+    #[test]
+    fn test_atcommand_execute() {
+        let handler = AtCommandHandler::new();
+        handler.register(CommandInfo {
+            name: "test",
+            aliases: vec![],
+            min_level: 0,
+            description: "Test",
+            usage: "@test",
+            handler: |_, _, _| CommandResult::Success("executed".to_string()),
+        });
+
+        let mut player = Player::from_character(create_test_character());
+        let map_state = Arc::new(MapState::new());
+        let result = handler.execute(&mut player, "@test", &map_state);
+
+        match result {
+            CommandResult::Success(msg) => assert_eq!(msg, "executed"),
+            _ => panic!("Expected success"),
+        }
+    }
+
+    #[test]
+    fn test_atcommand_unknown_command() {
+        let handler = AtCommandHandler::new();
+        let mut player = Player::from_character(create_test_character());
+        let map_state = Arc::new(MapState::new());
+        let result = handler.execute(&mut player, "@unknown", &map_state);
+
+        match result {
+            CommandResult::Failure(msg) => assert!(msg.contains("未知命令")),
+            _ => panic!("Expected failure"),
+        }
+    }
+
+    #[test]
+    fn test_permission_levels() {
+        let handler = AtCommandHandler::new();
+        assert_eq!(handler.get_level_name(0), "Player");
+        assert_eq!(handler.get_level_name(10), "GM");
+        assert_eq!(handler.get_level_name(99), "Super Admin");
+        assert_eq!(handler.get_level_name(255), "Unknown");
+    }
+
+    #[test]
+    fn test_try_handle_command() {
+        let handler = AtCommandHandler::new();
+        handler.register(CommandInfo {
+            name: "test",
+            aliases: vec![],
+            min_level: 0,
+            description: "Test",
+            usage: "@test",
+            handler: |_, _, _| CommandResult::Success("ok".to_string()),
+        });
+
+        let mut player = Player::from_character(create_test_character());
+        let map_state = Arc::new(MapState::new());
+
+        // 命令消息
+        assert!(try_handle_command(&handler, &mut player, "@test", &map_state).is_some());
+
+        // 普通消息
+        assert!(try_handle_command(&handler, &mut player, "hello world", &map_state).is_none());
     }
 }
