@@ -1,5 +1,6 @@
 pub mod battle;
 pub mod char;
+pub mod command;
 pub mod game_loop;
 pub mod item;
 pub mod login;
