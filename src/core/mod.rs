@@ -13,9 +13,9 @@ use std::sync::Arc;
 use crate::cli::Cli;
 use crate::storage::{Database, init_schema};
 use crate::network::{SessionManager, GameServer, PacketHandler};
-use crate::game::token::TokenStore;
 use crate::game::map::{MapState, ChannelBus, DropManager};
 use crate::game::party::PartyManager;
+use crate::game::token::TokenStore;
 
 pub struct Core {
     cli: Cli,
@@ -66,6 +66,31 @@ impl Core {
         let channel_bus = self.channel_bus.clone();
         let drop_manager = self.drop_manager.clone();
         let party_manager = self.party_manager.clone();
+
+        // 创建 MapDatabase
+        let map_database = Arc::new(crate::game::map::data::MapDatabase::new());
+
+        // 创建 MobSpawnManager（init_default_spawns 在 new() 中自动调用）
+        let spawn_manager = Arc::new(crate::game::mob::MobSpawnManager::new());
+
+        // 创建 MobAI
+        let mob_ai = Arc::new(crate::game::mob::MobAI::new(
+            spawn_manager.clone(),
+            channel_bus.clone(),
+            drop_manager.clone(),
+            party_manager.clone(),
+            map_database.clone(),
+        ));
+
+        // 创建并启动 GameLoop
+        let game_loop = Arc::new(crate::game::GameLoop::new(
+            map_state.clone(),
+            drop_manager.clone(),
+            token_store.clone(),
+            mob_ai.clone(),
+            spawn_manager.clone(),
+        ));
+        let _game_loop_handle = game_loop.clone().start();
 
         // 创建 PacketHandler
         let packet_handler = Arc::new(PacketHandler::new(
