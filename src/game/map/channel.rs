@@ -85,6 +85,17 @@ pub enum GameEvent {
         item_id: u32,
         amount: u16,
     },
+    MobDamage {
+        mob_id: Uuid,
+        attacker_id: Uuid,
+        damage: u32,
+        is_crit: bool,
+    },
+    MobHpUpdate {
+        mob_id: Uuid,
+        hp: u32,
+        max_hp: u32,
+    },
 }
 
 impl GameEvent {
@@ -103,6 +114,8 @@ impl GameEvent {
             GameEvent::MobDeath { killer_id, .. } => Some(*killer_id),
             GameEvent::ItemDrop { .. } => None,
             GameEvent::ItemPickup { player_id, .. } => Some(*player_id),
+            GameEvent::MobDamage { attacker_id, .. } => Some(*attacker_id),
+            GameEvent::MobHpUpdate { .. } => None,
         }
     }
 
