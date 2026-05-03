@@ -14,6 +14,7 @@ pub mod token;
 pub mod trade;
 pub mod zeny;
 pub mod guild;
+pub mod heal;
 
 pub use battle::BattleHandler;
 pub use char::CharServer;
@@ -31,3 +32,4 @@ pub use token::TokenStore;
 pub use trade::TradeManager;
 pub use zeny::ZenyManager;
 pub use guild::{Guild, GuildManager, GuildMember, GuildPosition, GuildPermission};
+pub use heal::HealService;

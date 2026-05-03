@@ -166,6 +166,11 @@ impl MapState {
     pub fn is_walkable(&self, _map_name: &str, _x: u16, _y: u16) -> bool {
         true // TODO: 实现实际碰撞检测
     }
+
+    /// 获取所有唯一地图名称
+    pub fn get_all_map_names(&self) -> Vec<String> {
+        self.players_by_map.read().keys().cloned().collect()
+    }
 }
 
 impl Default for MapState {

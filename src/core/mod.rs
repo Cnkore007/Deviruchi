@@ -6,6 +6,8 @@ pub mod panic;
 pub mod timer;
 pub mod version;
 
+use crate::game::heal;
+
 pub use config::{Config, HotReloadConfig};
 pub use version::VERSION;
 pub use logging::{LogManager, LogConfig, LogCategory, LogLevel};
@@ -28,11 +30,13 @@ pub struct Core {
     channel_bus: Arc<ChannelBus>,
     drop_manager: Arc<DropManager>,
     party_manager: Arc<PartyManager>,
+    heal_service: Arc<heal::HealService>,
 }
 
 impl Core {
     pub fn new(cli: Cli) -> Self {
         let config = Config::load(&cli.config).unwrap_or_default();
+        let config_for_heal = config.clone();
         Self {
             cli,
             config,
@@ -43,6 +47,7 @@ impl Core {
             channel_bus: Arc::new(ChannelBus::new()),
             drop_manager: Arc::new(DropManager::new()),
             party_manager: Arc::new(PartyManager::new()),
+            heal_service: Arc::new(heal::HealService::new(Arc::new(config_for_heal))),
         }
     }
 
@@ -64,6 +69,9 @@ impl Core {
         crate::core::panic::PanicHandler::init();
 
         tracing::info!("{} v{} 启动中...", crate::core::version::NAME, crate::core::VERSION);
+
+        // 启动 HP/SP 回复服务
+        self.heal_service.start(self.map_state.clone());
 
         // 初始化数据库
         let db = Arc::new(Database::open(&self.config.database.path)?);

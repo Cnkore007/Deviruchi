@@ -31,64 +31,64 @@ impl HealService {
         let threshold_hp = self.config.battle.natural_heal_threshold_hp;
         let threshold_sp = self.config.battle.natural_heal_threshold_sp;
 
-        // 获取所有唯一地图
-        let map_names: Vec<String> = {
-            let players = map_state.players.read();
-            players.values().map(|p| p.map_name.clone()).collect()
-        };
-        let unique_maps: Vec<String> = map_names.into_iter().collect::<std::collections::HashSet<_>>().into_iter().collect();
+        // 获取所有唯一地图名称
+        let unique_maps = map_state.get_all_map_names();
 
-        for map_name in unique_maps {
-            let players = map_state.get_players_on_map(&map_name);
+        for map_name in &unique_maps {
+            let players = map_state.get_players_on_map(map_name);
 
             for player in players {
-                if *player.state.read() == PlayerState::Dead {
-                    continue;
-                }
-
-                let is_sitting = player.is_sitting();
-
-                // 一次性读取所有 HP/SP 相关值，避免竞态
-                let (current_hp, max_hp, current_sp, max_sp) = {
-                    let hp = player.hp.read();
-                    let max_hp_val = *player.max_hp.read();
-                    let sp = player.sp.read();
-                    let max_sp_val = *player.max_sp.read();
-                    (*hp, max_hp_val, *sp, max_sp_val)
-                };
-
-                let mut changed = false;
-                let mut new_hp = current_hp;
-                let mut new_sp = current_sp;
-
-                // HP 回复
-                if current_hp < max_hp {
-                    let hp_threshold = (max_hp * threshold_hp) / 100;
-                    if current_hp >= hp_threshold {
-                        let heal = self.calculate_hp_heal(&player, is_sitting);
-                        new_hp = (current_hp + heal).min(max_hp);
-                        changed = true;
-                        tracing::trace!("Player {} healed {} HP (sitting: {})", player.name, heal, is_sitting);
-                    }
-                }
-
-                // SP 回复
-                if current_sp < max_sp {
-                    let sp_threshold = (max_sp * threshold_sp) / 100;
-                    if current_sp >= sp_threshold {
-                        let heal = self.calculate_sp_heal(&player, is_sitting);
-                        new_sp = (current_sp + heal).min(max_sp);
-                        changed = true;
-                        tracing::trace!("Player {} healed {} SP (sitting: {})", player.name, heal, is_sitting);
-                    }
-                }
-
-                // 一次性写入
-                if changed {
-                    *player.hp.write() = new_hp;
-                    *player.sp.write() = new_sp;
-                }
+                self.heal_player(&player, threshold_hp, threshold_sp);
             }
+        }
+    }
+
+    fn heal_player(&self, player: &Player, threshold_hp: u32, threshold_sp: u32) {
+        if *player.state.read() == PlayerState::Dead {
+            return;
+        }
+
+        let is_sitting = player.is_sitting();
+
+        // 一次性读取所有 HP/SP 相关值，避免竞态
+        let (current_hp, max_hp, current_sp, max_sp) = {
+            let hp = player.hp.read();
+            let max_hp_val = *player.max_hp.read();
+            let sp = player.sp.read();
+            let max_sp_val = *player.max_sp.read();
+            (*hp, max_hp_val, *sp, max_sp_val)
+        };
+
+        let mut changed = false;
+        let mut new_hp = current_hp;
+        let mut new_sp = current_sp;
+
+        // HP 回复
+        if current_hp < max_hp {
+            let hp_threshold = (max_hp * threshold_hp) / 100;
+            if current_hp >= hp_threshold {
+                let heal = self.calculate_hp_heal(player, is_sitting);
+                new_hp = (current_hp + heal).min(max_hp);
+                changed = true;
+                tracing::trace!("Player {} healed {} HP (sitting: {})", player.name, heal, is_sitting);
+            }
+        }
+
+        // SP 回复
+        if current_sp < max_sp {
+            let sp_threshold = (max_sp * threshold_sp) / 100;
+            if current_sp >= sp_threshold {
+                let heal = self.calculate_sp_heal(player, is_sitting);
+                new_sp = (current_sp + heal).min(max_sp);
+                changed = true;
+                tracing::trace!("Player {} healed {} SP (sitting: {})", player.name, heal, is_sitting);
+            }
+        }
+
+        // 一次性写入
+        if changed {
+            *player.hp.write() = new_hp;
+            *player.sp.write() = new_sp;
         }
     }
 
