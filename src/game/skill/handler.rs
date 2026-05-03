@@ -1,16 +1,22 @@
 use std::sync::Arc;
+use std::collections::HashMap;
+use uuid::Uuid;
+use parking_lot::RwLock;
 use crate::game::map::{Player, MapState};
 use super::data::SkillDatabase;
 use super::effect::{SkillEffect, SkillResult};
+use super::PlayerCooldown;
 
 pub struct SkillHandler {
     db: Arc<SkillDatabase>,
+    cooldowns: RwLock<HashMap<Uuid, PlayerCooldown>>,
 }
 
 impl SkillHandler {
     pub fn new() -> Self {
         Self {
             db: Arc::new(SkillDatabase::new()),
+            cooldowns: RwLock::new(HashMap::new()),
         }
     }
 
@@ -32,8 +38,12 @@ impl SkillHandler {
             return SkillError::NotEnoughHP;
         }
 
-        // 检查施法距离 (后续与地图集成)
         // 检查冷却时间
+        if let Err(e) = self.check_cooldown(player.id, skill.id) {
+            return e;
+        }
+
+        // 检查施法距离 (后续与地图集成)
 
         SkillError::None
     }
@@ -61,7 +71,14 @@ impl SkillHandler {
         // 获取目标玩家 (通过 char_id)
         let target = self.find_target_by_char_id(caster.clone(), target_id, map_state)?;
 
-        Ok(SkillEffect::apply(skill, &caster, &target, level))
+        let result = SkillEffect::apply(skill, &caster, &target, level);
+
+        // 设置冷却
+        if skill.cooldown > 0 {
+            self.set_cooldown(caster.id, skill.id, skill.cooldown);
+        }
+
+        Ok(result)
     }
 
     /// 根据 char_id 查找目标玩家
@@ -83,6 +100,40 @@ impl SkillHandler {
     /// 获取技能数据库
     pub fn get_database(&self) -> Arc<SkillDatabase> {
         self.db.clone()
+    }
+
+    /// 检查技能冷却
+    pub fn check_cooldown(&self, player_id: Uuid, skill_id: u16) -> Result<(), SkillError> {
+        let cooldowns = self.cooldowns.read();
+        if let Some(cd) = cooldowns.get(&player_id) {
+            if !cd.is_ready(skill_id) {
+                return Err(SkillError::Cooldown);
+            }
+        }
+        Ok(())
+    }
+
+    /// 设置技能冷却
+    pub fn set_cooldown(&self, player_id: Uuid, skill_id: u16, duration_ms: u32) {
+        let mut cooldowns = self.cooldowns.write();
+        let cd = cooldowns.entry(player_id).or_insert_with(|| PlayerCooldown::new(player_id));
+        cd.set_cooldown(skill_id, duration_ms);
+    }
+
+    /// 获取冷却剩余时间
+    pub fn get_cooldown_remaining(&self, player_id: Uuid, skill_id: u16) -> u64 {
+        let cooldowns = self.cooldowns.read();
+        cooldowns.get(&player_id)
+            .map(|cd| cd.remaining_ms(skill_id))
+            .unwrap_or(0)
+    }
+
+    /// 清除玩家所有冷却
+    pub fn clear_cooldowns(&self, player_id: Uuid) {
+        let mut cooldowns = self.cooldowns.write();
+        if let Some(cd) = cooldowns.get_mut(&player_id) {
+            cd.clear_all();
+        }
     }
 }
 
