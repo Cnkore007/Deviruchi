@@ -11,6 +11,7 @@ use crate::game::storage::StorageManager;
 use crate::game::trade::TradeManager;
 use crate::game::guild::GuildManager;
 use crate::game::map::teleport::{TeleportManager, WarpService, SavePointManager};
+use crate::game::mob::MobSpawnManager;
 
 pub struct PacketHandler {
     login_server: Arc<crate::game::login::LoginServer>,
@@ -53,6 +54,7 @@ impl PacketHandler {
             trade_manager,
             teleport_manager,
             warp_service,
+            Arc::new(MobSpawnManager::new()),
             false, // death_drop_items
         ));
 

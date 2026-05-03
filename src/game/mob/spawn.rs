@@ -62,6 +62,19 @@ impl MobSpawnManager {
         self.active_mobs.read().keys().cloned().collect()
     }
 
+    /// 根据 ID 获取怪物
+    pub fn get_mob(&self, mob_id: &uuid::Uuid) -> Option<Arc<Mob>> {
+        let active = self.active_mobs.read();
+        for mobs in active.values() {
+            for mob in mobs {
+                if mob.id == *mob_id {
+                    return Some(mob.clone());
+                }
+            }
+        }
+        None
+    }
+
     /// 初始化默认刷新点
     pub fn init_default_spawns(&self) {
         self.add_spawn("prontera.gat", SpawnPoint {

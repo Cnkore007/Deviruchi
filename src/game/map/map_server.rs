@@ -21,6 +21,8 @@ use crate::protocol::guild_packets::*;
 use crate::protocol::packet_builder::Packed;
 use crate::network::packet::id::*;
 use crate::game::storage::{StorageManager, Storage};
+use crate::game::battle::BattleHandler;
+use crate::game::mob::MobSpawnManager;
 
 pub struct MapServer {
     pub db: Arc<crate::storage::Database>,
@@ -34,7 +36,9 @@ pub struct MapServer {
     pub trade_manager: Arc<TradeManager>,
     pub teleport_manager: Arc<RwLock<TeleportManager>>,
     pub warp_service: Arc<WarpService>,
+    pub spawn_manager: Arc<MobSpawnManager>,
     pub death_drop_items: bool,
+    battle_handler: BattleHandler,
 }
 
 impl MapServer {
@@ -50,6 +54,7 @@ impl MapServer {
         trade_manager: Arc<TradeManager>,
         teleport_manager: Arc<RwLock<TeleportManager>>,
         warp_service: Arc<WarpService>,
+        spawn_manager: Arc<MobSpawnManager>,
         death_drop_items: bool,
     ) -> Self {
         Self {
@@ -64,7 +69,9 @@ impl MapServer {
             trade_manager,
             teleport_manager,
             warp_service,
+            spawn_manager,
             death_drop_items,
+            battle_handler: BattleHandler::new(),
         }
     }
 
@@ -205,23 +212,97 @@ impl MapServer {
     }
 
     /// Handle attack (0x0089)
+    /// 参考 rAthena: CZ_REQUEST_ACT → unit_attack → battle_attack
     fn handle_attack(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let action_pkt = CZRequestAction::from_slice(data)?;
 
         let player = self.map_state.get_player(&player_id)?;
+        let target_mob_id = Uuid::from_u128(action_pkt.target_id as u128);
 
-        let channel_name = format!("map:{}", player.map_name);
-        let event = GameEvent::PlayerAttack {
-            attacker_id: player_id,
-            target_id: Uuid::from_u128(action_pkt.target_id as u128),
-            damage: 10,
-            is_crit: false,
-            killed: false,
+        // 从 MobSpawnManager 查找目标怪物
+        let mob = self.spawn_manager.get_mob(&target_mob_id)?;
+
+        // 必须是同地图
+        if mob.map_name != player.map_name {
+            return None;
+        }
+
+        // 调用 BattleHandler 处理伤害
+        let result = self.battle_handler.normal_attack(&player, &mob);
+
+        match result {
+            crate::game::battle::AttackResult::Miss => None,
+            crate::game::battle::AttackResult::Hit { damage, is_crit, killed } => {
+                // 记录伤害（用于血条同步）
+                mob.add_damage(player_id, damage as u32);
+
+                // 广播 0x8d (ZC_NOTIFY_ACT) 给周围玩家
+                let channel_name = format!("map:{}", player.map_name);
+                let src_gid = player_id.as_u128() as u32;
+                let dst_gid = target_mob_id.as_u128() as u32;
+                let action_type = if is_crit { 5 } else { 0 };
+
+                use crate::protocol::map_packets::ZCNotifyAct;
+                let damage_packet = ZCNotifyAct {
+                    src_id: src_gid,
+                    dst_id: dst_gid,
+                    damage: damage as u32,
+                    action: action_type,
+                    left_damage: 0,
+                }.to_packet();
+
+                let event = GameEvent::MobDamage {
+                    mob_id: target_mob_id,
+                    attacker_id: player_id,
+                    damage: damage as u32,
+                    is_crit,
+                };
+                self.channel_bus.publish(&channel_name, &event, damage_packet);
+
+                // 如果击杀，发布 MobDeath 事件
+                if killed {
+                    let killer_id = player_id;
+                    let event = GameEvent::MobDeath {
+                        mob_id: target_mob_id,
+                        killer_id,
+                    };
+                    self.channel_bus.publish(&channel_name, &event, vec![]);
+                } else {
+                    // 广播 0x977 给 dmglog 中的玩家
+                    self.broadcast_mob_hp_bar(&mob, &channel_name);
+                }
+
+                None
+            }
+            crate::game::battle::AttackResult::Blocked | crate::game::battle::AttackResult::Immune => None,
+        }
+    }
+
+    /// 广播怪物血条给 dmglog 中的玩家（参考 rAthena mob_damage）
+    fn broadcast_mob_hp_bar(&self, mob: &Arc<crate::game::mob::Mob>, channel_name: &str) {
+        let dmglog = mob.dmglog.read();
+        if dmglog.is_empty() {
+            return;
+        }
+
+        let hp = *mob.hp.read();
+        let max_hp = mob.max_hp;
+        let mob_gid = mob.id.as_u128() as u32;
+
+        use crate::protocol::map_packets::ZCMonsterHpBar;
+        let hp_packet = ZCMonsterHpBar {
+            mob_id: mob_gid,
+            hp,
+            max_hp,
+        }.to_packet();
+
+        let event = GameEvent::MobHpUpdate {
+            mob_id: mob.id,
+            hp,
+            max_hp,
         };
-        self.channel_bus.publish(&channel_name, &event, vec![]);
-
-        None
+        self.channel_bus.publish(channel_name, &event, hp_packet);
     }
 
     /// Handle use item (0x009B)
@@ -956,6 +1037,7 @@ mod tests {
             Arc::new(TradeManager::new()),
             teleport_manager,
             warp_service,
+            Arc::new(MobSpawnManager::new()),
             false,
         );
         let mut session = Session::new();
