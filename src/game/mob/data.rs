@@ -1,4 +1,5 @@
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 use std::time::Instant;
 
@@ -168,6 +169,9 @@ pub struct Mob {
 
     // 路径管理
     pub path_manager: RwLock<MobPathManager>,
+
+    // 伤害记录（用于血条同步，参考 rAthena dmglog）
+    pub dmglog: RwLock<HashMap<Uuid, u32>>,
 }
 
 impl Mob {
@@ -209,6 +213,7 @@ impl Mob {
             job_exp: 0,
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
+            dmglog: RwLock::new(HashMap::new()),
         }
     }
 
@@ -251,6 +256,7 @@ impl Mob {
             job_exp: template.job_exp,
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
+            dmglog: RwLock::new(HashMap::new()),
         }
     }
 
@@ -280,6 +286,13 @@ impl Mob {
         *self.hp.read() == 0
     }
 
+    /// 记录玩家对此怪物造成的伤害
+    pub fn add_damage(&self, player_id: Uuid, damage: u32) {
+        let mut log = self.dmglog.write();
+        let entry = log.entry(player_id).or_insert(0);
+        *entry += damage;
+    }
+
     /// 重生：回到出生点并恢复满血
     pub fn respawn(&self) {
         *self.hp.write() = self.max_hp;
@@ -291,6 +304,7 @@ impl Mob {
         *self.death_time.write() = None;
         *self.drops_processed.write() = false;
         *self.path_manager.write() = MobPathManager::new();
+        self.dmglog.write().clear();
     }
 }
 
