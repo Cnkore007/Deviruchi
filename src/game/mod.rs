@@ -36,4 +36,4 @@ pub use trade::TradeManager;
 pub use zeny::ZenyManager;
 pub use guild::{Guild, GuildManager, GuildMember, GuildPosition, GuildPermission};
 pub use heal::HealService;
-pub use script::{NpcScript, ScriptCommand, ScriptNode, parse_script};
+pub use script::{NpcScript, ScriptCommand, ScriptNode, parse_script, NpcDialogueState, DialogueResponse};
