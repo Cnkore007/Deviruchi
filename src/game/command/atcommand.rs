@@ -6,7 +6,7 @@ use crate::game::map::{Player, MapState};
 
 /// 命令处理器类型
 pub type CommandHandler = fn(
-    player: &Player,
+    player: &mut Player,
     args: &[String],
     map_state: &MapState,
 ) -> CommandResult;
@@ -65,7 +65,7 @@ impl AtCommandHandler {
     }
 
     /// 执行命令
-    pub fn execute(&self, player: &Player, input: &str, map_state: &MapState) -> CommandResult {
+    pub fn execute(&self, player: &mut Player, input: &str, map_state: &MapState) -> CommandResult {
         let (cmd_name, args) = crate::game::command::parser::parse_command(input);
 
         if cmd_name.is_empty() {
@@ -118,6 +118,85 @@ impl AtCommandHandler {
 
         result.sort();
         result
+    }
+
+    /// 注册默认命令
+    pub fn register_default_commands(&self) {
+        use crate::game::command::commands;
+
+        // 传送命令
+        self.register(CommandInfo {
+            name: "warp",
+            aliases: vec!["mapmove", "rura"],
+            min_level: 10,
+            description: "传送到指定地图",
+            usage: "@warp <地图> [x] [y]",
+            handler: commands::teleport::cmd_warp,
+        });
+
+        self.register(CommandInfo {
+            name: "goto",
+            aliases: vec!["jumpto", "warpto"],
+            min_level: 10,
+            description: "传送到玩家位置",
+            usage: "@goto <玩家名>",
+            handler: commands::teleport::cmd_goto,
+        });
+
+        // 玩家命令
+        self.register(CommandInfo {
+            name: "heal",
+            aliases: vec![],
+            description: "恢复 HP 和 SP",
+            usage: "@heal",
+            min_level: 10,
+            handler: commands::player::cmd_heal,
+        });
+
+        self.register(CommandInfo {
+            name: "revive",
+            aliases: vec!["respawn"],
+            min_level: 10,
+            description: "复活",
+            usage: "@revive",
+            handler: commands::player::cmd_revive,
+        });
+
+        self.register(CommandInfo {
+            name: "level",
+            aliases: vec!["lv"],
+            min_level: 50,
+            description: "设置等级",
+            usage: "@level <1-99>",
+            handler: commands::player::cmd_level,
+        });
+
+        self.register(CommandInfo {
+            name: "zeny",
+            aliases: vec!["gold"],
+            min_level: 50,
+            description: "增加 Zeny",
+            usage: "@zeny <数量>",
+            handler: commands::player::cmd_zeny,
+        });
+
+        self.register(CommandInfo {
+            name: "hp",
+            aliases: vec![],
+            min_level: 10,
+            description: "设置 HP",
+            usage: "@hp <数量>",
+            handler: commands::player::cmd_hp,
+        });
+
+        self.register(CommandInfo {
+            name: "sp",
+            aliases: vec![],
+            min_level: 10,
+            description: "设置 SP",
+            usage: "@sp <数量>",
+            handler: commands::player::cmd_sp,
+        });
     }
 }
 
