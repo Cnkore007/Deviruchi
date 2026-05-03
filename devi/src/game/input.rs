@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::game::player::{Position, LocalPlayer};
 use crate::game::map::GameMap;
+use crate::network::Packet;
 
 const MOVE_SPEED: f32 = 5.0;
 
@@ -9,6 +10,7 @@ pub fn handle_input(
     time: Res<Time>,
     mut query: Query<(&mut Position, &mut Transform), With<LocalPlayer>>,
     map: Res<GameMap>,
+    network: Res<crate::network::NetworkResource>,
 ) {
     let Ok((mut pos, mut transform)) = query.get_single_mut() else {
         return;
@@ -32,6 +34,9 @@ pub fn handle_input(
 
     if dx != 0.0 || dy != 0.0 {
         let delta = time.delta_seconds() * MOVE_SPEED * 32.0;
+        let old_x = pos.x;
+        let old_y = pos.y;
+
         pos.x += dx * delta;
         pos.y += dy * delta;
 
@@ -41,5 +46,24 @@ pub fn handle_input(
 
         transform.translation.x = pos.x;
         transform.translation.y = pos.y;
+
+        // 发送移动协议
+        if old_x != pos.x || old_y != pos.y {
+            let packet = Packet {
+                packet_type: "MOVE".to_string(),
+                payload: serde_json::json!({
+                    "x": pos.x,
+                    "y": pos.y
+                }),
+            };
+            if let Ok(json) = serde_json::to_string(&packet) {
+                let client = network.client.clone();
+                tokio::spawn(async move {
+                    if let Some(c) = client.lock().await.as_ref() {
+                        c.send(&json).await.ok();
+                    }
+                });
+            }
+        }
     }
 }
