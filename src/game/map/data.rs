@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use super::cell::{Cell, CellType};
+use crate::game::rand::GameRng;
 
 /// 地图数据
 #[derive(Debug, Clone)]
@@ -45,15 +46,9 @@ impl MapData {
     }
 
     /// 获取随机可行走位置
-    pub fn random_walkable_pos(&self) -> Option<(u16, u16)> {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .subsec_nanos() as u32;
-
+    pub fn random_walkable_pos(&self, rng: &dyn GameRng) -> Option<(u16, u16)> {
         for attempt in 0..100 {
-            let seed = nanos.wrapping_add(attempt * 7919);
+            let seed = rng.rand_range(0, u32::MAX).wrapping_add(attempt as u32 * 7919);
             let x = (seed % self.width as u32) as u16;
             let y = ((seed / self.width as u32) % self.height as u32) as u16;
 

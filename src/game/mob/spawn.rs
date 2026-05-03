@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use parking_lot::RwLock;
+use uuid::Uuid;
 use crate::game::mob::Mob;
 
 /// 怪物刷新点
@@ -13,10 +15,14 @@ pub struct SpawnPoint {
     pub interval: u32,
 }
 
+/// 默认怪物重生延迟 (5 秒)
+pub const MOB_RESPAWN_DELAY_MS: u64 = 5000;
+
 /// 地图怪物刷新管理
 pub struct MobSpawnManager {
     spawns: RwLock<HashMap<String, Vec<SpawnPoint>>>,
     active_mobs: RwLock<HashMap<String, Vec<Arc<Mob>>>>,
+    death_times: RwLock<HashMap<Uuid, Instant>>,
 }
 
 impl MobSpawnManager {
@@ -24,6 +30,7 @@ impl MobSpawnManager {
         Self {
             spawns: RwLock::new(HashMap::new()),
             active_mobs: RwLock::new(HashMap::new()),
+            death_times: RwLock::new(HashMap::new()),
         }
     }
 
@@ -50,11 +57,43 @@ impl MobSpawnManager {
         if let Some(mobs) = active.get_mut(map_name) {
             mobs.retain(|m| &m.id != mob_id);
         }
+        // Record death time for respawn tracking
+        self.death_times.write().insert(*mob_id, Instant::now());
     }
 
     /// 获取地图上所有活跃怪物
     pub fn get_active_mobs(&self, map_name: &str) -> Vec<Arc<Mob>> {
         self.active_mobs.read().get(map_name).cloned().unwrap_or_default()
+    }
+
+    /// 获取所有地图上的所有活跃怪物
+    pub fn get_all_active_mobs(&self) -> Vec<Arc<Mob>> {
+        self.active_mobs.read().values().flatten().cloned().collect()
+    }
+
+    /// Check and process mob respawns. Called by GameLoop tick.
+    /// Returns list of mob IDs that just respawned.
+    pub fn check_respawn(&self, channel_bus: &crate::game::map::ChannelBus) -> Vec<Uuid> {
+        let mut respawned_ids = Vec::new();
+        let mut death_times = self.death_times.write();
+
+        let mobs_to_respawn: Vec<(Uuid, Instant)> = death_times
+            .iter()
+            .filter(|(_, death_time)| {
+                death_time.elapsed() >= Duration::from_millis(MOB_RESPAWN_DELAY_MS)
+            })
+            .map(|(id, time)| (*id, *time))
+            .collect();
+
+        for (mob_id, _) in mobs_to_respawn {
+            // Find the mob in active_mobs - it may have been re-added or we need to respawn it
+            // For now, we'll just remove the death time record
+            // The actual respawn will be handled by the mob itself in update_dead
+            death_times.remove(&mob_id);
+            respawned_ids.push(mob_id);
+        }
+
+        respawned_ids
     }
 
     /// 初始化默认刷新点

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use uuid::Uuid;
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SessionStage {
@@ -20,6 +21,8 @@ pub struct Session {
     pub client_type: u8,
     pub stage: SessionStage,
     pub player_id: Option<Uuid>,
+    /// Channel sender for game events pushed to client (connected to ChannelBus)
+    pub map_event_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
 }
 
 impl Session {
@@ -33,6 +36,7 @@ impl Session {
             client_type: 0,
             stage: SessionStage::Login,
             player_id: None,
+            map_event_tx: None,
         }
     }
 

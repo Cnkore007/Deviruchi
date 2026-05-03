@@ -166,6 +166,18 @@ impl Player {
         *self.job_exp.write() = job.saturating_sub(job / 100);
     }
 
+    /// 死亡时掉落 Zeny（默认掉落50%）
+    ///
+    /// 返回掉落的 Zeny 数量
+    pub fn drop_zeny_on_death(&self) -> u32 {
+        let zeny = *self.zeny.read();
+        let drop_amount = zeny / 2; // 50%
+        if drop_amount > 0 {
+            *self.zeny.write() = zeny - drop_amount;
+        }
+        drop_amount
+    }
+
     /// 获得基础经验值
     pub fn add_base_exp(&self, exp: u64) {
         *self.base_exp.write() += exp;
@@ -174,6 +186,11 @@ impl Player {
     /// 获得职业经验值
     pub fn add_job_exp(&self, exp: u64) {
         *self.job_exp.write() += exp;
+    }
+
+    /// 获得 Zeny
+    pub fn add_zeny(&self, zeny: u64) {
+        *self.zeny.write() += zeny as u32;
     }
 
     /// 计算最大负重 (基础20000 + STR*200, 单位0.1)
@@ -319,5 +336,51 @@ mod tests {
         let player = make_player();
         player.add_job_exp(200);
         assert_eq!(*player.job_exp.read(), 3200);
+    }
+
+    #[test]
+    fn test_player_drop_zeny_on_death_drops_50_percent() {
+        let player = make_player();
+        *player.zeny.write() = 1000;
+
+        let dropped = player.drop_zeny_on_death();
+
+        assert_eq!(dropped, 500); // 50% of 1000
+        assert_eq!(*player.zeny.read(), 500); // Remaining 50%
+    }
+
+    #[test]
+    fn test_player_drop_zeny_on_death_small_zeny() {
+        let player = make_player();
+        *player.zeny.write() = 1;
+
+        let dropped = player.drop_zeny_on_death();
+
+        // 1 / 2 = 0 in integer division, so no zeny is dropped
+        assert_eq!(dropped, 0);
+        assert_eq!(*player.zeny.read(), 1); // All zeny remains
+    }
+
+    #[test]
+    fn test_player_drop_zeny_on_death_zero_zeny() {
+        let player = make_player();
+        *player.zeny.write() = 0;
+
+        let dropped = player.drop_zeny_on_death();
+
+        assert_eq!(dropped, 0);
+        assert_eq!(*player.zeny.read(), 0);
+    }
+
+    #[test]
+    fn test_player_drop_zeny_on_death_odd_number() {
+        let player = make_player();
+        *player.zeny.write() = 101;
+
+        let dropped = player.drop_zeny_on_death();
+
+        // 101 / 2 = 50 (floor division)
+        assert_eq!(dropped, 50);
+        assert_eq!(*player.zeny.read(), 51);
     }
 }

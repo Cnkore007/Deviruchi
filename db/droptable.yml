@@ -1,0 +1,56 @@
+# Deviruchi Mob Drop Table
+# Format: Mob ID -> List of drop entries
+# - item_id: Item ID (0 = zeny)
+# - min_amount: Minimum drop amount
+# - max_amount: Maximum drop amount
+# - chance: Drop chance in basis points (0-10000, where 10000 = 100%)
+# - is_zeny: Whether this is zeny drop (item_id should be 0)
+# - is_mvp_bonus: Whether this only drops for MVP (requires MVP ID)
+
+1001: # Poring
+  - item_id: 501
+    min_amount: 1
+    max_amount: 1
+    chance: 5000
+    is_zeny: false
+    is_mvp_bonus: false
+  - item_id: 0
+    min_amount: 1
+    max_amount: 10
+    chance: 3000
+    is_zeny: true
+    is_mvp_bonus: false
+  - item_id: 1201
+    min_amount: 1
+    max_amount: 1
+    chance: 100
+    is_zeny: false
+    is_mvp_bonus: true
+
+1002: # Fabre
+  - item_id: 915
+    min_amount: 1
+    max_amount: 1
+    chance: 1000
+    is_zeny: false
+    is_mvp_bonus: false
+  - item_id: 0
+    min_amount: 5
+    max_amount: 15
+    chance: 5000
+    is_zeny: true
+    is_mvp_bonus: false
+
+1003: # Lunatic
+  - item_id: 507
+    min_amount: 1
+    max_amount: 1
+    chance: 2000
+    is_zeny: false
+    is_mvp_bonus: false
+  - item_id: 0
+    min_amount: 3
+    max_amount: 8
+    chance: 4000
+    is_zeny: true
+    is_mvp_bonus: false

@@ -85,6 +85,11 @@ pub enum GameEvent {
         item_id: u32,
         amount: u16,
     },
+    ItemDespawn {
+        item_id: u32,
+        x: u16,
+        y: u16,
+    },
 }
 
 impl GameEvent {
@@ -103,6 +108,7 @@ impl GameEvent {
             GameEvent::MobDeath { killer_id, .. } => Some(*killer_id),
             GameEvent::ItemDrop { .. } => None,
             GameEvent::ItemPickup { player_id, .. } => Some(*player_id),
+            GameEvent::ItemDespawn { .. } => None,
         }
     }
 
@@ -115,6 +121,7 @@ impl GameEvent {
             GameEvent::MobSpawn { x, y, .. } => Some((*x, *y)),
             GameEvent::MobMove { to_x, to_y, .. } => Some((*to_x, *to_y)),
             GameEvent::ItemDrop { x, y, .. } => Some((*x, *y)),
+            GameEvent::ItemDespawn { x, y, .. } => Some((*x, *y)),
             _ => None,
         }
     }

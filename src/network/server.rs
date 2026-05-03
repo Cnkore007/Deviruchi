@@ -54,13 +54,13 @@ impl GameServer {
         let mut session = Session::new();
         let session_id = session.id;
 
+        // Create channel for game events from ChannelBus to client
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        session.map_event_tx = Some(event_tx);
+
         session_manager.add(addr.to_string(), session.clone());
 
         let mut framed = Framed::new(stream, PacketCodec);
-
-        // Create a channel for receiving push packets
-        // In a full implementation, this would be connected to the ChannelBus
-        let (push_tx, mut push_rx) = mpsc::unbounded_channel::<Vec<u8>>();
 
         loop {
             tokio::select! {
@@ -83,14 +83,18 @@ impl GameServer {
                         None => break,
                     }
                 }
-                // Handle push packets from ChannelBus
-                push_data = push_rx.recv() => {
-                    if let Some(data) = push_data {
+                // Handle game events from ChannelBus
+                event_data = event_rx.recv() => {
+                    if let Some(data) = event_data {
                         if !data.is_empty() {
                             if let Err(e) = framed.send(data.into()).await {
-                                warn!("Failed to send push packet: {}", e);
+                                warn!("Failed to send event to client: {}", e);
                             }
                         }
+                    } else {
+                        // Channel closed - client disconnected from event bus
+                        warn!("Event channel closed for session {}", session_id);
+                        break;
                     }
                 }
             }

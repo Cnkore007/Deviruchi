@@ -4,6 +4,8 @@ use std::time::Instant;
 use parking_lot::RwLock;
 use uuid::Uuid;
 
+use super::channel::{ChannelBus, GameEvent};
+
 const DROP_TTL_SECS: u64 = 300; // 5 minutes
 
 #[derive(Debug, Clone)]
@@ -44,9 +46,56 @@ impl DropManager {
         id
     }
 
+    /// Add a dropped item and broadcast to nearby players
+    pub fn add_with_broadcast(
+        &self,
+        item_id: u32,
+        amount: u16,
+        x: u16,
+        y: u16,
+        map_name: &str,
+        channel_bus: &ChannelBus,
+    ) -> Uuid {
+        let id = self.add(item_id, amount, x, y, map_name);
+
+        // Broadcast item drop event
+        let channel_name = format!("map:{}", map_name);
+        let event = GameEvent::ItemDrop {
+            item_id,
+            x,
+            y,
+            amount,
+        };
+        channel_bus.publish(&channel_name, &event, vec![]);
+
+        id
+    }
+
     /// Pick up a dropped item, returns the DropItem if it exists
     pub fn pickup(&self, drop_id: &Uuid) -> Option<DropItem> {
         self.drops.write().remove(drop_id)
+    }
+
+    /// Pick up a dropped item and broadcast to nearby players
+    pub fn pickup_with_broadcast(
+        &self,
+        drop_id: &Uuid,
+        player_id: Uuid,
+        channel_bus: &ChannelBus,
+        map_name: &str,
+    ) -> Option<DropItem> {
+        let item = self.pickup(drop_id);
+        if let Some(ref drop) = item {
+            // Broadcast item pickup event
+            let channel_name = format!("map:{}", map_name);
+            let event = GameEvent::ItemPickup {
+                player_id,
+                item_id: drop.item_id,
+                amount: drop.amount,
+            };
+            channel_bus.publish(&channel_name, &event, vec![]);
+        }
+        item
     }
 
     /// Find a drop item at the given position
@@ -70,6 +119,46 @@ impl DropManager {
         for id in &expired {
             drops.remove(id);
         }
+        expired
+    }
+
+    /// Clean up expired drops and broadcast despawn events to nearby players.
+    /// Returns the list of expired drop IDs.
+    pub fn cleanup_expired_with_broadcast(&self, channel_bus: &ChannelBus) -> Vec<Uuid> {
+        // First get the expired drops info before removing
+        let expired_info: Vec<(Uuid, u32, u16, u16, String)> = {
+            let drops = self.drops.read();
+            drops
+                .iter()
+                .filter(|(_, d)| d.dropped_at.elapsed().as_secs() > DROP_TTL_SECS)
+                .map(|(id, d)| (*id, d.item_id, d.x, d.y, d.map_name.clone()))
+                .collect()
+        };
+
+        let expired: Vec<Uuid> = {
+            let mut drops = self.drops.write();
+            drops
+                .iter()
+                .filter(|(_, d)| d.dropped_at.elapsed().as_secs() > DROP_TTL_SECS)
+                .map(|(id, _)| *id)
+                .collect()
+        };
+
+        // Remove expired drops
+        {
+            let mut drops = self.drops.write();
+            for id in &expired {
+                drops.remove(id);
+            }
+        }
+
+        // Broadcast despawn events
+        for (_drop_id, item_id, x, y, map_name) in expired_info {
+            let channel_name = format!("map:{}", map_name);
+            let event = GameEvent::ItemDespawn { item_id, x, y };
+            channel_bus.publish(&channel_name, &event, vec![]);
+        }
+
         expired
     }
 

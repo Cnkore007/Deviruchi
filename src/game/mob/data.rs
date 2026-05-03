@@ -164,10 +164,14 @@ pub struct Mob {
     pub drops: Vec<MobDrop>,
     pub base_exp: u64,
     pub job_exp: u64,
+    pub zeny: Option<u64>,  // Zeny 掉落（运行时设置）
     pub drops_processed: RwLock<bool>,
 
     // 路径管理
     pub path_manager: RwLock<MobPathManager>,
+
+    // 伤害记录（用于确定 MVP）
+    pub damage_log: RwLock<std::collections::HashMap<Uuid, u64>>,
 }
 
 impl Mob {
@@ -207,8 +211,10 @@ impl Mob {
             drops: Vec::new(),
             base_exp: 0,
             job_exp: 0,
+            zeny: None,
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
+            damage_log: RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -249,8 +255,10 @@ impl Mob {
             drops: template.drops.clone(),
             base_exp: template.base_exp,
             job_exp: template.job_exp,
+            zeny: template.zeny,
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
+            damage_log: RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -326,6 +334,7 @@ impl MobDatabase {
                 ],
                 base_exp: 2,
                 job_exp: 1,
+                zeny: Some(10),
             },
             1002 => MobTemplate {
                 name: "Lunatic".to_string(),
@@ -352,6 +361,7 @@ impl MobDatabase {
                 ],
                 base_exp: 6,
                 job_exp: 4,
+                zeny: Some(15),
             },
             1003 => MobTemplate {
                 name: "Blue Poring".to_string(),
@@ -378,6 +388,7 @@ impl MobDatabase {
                 ],
                 base_exp: 4,
                 job_exp: 3,
+                zeny: Some(12),
             },
             1312 => MobTemplate {
                 name: "Fabre".to_string(),
@@ -404,6 +415,7 @@ impl MobDatabase {
                 ],
                 base_exp: 8,
                 job_exp: 5,
+                zeny: Some(20),
             },
             _ => MobTemplate::default(mob_id),
         }
@@ -434,6 +446,7 @@ pub struct MobTemplate {
     pub drops: Vec<MobDrop>,
     pub base_exp: u64,
     pub job_exp: u64,
+    pub zeny: Option<u64>,
 }
 
 impl MobTemplate {
@@ -460,6 +473,7 @@ impl MobTemplate {
             drops: Vec::new(),
             base_exp: 10,
             job_exp: 5,
+            zeny: None,
         }
     }
 }

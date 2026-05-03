@@ -145,10 +145,11 @@ impl MapServer {
         // Update session
         session.player_id = Some(player_id);
 
-        // Subscribe to map channel
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let channel_name = format!("map:{}", map_name);
-        self.channel_bus.subscribe(&channel_name, player_id, tx, pos_x, pos_y);
+        // Subscribe to map channel using session's event sender
+        if let Some(tx) = &session.map_event_tx {
+            let channel_name = format!("map:{}", map_name);
+            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), pos_x, pos_y);
+        }
 
         // Return accept packet (simplified)
         Some(vec![0x2D, 0xD3, 0x00, 0x00])
@@ -276,11 +277,12 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
         let party = self.party_manager.create_party(&pkt.party_name, player_id, player.name.clone());
 
-        // Subscribe to party channel
-        let channel_name = format!("party:{}", party.id);
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let (x, y) = player.get_position();
-        self.channel_bus.subscribe(&channel_name, player_id, tx, x, y);
+        // Subscribe to party channel using session's event sender
+        if let Some(tx) = &session.map_event_tx {
+            let channel_name = format!("party:{}", party.id);
+            let (x, y) = player.get_position();
+            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), x, y);
+        }
 
         None
     }
@@ -307,11 +309,12 @@ impl MapServer {
 
         self.party_manager.join_party(&party_id, player_id, player.name.clone())?;
 
-        // Subscribe to party channel
-        let channel_name = format!("party:{}", party_id);
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let (x, y) = player.get_position();
-        self.channel_bus.subscribe(&channel_name, player_id, tx, x, y);
+        // Subscribe to party channel using session's event sender
+        if let Some(tx) = &session.map_event_tx {
+            let channel_name = format!("party:{}", party_id);
+            let (x, y) = player.get_position();
+            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), x, y);
+        }
 
         None
     }

@@ -151,6 +151,17 @@ impl MapState {
         }
     }
 
+    /// 给玩家增加 Zeny（原地修改）
+    pub fn add_player_zeny(&self, player_id: &Uuid, zeny: u64) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.add_zeny(zeny);
+            true
+        } else {
+            false
+        }
+    }
+
     /// 检查位置是否可通行（简化版本，始终返回 true）
     pub fn is_walkable(&self, _map_name: &str, _x: u16, _y: u16) -> bool {
         true // TODO: 实现实际碰撞检测
