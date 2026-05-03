@@ -7,21 +7,30 @@ use super::data::SkillDatabase;
 use super::effect::{SkillEffect, SkillResult};
 use super::PlayerCooldown;
 
+#[derive(Clone)]
 pub struct SkillHandler {
     db: Arc<SkillDatabase>,
-    cooldowns: RwLock<HashMap<Uuid, PlayerCooldown>>,
+    // Note: cooldowns is not cloned - each clone shares the same underlying map
+    cooldowns: Arc<RwLock<HashMap<Uuid, PlayerCooldown>>>,
 }
 
 impl SkillHandler {
     pub fn new() -> Self {
         Self {
             db: Arc::new(SkillDatabase::new()),
-            cooldowns: RwLock::new(HashMap::new()),
+            cooldowns: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// 检查是否能使用技能
-    pub fn can_use_skill(&self, player: &Player, skill_id: u16, level: u8) -> SkillError {
+    /// 检查是否能使用技能（完整检查）
+    pub fn can_use_skill(
+        &self,
+        player: &Player,
+        skill_id: u16,
+        level: u8,
+        target_id: u32,
+        map_state: &MapState,
+    ) -> SkillError {
         let skill = match self.db.get(skill_id) {
             Some(s) => s,
             None => return SkillError::SkillNotFound,
@@ -43,7 +52,10 @@ impl SkillHandler {
             return e;
         }
 
-        // 检查施法距离 (后续与地图集成)
+        // 检查施法距离
+        if target_id != 0 && !self.is_target_in_range(player, target_id, skill.range, map_state) {
+            return SkillError::OutOfRange;
+        }
 
         SkillError::None
     }
@@ -57,6 +69,12 @@ impl SkillHandler {
         target_id: u32,
         map_state: &MapState,
     ) -> Result<SkillResult, SkillError> {
+        // 完整检查
+        let error = self.can_use_skill(&caster, skill_id, level, target_id, map_state);
+        if error != SkillError::None {
+            return Err(error);
+        }
+
         let skill = self.db.get(skill_id)
             .ok_or(SkillError::SkillNotFound)?;
 
@@ -68,10 +86,30 @@ impl SkillHandler {
             *caster.hp.write() -= skill.hp_cost;
         }
 
-        // 获取目标玩家 (通过 char_id)
-        let target = self.find_target_by_char_id(caster.clone(), target_id, map_state)?;
+        // 获取目标玩家
+        let target = if target_id != 0 {
+            Some(self.find_target_by_char_id(caster.clone(), target_id, map_state)?)
+        } else {
+            None
+        };
 
-        let result = SkillEffect::apply(skill, &caster, &target, level);
+        // 执行效果
+        let result = if let Some(ref t) = target {
+            SkillEffect::apply(skill, &caster, t, level)
+        } else {
+            SkillEffect::apply(skill, &caster, &caster, level)
+        };
+
+        // 应用伤害/治疗
+        if let SkillResult::Damage { damage, .. } = &result {
+            if let Some(ref t) = target {
+                let died = t.take_damage(*damage as u32);
+                tracing::info!("Skill {} dealt {} damage to {}", skill.name, damage, t.name);
+                if died {
+                    tracing::info!("Player {} was killed", t.name);
+                }
+            }
+        }
 
         // 设置冷却
         if skill.cooldown > 0 {
@@ -79,6 +117,30 @@ impl SkillHandler {
         }
 
         Ok(result)
+    }
+
+    /// 检查目标是否在技能范围内
+    pub fn is_in_range(&self, caster: &Player, target: &Player, range: u16) -> bool {
+        if caster.map_name != target.map_name {
+            return false;
+        }
+        let (cx, cy) = caster.get_position();
+        let (tx, ty) = target.get_position();
+        let dx = (cx as i32 - tx as i32).unsigned_abs() as u16;
+        let dy = (cy as i32 - ty as i32).unsigned_abs() as u16;
+        dx <= range && dy <= range
+    }
+
+    /// 检查玩家是否在范围内
+    pub fn is_target_in_range(&self, caster: &Player, target_char_id: u32, range: u16, map_state: &MapState) -> bool {
+        let map_name = caster.map_name.clone();
+        let players = map_state.get_players_on_map(&map_name);
+
+        if let Some(target) = players.iter().find(|p| p.char_id == target_char_id) {
+            self.is_in_range(caster, target, range)
+        } else {
+            false
+        }
     }
 
     /// 根据 char_id 查找目标玩家
@@ -144,7 +206,7 @@ impl Default for SkillHandler {
 }
 
 /// 技能错误
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SkillError {
     None,
     SkillNotFound,
@@ -153,4 +215,5 @@ pub enum SkillError {
     OutOfRange,
     Cooldown,
     InvalidTarget,
+    NoTarget,
 }
