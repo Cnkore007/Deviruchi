@@ -205,3 +205,19 @@ impl Default for AtCommandHandler {
         Self::new()
     }
 }
+
+/// 处理聊天消息中的命令
+/// 如果消息以 @ 开头，则作为命令处理
+/// 返回 Some(result) 如果是命令，否则返回 None
+pub fn try_handle_command(
+    handler: &AtCommandHandler,
+    player: &mut Player,
+    message: &str,
+    map_state: &MapState,
+) -> Option<CommandResult> {
+    if message.starts_with('@') {
+        Some(handler.execute(player, message, map_state))
+    } else {
+        None
+    }
+}

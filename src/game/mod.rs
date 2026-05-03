@@ -19,6 +19,7 @@ pub mod heal;
 
 pub use battle::BattleHandler;
 pub use char::CharServer;
+pub use command::AtCommandHandler;
 pub use game_loop::GameLoop;
 pub use item::ItemHandler;
 pub use login::LoginServer;

@@ -11,6 +11,7 @@ use crate::game::heal;
 pub use config::{Config, HotReloadConfig};
 pub use version::VERSION;
 pub use logging::{LogManager, LogConfig, LogCategory, LogLevel};
+pub use crate::game::AtCommandHandler;
 
 use std::sync::Arc;
 use crate::cli::Cli;
@@ -31,12 +32,18 @@ pub struct Core {
     drop_manager: Arc<DropManager>,
     party_manager: Arc<PartyManager>,
     heal_service: Arc<heal::HealService>,
+    at_command_handler: Arc<AtCommandHandler>,
 }
 
 impl Core {
     pub fn new(cli: Cli) -> Self {
         let config = Config::load(&cli.config).unwrap_or_default();
         let config_for_heal = config.clone();
+        let at_command_handler = Arc::new({
+            let handler = AtCommandHandler::new();
+            handler.register_default_commands();
+            handler
+        });
         Self {
             cli,
             config,
@@ -48,6 +55,7 @@ impl Core {
             drop_manager: Arc::new(DropManager::new()),
             party_manager: Arc::new(PartyManager::new()),
             heal_service: Arc::new(heal::HealService::new(Arc::new(config_for_heal))),
+            at_command_handler,
         }
     }
 
