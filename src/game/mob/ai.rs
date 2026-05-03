@@ -570,6 +570,7 @@ mod tests {
             current_weight: parking_lot::RwLock::new(0),
             max_weight: parking_lot::RwLock::new(20000),
             equipment: parking_lot::RwLock::new(crate::game::item::Equipment::new()),
+            is_sitting: parking_lot::RwLock::new(false),
         })
     }
 
@@ -851,6 +852,7 @@ mod tests {
             current_weight: parking_lot::RwLock::new(0),
             max_weight: parking_lot::RwLock::new(20000),
             equipment: parking_lot::RwLock::new(crate::game::item::Equipment::new()),
+            is_sitting: parking_lot::RwLock::new(false),
         });
 
         let map_state = create_test_map_state();

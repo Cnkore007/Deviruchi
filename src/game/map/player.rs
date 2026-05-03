@@ -37,6 +37,7 @@ pub struct Player {
     pub current_weight: RwLock<u32>,
     pub max_weight: RwLock<u32>,
     pub equipment: RwLock<Equipment>,
+    pub is_sitting: RwLock<bool>,
 }
 
 impl Clone for Player {
@@ -69,6 +70,7 @@ impl Clone for Player {
             current_weight: RwLock::new(*self.current_weight.read()),
             max_weight: RwLock::new(*self.max_weight.read()),
             equipment: RwLock::new(self.equipment.read().clone()),
+            is_sitting: RwLock::new(*self.is_sitting.read()),
         }
     }
 }
@@ -104,6 +106,7 @@ impl Player {
             current_weight: RwLock::new(0),
             max_weight: RwLock::new(20000 + (char.str as u32) * 200),
             equipment: RwLock::new(Equipment::new()),
+            is_sitting: RwLock::new(false),
         }
     }
 
@@ -156,6 +159,21 @@ impl Player {
     /// 是否存活
     pub fn is_alive(&self) -> bool {
         *self.state.read() == PlayerState::Alive
+    }
+
+    /// 坐下
+    pub fn sit(&self) {
+        *self.is_sitting.write() = true;
+    }
+
+    /// 站起
+    pub fn stand(&self) {
+        *self.is_sitting.write() = false;
+    }
+
+    /// 是否坐下
+    pub fn is_sitting(&self) -> bool {
+        *self.is_sitting.read()
     }
 
     /// 施加死亡惩罚：损失 1% 当前经验值
@@ -253,6 +271,7 @@ mod tests {
             current_weight: RwLock::new(0),
             max_weight: RwLock::new(20000),
             equipment: RwLock::new(Equipment::new()),
+            is_sitting: RwLock::new(false),
         }
     }
 

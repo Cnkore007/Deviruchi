@@ -210,6 +210,7 @@ mod tests {
             current_weight: RwLock::new(0),
             max_weight: RwLock::new(20000 + 200),
             equipment: RwLock::new(Equipment::new()),
+            is_sitting: RwLock::new(false),
         }
     }
 
