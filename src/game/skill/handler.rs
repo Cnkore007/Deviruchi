@@ -217,3 +217,100 @@ pub enum SkillError {
     InvalidTarget,
     NoTarget,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_player_cooldown_new() {
+        let player_id = Uuid::new_v4();
+        let cd = PlayerCooldown::new(player_id);
+        assert_eq!(cd.player_id(), player_id);
+    }
+
+    #[test]
+    fn test_player_cooldown_ready_initially() {
+        let cd = PlayerCooldown::new(Uuid::new_v4());
+        assert!(cd.is_ready(1)); // 新技能无冷却
+        assert!(cd.is_ready(100));
+    }
+
+    #[test]
+    fn test_player_cooldown_set() {
+        let cd = PlayerCooldown::new(Uuid::new_v4());
+        cd.set_cooldown(1, 5000);
+        assert!(!cd.is_ready(1)); // 刚设置的技能应该冷却中
+        assert!(cd.remaining_ms(1) > 0);
+    }
+
+    #[test]
+    fn test_player_cooldown_others_ready() {
+        let cd = PlayerCooldown::new(Uuid::new_v4());
+        cd.set_cooldown(1, 5000);
+        assert!(cd.is_ready(2)); // 其他技能不受影响
+    }
+
+    #[test]
+    fn test_player_cooldown_clear() {
+        let cd = PlayerCooldown::new(Uuid::new_v4());
+        cd.set_cooldown(1, 5000);
+        cd.set_cooldown(2, 5000);
+        cd.clear_all();
+        assert!(cd.is_ready(1));
+        assert!(cd.is_ready(2));
+    }
+
+    #[test]
+    fn test_skill_handler_new() {
+        let handler = SkillHandler::new();
+        assert!(handler.get_database().get(1).is_some()); // 默认技能存在
+    }
+
+    #[test]
+    fn test_skill_handler_default() {
+        let handler = SkillHandler::default();
+        assert!(handler.get_database().get(1).is_some());
+    }
+
+    #[test]
+    fn test_skill_cooldown_check() {
+        let handler = SkillHandler::new();
+        let player_id = Uuid::new_v4();
+
+        // 新技能无冷却
+        assert!(handler.check_cooldown(player_id, 1).is_ok());
+
+        // 设置冷却
+        handler.set_cooldown(player_id, 1, 5000);
+        assert!(handler.check_cooldown(player_id, 1).is_err());
+
+        // 其他技能不受影响
+        assert!(handler.check_cooldown(player_id, 2).is_ok());
+    }
+
+    #[test]
+    fn test_skill_cooldown_remaining() {
+        let handler = SkillHandler::new();
+        let player_id = Uuid::new_v4();
+
+        assert_eq!(handler.get_cooldown_remaining(player_id, 1), 0);
+
+        handler.set_cooldown(player_id, 1, 5000);
+        let remaining = handler.get_cooldown_remaining(player_id, 1);
+        assert!(remaining > 0 && remaining <= 5000);
+    }
+
+    #[test]
+    fn test_skill_clear_cooldowns() {
+        let handler = SkillHandler::new();
+        let player_id = Uuid::new_v4();
+
+        handler.set_cooldown(player_id, 1, 5000);
+        handler.set_cooldown(player_id, 2, 5000);
+        handler.clear_cooldowns(player_id);
+
+        assert!(handler.check_cooldown(player_id, 1).is_ok());
+        assert!(handler.check_cooldown(player_id, 2).is_ok());
+    }
+}

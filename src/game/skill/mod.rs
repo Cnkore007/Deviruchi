@@ -67,4 +67,9 @@ impl PlayerCooldown {
     pub fn clear_all(&self) {
         self.cooldowns.write().clear();
     }
+
+    /// 获取玩家ID
+    pub fn player_id(&self) -> Uuid {
+        self.player_id
+    }
 }
