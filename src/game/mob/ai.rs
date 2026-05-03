@@ -2,7 +2,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 use crate::game::mob::{Mob, MobAIState, MobSpawnManager};
+use crate::game::mob::pathfinder::Pathfinder;
 use crate::game::map::{MapState, ChannelBus, GameEvent, DropManager};
+use crate::game::map::data::MapDatabase;
 use crate::game::party::PartyManager;
 use crate::game::battle::ExpDistributor;
 
@@ -12,6 +14,7 @@ pub struct MobAI {
     channel_bus: Arc<ChannelBus>,
     drop_manager: Arc<DropManager>,
     party_manager: Arc<PartyManager>,
+    map_database: Arc<MapDatabase>,
 }
 
 impl MobAI {
@@ -20,8 +23,9 @@ impl MobAI {
         channel_bus: Arc<ChannelBus>,
         drop_manager: Arc<DropManager>,
         party_manager: Arc<PartyManager>,
+        map_database: Arc<MapDatabase>,
     ) -> Self {
-        Self { spawn_manager, channel_bus, drop_manager, party_manager }
+        Self { spawn_manager, channel_bus, drop_manager, party_manager, map_database }
     }
 
     /// 更新怪物AI
@@ -81,14 +85,66 @@ impl MobAI {
                 } else if distance > mob.chase_range {
                     *mob.ai_state.write() = MobAIState::Return;
                     *mob.target_id.write() = None;
+                    mob.path_manager.write().stop_chase();
                 } else {
-                    let new_x = Self::approach(x, tx);
-                    let new_y = Self::approach(y, ty);
-                    mob.move_to(new_x, new_y);
+                    // 使用 MobPathManager 寻路
+                    let mut pm = mob.path_manager.write();
+
+                    // 检查是否需要重新计算路径
+                    let needs_recalc = !pm.is_chasing
+                        || pm.target_pos != Some((tx, ty))
+                        || pm.path_invalid;
+
+                    if needs_recalc {
+                        // 获取地图数据
+                        if let Some(map_data) = self.map_database.get(&mob.map_name) {
+                            // 创建可通行性检查闭包
+                            let is_walkable = |wx: u16, wy: u16| -> bool {
+                                map_data.is_walkable(wx, wy)
+                            };
+
+                            // 计算新路径
+                            if let Some(path) = Pathfinder::find_path(
+                                (x, y),
+                                (tx, ty),
+                                is_walkable,
+                                mob.chase_range,
+                            ) {
+                                pm.start_chase((tx, ty));
+                                pm.set_path(path);
+                            } else {
+                                // 无法找到路径，停止追击
+                                pm.stop_chase();
+                                drop(pm);
+                                *mob.ai_state.write() = MobAIState::Return;
+                                *mob.target_id.write() = None;
+                                return;
+                            }
+                        } else {
+                            // 没有地图数据，使用简单追击
+                            pm.stop_chase();
+                        }
+                    }
+
+                    // 沿路径移动一步
+                    let mut pm = mob.path_manager.write();
+                    if let Some(next_pos) = pm.advance_step() {
+                        let (nx, ny) = next_pos;
+                        // 验证下一步可通行（双重检查）
+                        if let Some(map_data) = self.map_database.get(&mob.map_name) {
+                            if map_data.is_walkable(nx, ny) {
+                                mob.move_to(nx, ny);
+                            } else {
+                                // 路径失效，需要下次重算
+                                pm.invalidate();
+                            }
+                        }
+                    }
                 }
             } else {
                 *mob.ai_state.write() = MobAIState::Return;
                 *mob.target_id.write() = None;
+                mob.path_manager.write().stop_chase();
             }
         }
     }
@@ -208,14 +264,6 @@ impl MobAI {
         let dx = (x1 as i32 - x2 as i32).abs();
         let dy = (y1 as i32 - y2 as i32).abs();
         ((dx * dx + dy * dy) as f32).sqrt() as u16
-    }
-
-    fn approach(current: u16, target: u16) -> u16 {
-        if current < target {
-            (current + 1).min(target)
-        } else {
-            current.saturating_sub(1)
-        }
     }
 }
 
