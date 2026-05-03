@@ -1,0 +1,7 @@
+2026-05-03T17:39:38.258716Z  INFO deviruchi::core::logging: src/core/logging.rs:270: 日志系统初始化完成, 目录: logs
+2026-05-03T17:39:38.258756Z  INFO deviruchi::core: src/core/mod.rs:66: Deviruchi v0.1.0 启动中...
+2026-05-03T17:39:38.261546Z  INFO deviruchi::storage::schema: src/storage/schema.rs:177: 数据库 Schema 初始化完成
+2026-05-03T17:39:38.261596Z  INFO deviruchi::core: src/core/mod.rs:92: 服务器初始化完成
+2026-05-03T17:39:38.261605Z  INFO deviruchi::core: src/core/mod.rs:93: 运行模式: all
+2026-05-03T17:39:38.261614Z  INFO deviruchi::core: src/core/mod.rs:103: 启动 Login Server: 0.0.0.0:6900
+2026-05-03T17:39:38.261828Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6900

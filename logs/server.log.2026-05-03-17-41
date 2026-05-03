@@ -1,0 +1,30 @@
+2026-05-03T17:41:13.829034Z  INFO deviruchi::core::logging: src/core/logging.rs:270: 日志系统初始化完成, 目录: logs
+2026-05-03T17:41:13.829107Z  INFO deviruchi::core: src/core/mod.rs:66: Deviruchi v0.1.0 启动中...
+2026-05-03T17:41:13.831871Z  INFO deviruchi::storage::schema: src/storage/schema.rs:177: 数据库 Schema 初始化完成
+2026-05-03T17:41:13.831890Z  INFO deviruchi::core: src/core/mod.rs:92: 服务器初始化完成
+2026-05-03T17:41:13.831899Z  INFO deviruchi::core: src/core/mod.rs:93: 运行模式: all
+2026-05-03T17:41:13.832055Z  INFO deviruchi::core: src/core/mod.rs:120: 启动 Login Server: 0.0.0.0:6900
+2026-05-03T17:41:13.832093Z  INFO deviruchi::core: src/core/mod.rs:155: 启动 Modern Server (WebSocket): 0.0.0.0:16121
+2026-05-03T17:41:13.832120Z  INFO deviruchi::core: src/core/mod.rs:144: 启动 Map Server: 0.0.0.0:6121
+2026-05-03T17:41:13.832130Z  INFO deviruchi::core: src/core/mod.rs:132: 启动 Char Server: 0.0.0.0:6000
+2026-05-03T17:41:13.832258Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6900
+2026-05-03T17:41:13.832280Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6000
+2026-05-03T17:41:13.832304Z  INFO deviruchi::network::modern_server: src/network/modern_server.rs:67: Modern Server listening on 0.0.0.0:16121
+2026-05-03T17:41:13.832322Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6121
+2026-05-03T17:41:44.692116Z  INFO deviruchi::core::logging: src/core/logging.rs:270: 日志系统初始化完成, 目录: logs
+2026-05-03T17:41:44.692135Z  INFO deviruchi::core: src/core/mod.rs:66: Deviruchi v0.1.0 启动中...
+2026-05-03T17:41:44.692981Z  INFO deviruchi::storage::schema: src/storage/schema.rs:177: 数据库 Schema 初始化完成
+2026-05-03T17:41:44.692989Z  INFO deviruchi::core: src/core/mod.rs:92: 服务器初始化完成
+2026-05-03T17:41:44.692995Z  INFO deviruchi::core: src/core/mod.rs:93: 运行模式: all
+2026-05-03T17:41:44.693028Z  INFO deviruchi::core: src/core/mod.rs:132: 启动 Char Server: 0.0.0.0:6000
+2026-05-03T17:41:44.693036Z  INFO deviruchi::core: src/core/mod.rs:144: 启动 Map Server: 0.0.0.0:6121
+2026-05-03T17:41:44.693090Z  INFO deviruchi::core: src/core/mod.rs:120: 启动 Login Server: 0.0.0.0:6900
+2026-05-03T17:41:44.693106Z  INFO deviruchi::core: src/core/mod.rs:155: 启动 Modern Server (WebSocket): 0.0.0.0:16121
+2026-05-03T17:41:44.693137Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6000
+2026-05-03T17:41:44.693164Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6900
+2026-05-03T17:41:44.693177Z  INFO deviruchi::network::server: src/network/server.rs:26: Server listening on 0.0.0.0:6121
+2026-05-03T17:41:44.693188Z  INFO deviruchi::network::modern_server: src/network/modern_server.rs:67: Modern Server listening on 0.0.0.0:16121
+2026-05-03T17:41:53.445888Z  INFO deviruchi::network::modern_server: src/network/modern_server.rs:93: New Modern connection: 127.0.0.1:53171
+2026-05-03T17:41:53.445999Z  INFO deviruchi::network::modern_server: src/network/modern_server.rs:130: Player Player_3eeab1de joined at (160, 160)
+2026-05-03T17:41:53.446125Z  WARN deviruchi::network::modern_server: src/network/modern_server.rs:144: WebSocket error: IO error: Connection reset by peer (os error 54)
+2026-05-03T17:41:53.446137Z  INFO deviruchi::network::modern_server: src/network/modern_server.rs:175: Player Player_3eeab1de disconnected
