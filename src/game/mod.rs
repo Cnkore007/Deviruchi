@@ -18,7 +18,7 @@ pub use battle::BattleHandler;
 pub use char::CharServer;
 pub use game_loop::GameLoop;
 pub use item::ItemHandler;
-pub use map::{MapState, TeleportManager, WarpService, WarpError, TeleportAction, MapEdge, MapAdjacency};
+pub use map::{MapState, TeleportManager, WarpService, WarpError, TeleportAction, MapEdge, MapAdjacency, MapDatabase};
 pub use mob::{MobSpawnManager, MobAI};
 pub use npc::NpcHandler;
 pub use party::PartyManager;

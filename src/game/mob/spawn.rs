@@ -57,6 +57,11 @@ impl MobSpawnManager {
         self.active_mobs.read().get(map_name).cloned().unwrap_or_default()
     }
 
+    /// 获取所有有活跃怪物的地图
+    pub fn get_active_maps(&self) -> Vec<String> {
+        self.active_mobs.read().keys().cloned().collect()
+    }
+
     /// 初始化默认刷新点
     pub fn init_default_spawns(&self) {
         self.add_spawn("prontera.gat", SpawnPoint {
