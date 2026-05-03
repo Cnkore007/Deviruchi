@@ -169,6 +169,57 @@ impl Packed for CHMakeChar {
     }
 }
 
+/// 服务器通知动作/伤害 (0x008D)
+/// 参考 rAthena: clif_damage() in clif.cpp
+#[derive(Debug, Clone)]
+pub struct ZCNotifyAct {
+    pub src_id: u32,       // 攻击者 GID
+    pub dst_id: u32,       // 目标 GID
+    pub damage: u32,       // 伤害值
+    pub action: u8,         // 0=damage, 5=critical, 14=pickup
+    pub left_damage: u32,  // 左侧伤害（分身后用）
+}
+
+impl Packed for ZCNotifyAct {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x008D)
+            .put_u32(self.src_id)
+            .put_u32(self.dst_id)
+            .put_u32(self.damage)
+            .put_u8(self.action)
+            .put_u32(self.left_damage)
+            .build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 怪物血条更新 (0x0977)
+/// 参考 rAthena: clif_monster_hp_bar() in clif.cpp
+/// 只发送给 dmglog 中的玩家（攻击过该怪物的玩家）
+#[derive(Debug, Clone)]
+pub struct ZCMonsterHpBar {
+    pub mob_id: u32,
+    pub hp: u32,
+    pub max_hp: u32,
+}
+
+impl Packed for ZCMonsterHpBar {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0977)
+            .put_u32(self.mob_id)
+            .put_u32(self.hp)
+            .put_u32(self.max_hp)
+            .build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
 /// Char Server 通知客户端连接 Map Server (0x0083)
 #[derive(Debug, Clone)]
 pub struct HCNotifyZoneServer {
@@ -317,5 +368,47 @@ mod tests {
         assert_eq!(pkt.account_id, 1);
         assert_eq!(pkt.target_id, 2);
         assert_eq!(pkt.action_type, 7);
+    }
+
+    #[test]
+    fn test_zc_notify_act_packet_id() {
+        let pkt = ZCNotifyAct {
+            src_id: 1,
+            dst_id: 2,
+            damage: 50,
+            action: 0,
+            left_damage: 0,
+        };
+        let bytes = pkt.to_packet();
+        let packet_id = u16::from_le_bytes([bytes[2], bytes[3]]);
+        assert_eq!(packet_id, 0x008D);
+    }
+
+    #[test]
+    fn test_zc_monster_hp_bar_packet_id() {
+        let pkt = ZCMonsterHpBar {
+            mob_id: 100,
+            hp: 30,
+            max_hp: 100,
+        };
+        let bytes = pkt.to_packet();
+        let packet_id = u16::from_le_bytes([bytes[2], bytes[3]]);
+        assert_eq!(packet_id, 0x0977);
+    }
+
+    #[test]
+    fn test_zc_notify_act_content() {
+        let pkt = ZCNotifyAct {
+            src_id: 12345,
+            dst_id: 67890,
+            damage: 999,
+            action: 5,
+            left_damage: 0,
+        };
+        let bytes = pkt.to_packet();
+        // BytesMut uses big-endian, so read as BE
+        assert_eq!(u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 12345);
+        assert_eq!(u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 67890);
+        assert_eq!(u32::from_be_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]), 999);
     }
 }
