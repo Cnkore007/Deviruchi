@@ -118,3 +118,162 @@ impl LoginServer {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::login_packets::CALogin;
+    use crate::protocol::packet_builder::Packed;
+    use crate::storage::{init_schema, Database};
+
+    /// 创建测试用的 LoginServer，内部包含内存数据库和已初始化的 schema
+    fn create_test_server() -> (LoginServer, Arc<Database>) {
+        let db = Arc::new(Database::open_memory().unwrap());
+        init_schema(&db).unwrap();
+        let session_manager = Arc::new(SessionManager::new());
+        let server = LoginServer::new(db.clone(), session_manager);
+        (server, db)
+    }
+
+    /// 构造一个合法的 CALogin 包的原始字节
+    fn make_login_packet(username: &str, password: &str, version: u32) -> Vec<u8> {
+        CALogin {
+            version,
+            username: username.to_string(),
+            password: password.to_string(),
+        }
+        .to_packet()
+    }
+
+    #[test]
+    fn test_login_success() {
+        let (server, db) = create_test_server();
+        // 创建测试账户，密码为 "password123"
+        db.create_account("testuser", "password123", 1).unwrap();
+
+        let packet = make_login_packet("testuser", "password123", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "成功登录应返回响应包");
+
+        let response = result.unwrap();
+        // ACAceptLogin 包头: 2字节长度 + 2字节 packet_id (0x0069)
+        assert_eq!(response.len(), 4 + 4 + 4 + 4 + 1, "ACAceptLogin 包长度应为 17 字节");
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x0069, "应返回 ACAceptLogin (0x0069)");
+
+        // 验证 session 已更新
+        assert!(session.authenticated, "登录成功后 session 应标记为已认证");
+        assert!(session.account_id.is_some(), "登录成功后 session 应有 account_id");
+    }
+
+    #[test]
+    fn test_login_account_not_found() {
+        let (server, _db) = create_test_server();
+        // 不创建任何账户
+
+        let packet = make_login_packet("nonexistent", "password", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "账号不存在时应返回拒绝包而非 None");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin (0x006A)");
+
+        // 验证 session 未被修改
+        assert!(!session.authenticated, "登录失败后 session 不应标记为已认证");
+        assert!(session.account_id.is_none(), "登录失败后 session 不应有 account_id");
+    }
+
+    #[test]
+    fn test_login_wrong_password() {
+        let (server, db) = create_test_server();
+        db.create_account("testuser", "correct_password", 1).unwrap();
+
+        let packet = make_login_packet("testuser", "wrong_password", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "密码错误时应返回拒绝包");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin (0x006A)");
+        assert!(!session.authenticated, "密码错误后 session 不应标记为已认证");
+    }
+
+    #[test]
+    fn test_login_banned_account() {
+        let (server, db) = create_test_server();
+        // 创建账户
+        let account_id = db.create_account("banned_user", "password", 1).unwrap();
+        // 将账户状态设为封禁 (state != 0)
+        db.execute_with_params(
+            "UPDATE accounts SET state = 5 WHERE account_id = ?1",
+            rusqlite::params![account_id],
+        ).unwrap();
+
+        let packet = make_login_packet("banned_user", "password", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "封禁账户应返回拒绝包");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin (0x006A)");
+        // error_code = 3 表示封禁/暂停
+        assert_eq!(response[4], 3, "封禁账户的 error_code 应为 3");
+    }
+
+    #[test]
+    fn test_login_packet_dispatch() {
+        let (server, db) = create_test_server();
+        db.create_account("user", "pass", 0).unwrap();
+
+        let packet = make_login_packet("user", "pass", 20);
+        let mut session = Session::new();
+
+        // 通过 handle_packet 分发
+        let result = server.handle_packet(0x0064, &packet[4..], &mut session);
+        assert!(result.is_some(), "通过 handle_packet 分发应正常工作");
+
+        // 未知包 ID
+        let result = server.handle_packet(0xFFFF, &[], &mut session);
+        assert!(result.is_none(), "未知包 ID 应返回 None");
+    }
+
+    #[test]
+    fn test_login_truncated_packet() {
+        let (server, _db) = create_test_server();
+        let mut session = Session::new();
+
+        // 发送截断的数据包（长度不足）
+        let truncated = vec![0u8; 10];
+        let result = server.handle_ca_login(&truncated, &mut session);
+        assert!(result.is_none(), "截断的包应返回 None（CALogin::from_slice 失败）");
+    }
+
+    #[test]
+    fn test_login_sets_login_ids() {
+        let (server, db) = create_test_server();
+        db.create_account("user", "pass", 0).unwrap();
+
+        // 设置自定义 login_id
+        server.set_login_ids(12345, 67890);
+
+        let packet = make_login_packet("user", "pass", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session).unwrap();
+        // ACAceptLogin 结构: [len:2LE][id:2LE][account_id:4BE][login_id1:4BE][login_id2:4BE][sex:1]
+        // 注意: PacketBuilder::put_u32 使用大端序（bytes crate 默认行为）
+        let login_id1 = u32::from_be_bytes([result[8], result[9], result[10], result[11]]);
+        let login_id2 = u32::from_be_bytes([result[12], result[13], result[14], result[15]]);
+        assert_eq!(login_id1, 12345, "login_id1 应匹配设置的值");
+        assert_eq!(login_id2, 67890, "login_id2 应匹配设置的值");
+    }
+}
