@@ -4,7 +4,6 @@ use crate::game::status::{PlayerStatus, StatusChange, StatusEffect, StatusSource
 use crate::storage::Character;
 use crate::storage::character::{CharacterHotkeyData, CharacterInventoryData};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -236,65 +235,6 @@ impl Player {
         }
     }
 
-    /// 从 CharacterData 创建 Player
-    #[allow(dead_code)]
-    pub fn from_character_data(
-        _db: &crate::storage::Database,
-        char: crate::game::map::CharacterData,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            id: Uuid::new_v4(),
-            char_id: char.char_id,
-            account_id: char.account_id,
-            name: char.name.clone(),
-            map_name: char.last_map.clone(),
-            combat: RwLock::new(CombatStats {
-                hp: char.hp,
-                max_hp: char.max_hp,
-                sp: char.sp,
-                max_sp: char.max_sp,
-                state: PlayerState::Alive,
-                in_combat: false,
-                is_sitting: false,
-                walk_speed: constants::DEFAULT_WALK_SPEED,
-            }),
-            pos: RwLock::new(Position {
-                x: char.last_x as u16,
-                y: char.last_y as u16,
-            }),
-            level: RwLock::new(LevelStats {
-                base_level: char.base_level,
-                job_level: char.job_level,
-                base_exp: char.base_exp,
-                job_exp: char.job_exp,
-            }),
-            attrs: RwLock::new(Attributes {
-                str: char.str,
-                agi: char.agi,
-                vit: char.vit,
-                int: char.int,
-                dex: char.dex,
-                luk: char.luk,
-            }),
-            economy: RwLock::new(Economy {
-                zeny: char.zeny,
-                current_weight: 0,
-                max_weight: constants::BASE_MAX_WEIGHT + (char.str as u32) * constants::WEIGHT_PER_STR,
-                job: char.job,
-                shop_id: None,
-                group_id: 0,
-            }),
-            save_point: RwLock::new(SavePoint {
-                map: char.save_map.clone(),
-                x: char.save_x as u16,
-                y: char.save_y as u16,
-            }),
-            equipment: RwLock::new(Equipment::new()),
-            status: PlayerStatus::new(Uuid::new_v4()),
-            inventory: RwLock::new(Vec::new()),
-            hotkeys: RwLock::new(Vec::new()),
-        })
-    }
 
     // ==================== 分组锁访问器 ====================
 

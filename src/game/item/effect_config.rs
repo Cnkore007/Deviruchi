@@ -546,21 +546,16 @@ mod tests {
     #[test]
     fn test_requirements_check() {
         use crate::game::map::Player;
-        use crate::storage::Database;
-
-        // 创建测试数据库
-        let db = Database::open_memory().unwrap();
 
         // 创建测试角色
-        let char_data = crate::game::map::CharacterData {
+        let char_data = crate::storage::Character {
             char_id: 1,
-            account_id: 1,
+            char_num: 0,
             name: "TestPlayer".to_string(),
-            job: 0,
-            level: 10,
+            class: 0,
             base_level: 10,
-            base_exp: 0,
             job_level: 1,
+            base_exp: 0,
             job_exp: 0,
             hp: 1000,
             max_hp: 1000,
@@ -573,15 +568,26 @@ mod tests {
             dex: 10,
             luk: 10,
             zeny: 1000,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
             last_map: "new_1-1.gat".to_string(),
             last_x: 53,
             last_y: 111,
             save_map: "new_1-1.gat".to_string(),
             save_x: 53,
             save_y: 111,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         };
 
-        let player = Player::from_character_data(&db, char_data);
+        let player = Player::from_character(char_data);
 
         // 测试等级要求
         let requirements = ItemRequirements {
