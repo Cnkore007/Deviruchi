@@ -465,8 +465,18 @@ impl MapServer {
             inviter.name, player_id, target.name, pkt.target_account_id, party.name, party.id
         );
 
-        // TODO: Send actual invite packet to target via channel_bus
-        // For now, log the invite - target player would need a UI notification
+        // Build invite packet: opcode(2) + party_id(4) + party_name(24)
+        // Use opcode 0x00dc (ZC_PARTY_JOIN_REQ) as placeholder
+        let mut packet = Vec::with_capacity(30);
+        packet.extend_from_slice(&0x00dcu16.to_le_bytes());
+        packet.extend_from_slice(&party.id.as_bytes()[0..4]); // first 4 bytes of UUID as party_id
+        let name_bytes = party.name.as_bytes();
+        let mut name_buf = [0u8; 24];
+        let copy_len = name_bytes.len().min(24);
+        name_buf[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
+        packet.extend_from_slice(&name_buf);
+
+        self.channel_bus.send_to_player(&target.id, packet);
 
         None
     }
@@ -481,14 +491,14 @@ impl MapServer {
         }
 
         let player = self.map_state.get_player(&player_id)?;
-        let party_id = Uuid::from_u128(pkt.party_id as u128);
+        let party = self.party_manager.find_party_by_short_id(pkt.party_id)?;
 
         self.party_manager
-            .join_party(&party_id, player_id, player.name.clone())?;
+            .join_party(&party.id, player_id, player.name.clone())?;
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
-            let channel_name = format!("party:{}", party_id);
+            let channel_name = format!("party:{}", party.id);
             let (x, y) = player.get_position();
             self.channel_bus
                 .subscribe(&channel_name, player_id, tx.clone(), x, y);
@@ -500,7 +510,10 @@ impl MapServer {
     /// Handle party leave (0x0103)
     fn handle_party_leave(&self, session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
+        let party = self.party_manager.get_player_party(&player_id)?;
+        let channel_name = format!("party:{}", party.id);
         self.party_manager.leave_party(&player_id);
+        self.channel_bus.unsubscribe(&channel_name, &player_id);
         None
     }
 

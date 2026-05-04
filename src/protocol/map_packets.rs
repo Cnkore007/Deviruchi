@@ -1,4 +1,4 @@
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string, parse_string};
 
 const NAME_LENGTH: usize = 24;
 
@@ -296,6 +296,167 @@ impl Packed for CZContactNpc {
     }
 }
 
+// ─── NPC 对话相关数据包 ───────────────────────────────────────────
+
+/// 服务器发送 NPC 对话消息 (0x00B4)
+#[derive(Debug, Clone)]
+pub struct ZcSayDialog {
+    pub npc_id: u32,
+    pub message: String,
+}
+
+impl Packed for ZcSayDialog {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B4)
+            .put_u32(self.npc_id)
+            .put_str(&self.message)
+            .put_u8(0)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 5 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let mut offset = 4;
+        let message = parse_string(slice, &mut offset)?;
+        Some(Self { npc_id, message })
+    }
+}
+
+/// 服务器发送 NPC 等待对话 (0x00B5)
+#[derive(Debug, Clone)]
+pub struct ZcWaitDialog {
+    pub npc_id: u32,
+}
+
+impl Packed for ZcWaitDialog {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B5).put_u32(self.npc_id).build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        Some(Self { npc_id })
+    }
+}
+
+/// 服务器关闭 NPC 对话 (0x00B6)
+#[derive(Debug, Clone)]
+pub struct ZcCloseDialog {
+    pub npc_id: u32,
+}
+
+impl Packed for ZcCloseDialog {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B6).put_u32(self.npc_id).build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        Some(Self { npc_id })
+    }
+}
+
+/// 服务器发送 NPC 菜单列表 (0x00B7)
+#[derive(Debug, Clone)]
+pub struct ZcMenuList {
+    pub npc_id: u32,
+    pub menu_text: String,
+}
+
+impl Packed for ZcMenuList {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B7)
+            .put_u32(self.npc_id)
+            .put_str(&self.menu_text)
+            .put_u8(0)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 5 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let mut offset = 4;
+        let menu_text = parse_string(slice, &mut offset)?;
+        Some(Self { npc_id, menu_text })
+    }
+}
+
+/// 客户端确认下一句对话 (0x00B9)
+#[derive(Debug, Clone)]
+pub struct CzAckNextDialog {
+    pub npc_id: u32,
+}
+
+impl Packed for CzAckNextDialog {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B9).put_u32(self.npc_id).build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        Some(Self { npc_id })
+    }
+}
+
+/// 客户端选择菜单项 (0x00B8)
+#[derive(Debug, Clone)]
+pub struct CzAckSelectMenu {
+    pub npc_id: u32,
+    pub select: u8,
+}
+
+impl Packed for CzAckSelectMenu {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x00B8)
+            .put_u32(self.npc_id)
+            .put_u8(self.select)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 5 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let select = slice[4];
+        Some(Self { npc_id, select })
+    }
+}
+
+/// 客户端关闭 NPC 对话 (0x0146)
+#[derive(Debug, Clone)]
+pub struct CzAckCloseDialog {
+    pub npc_id: u32,
+}
+
+impl Packed for CzAckCloseDialog {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0146).put_u32(self.npc_id).build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let npc_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        Some(Self { npc_id })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,4 +503,25 @@ mod tests {
         assert_eq!(pkt.hair_color, 0x000A);
         assert_eq!(pkt.hair, 0x0014);
     }
+}
+
+/// NPC 对话相关数据包 ID 常量
+pub mod id {
+    // 服务器 -> 客户端
+    #[allow(dead_code)]
+    pub const ZC_SAY_DIALOG: u16 = 0x00B4;
+    #[allow(dead_code)]
+    pub const ZC_WAIT_DIALOG: u16 = 0x00B5;
+    #[allow(dead_code)]
+    pub const ZC_CLOSE_DIALOG: u16 = 0x00B6;
+    #[allow(dead_code)]
+    pub const ZC_MENU_LIST: u16 = 0x00B7;
+
+    // 客户端 -> 服务器
+    #[allow(dead_code)]
+    pub const CZ_ACK_SELECT_MENU: u16 = 0x00B8;
+    #[allow(dead_code)]
+    pub const CZ_ACK_NEXT_DIALOG: u16 = 0x00B9;
+    #[allow(dead_code)]
+    pub const CZ_ACK_CLOSE_DIALOG: u16 = 0x0146;
 }

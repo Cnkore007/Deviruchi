@@ -92,6 +92,18 @@ impl PartyManager {
         self.parties.read().get(&party_id).cloned()
     }
 
+    /// Find a party by the first 4 bytes of its UUID (for client packet matching)
+    pub fn find_party_by_short_id(&self, short_id: u32) -> Option<Party> {
+        let parties = self.parties.read();
+        parties
+            .values()
+            .find(|p| {
+                let bytes = p.id.as_bytes();
+                u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) == short_id
+            })
+            .cloned()
+    }
+
     /// Check if a player is the leader of a party
     pub fn is_leader(&self, party_id: &Uuid, player_id: &Uuid) -> bool {
         self.parties
