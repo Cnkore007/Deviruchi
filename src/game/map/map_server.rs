@@ -166,6 +166,7 @@ impl MapServer {
                 char_id,
                 self.map_server_id
             );
+            session.authenticated = false;
             return None;
         }
 
