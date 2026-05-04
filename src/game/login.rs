@@ -79,13 +79,25 @@ impl LoginServer {
             return Some(ACRefuseLogin { error_code: 0 }.to_packet());
         }
 
-        // 检查账户状态
+        // 检查封禁过期（自动解除已过期的封禁）
+        let mut account = account; // 使 account 可变
         if account.state != 0 {
-            warn!(
-                "Login failed: account banned or suspended, user={}",
-                login.username
-            );
-            return Some(ACRefuseLogin { error_code: 3 }.to_packet());
+            let is_allowed = match self.db.check_and_clear_ban(&mut account) {
+                Ok(allowed) => allowed,
+                Err(e) => {
+                    error!("Failed to check ban status for user={}: {}", login.username, e);
+                    return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+                }
+            };
+
+            if !is_allowed {
+                warn!(
+                    "Login failed: account banned or suspended, user={}",
+                    login.username
+                );
+                let error_code = if account.expiration_time > 0 { 5 } else { 3 };
+                return Some(ACRefuseLogin { error_code }.to_packet());
+            }
         }
 
         // 更新最后登录时间
@@ -275,5 +287,53 @@ mod tests {
         let login_id2 = u32::from_be_bytes([result[12], result[13], result[14], result[15]]);
         assert_eq!(login_id1, 12345, "login_id1 应匹配设置的值");
         assert_eq!(login_id2, 67890, "login_id2 应匹配设置的值");
+    }
+
+    #[test]
+    fn test_login_ban_expired_auto_unban() {
+        let (server, db) = create_test_server();
+        let account_id = db.create_account("tempban", "pass", 1).unwrap();
+
+        // 设置封禁状态，但 unban_time 为过去的时间
+        let past_time = crate::storage::chrono_now() - 3600; // 1 小时前
+        db.execute_with_params(
+            "UPDATE accounts SET state = 5, unban_time = ?1 WHERE account_id = ?2",
+            rusqlite::params![past_time, account_id],
+        ).unwrap();
+
+        let packet = make_login_packet("tempban", "pass", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "封禁已过期时应允许登录");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x0069, "封禁已过期应返回 ACAceptLogin");
+        assert!(session.authenticated, "封禁过期后应认证成功");
+    }
+
+    #[test]
+    fn test_login_account_expired() {
+        let (server, db) = create_test_server();
+        let account_id = db.create_account("expired", "pass", 1).unwrap();
+
+        // 设置账号过期时间为过去
+        let past_time = crate::storage::chrono_now() - 3600;
+        db.execute_with_params(
+            "UPDATE accounts SET state = 5, expiration_time = ?1 WHERE account_id = ?2",
+            rusqlite::params![past_time, account_id],
+        ).unwrap();
+
+        let packet = make_login_packet("expired", "pass", 20);
+        let mut session = Session::new();
+
+        let result = server.handle_ca_login(&packet[4..], &mut session);
+        assert!(result.is_some(), "账号过期应返回拒绝包");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin");
+        assert_eq!(response[4], 5, "账号过期的 error_code 应为 5");
     }
 }
