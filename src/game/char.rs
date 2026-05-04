@@ -127,11 +127,47 @@ impl CharServer {
         // 找到空槽位
         let slot = self.find_empty_slot(&characters)?;
 
+        // 校验属性点：每个属性 1-9，总和 <= 30（rAthena 新角色分配）
+        const MAX_SINGLE_STAT: u8 = 9;
+        const MAX_TOTAL_STATS: u16 = 30;
+
+        let stats = [
+            make_char.str, make_char.agi, make_char.vit,
+            make_char.int, make_char.dex, make_char.luk,
+        ];
+
+        if stats.iter().any(|&s| s == 0 || s > MAX_SINGLE_STAT) {
+            warn!(
+                "Character creation rejected: stat out of range 1-9 for account_id={}",
+                account_id
+            );
+            return Some(vec![0x00]);
+        }
+
+        let total: u16 = stats.iter().map(|&s| s as u16).sum();
+        if total > MAX_TOTAL_STATS {
+            warn!(
+                "Character creation rejected: total stats {} > {} for account_id={}",
+                total, MAX_TOTAL_STATS, account_id
+            );
+            return Some(vec![0x00]);
+        }
+
+        // 校验名称长度
+        let name = make_char.name.trim_matches('\0');
+        if name.is_empty() || name.len() > 24 {
+            warn!(
+                "Character creation rejected: invalid name length for account_id={}",
+                account_id
+            );
+            return Some(vec![0x00]);
+        }
+
         // 创建角色
         match self.db.create_character(
             account_id,
             slot,
-            &make_char.name,
+            name,
             make_char.str,
             make_char.agi,
             make_char.vit,
@@ -146,7 +182,7 @@ impl CharServer {
                     "Character created: char_id={}, name={}",
                     char_id, make_char.name
                 );
-                Some(vec![0]) // 成功响应
+                Some(vec![0x01]) // 成功响应
             }
             Err(e) => {
                 error!("Failed to create character: {}", e);
