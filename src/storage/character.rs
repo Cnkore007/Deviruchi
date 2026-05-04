@@ -609,6 +609,118 @@ impl Database {
         Ok(deleted)
     }
 
+    /// 设置角色删除定时器（标记删除）
+    /// delete_after_secs: 从现在起多少秒后删除（rAthena 默认 86400 = 24小时）
+    pub fn mark_character_for_deletion(
+        &self,
+        char_id: u32,
+        account_id: u32,
+        delete_after_secs: i64,
+    ) -> Result<bool> {
+        let now = chrono_now();
+        let delete_timer = (now + delete_after_secs) as u32;
+
+        // 验证角色属于该账户
+        let affected = self.execute_with_params(
+            "UPDATE characters SET delete_timer = ?1
+             WHERE char_id = ?2 AND account_id = ?3 AND (delete_timer = 0 OR delete_timer IS NULL)",
+            params![delete_timer, char_id, account_id],
+        )?;
+
+        if affected > 0 {
+            tracing::info!(
+                "Character {} marked for deletion at {} (in {} seconds)",
+                char_id, delete_timer, delete_after_secs
+            );
+            Ok(true)
+        } else {
+            tracing::warn!(
+                "Failed to mark character {} for deletion (not found or already marked)",
+                char_id
+            );
+            Ok(false)
+        }
+    }
+
+    /// 取消角色删除标记
+    pub fn cancel_character_deletion(
+        &self,
+        char_id: u32,
+        account_id: u32,
+    ) -> Result<bool> {
+        let affected = self.execute_with_params(
+            "UPDATE characters SET delete_timer = 0
+             WHERE char_id = ?1 AND account_id = ?2 AND delete_timer > 0",
+            params![char_id, account_id],
+        )?;
+
+        if affected > 0 {
+            tracing::info!("Character {} deletion cancelled", char_id);
+            Ok(true)
+        } else {
+            tracing::warn!(
+                "Failed to cancel deletion for character {} (not found or not marked)",
+                char_id
+            );
+            Ok(false)
+        }
+    }
+
+    /// 按名称查找角色（用于名称重复检查）
+    pub fn get_character_by_name(&self, name: &str) -> Result<Option<Character>> {
+        self.query_row_optional(
+            "SELECT char_id, char_num, name, class, base_level, job_level,
+                    base_exp, job_exp, zeny, str, agi, vit, int, dex, luk,
+                    hp, max_hp, sp, max_sp,
+                    hair, hair_color, clothes_color,
+                    weapon, shield, head_top, head_mid, head_bottom,
+                    last_map, last_x, last_y, save_map, save_x, save_y,
+                    delete_timer, created_at, updated_at
+             FROM characters WHERE name = ?1",
+            params![name],
+            |row| {
+                Ok(Character {
+                    char_id: row.get(0)?,
+                    char_num: row.get(1)?,
+                    name: row.get(2)?,
+                    class: row.get(3)?,
+                    base_level: row.get(4)?,
+                    job_level: row.get(5)?,
+                    base_exp: row.get(6)?,
+                    job_exp: row.get(7)?,
+                    zeny: row.get(8)?,
+                    str: row.get(9)?,
+                    agi: row.get(10)?,
+                    vit: row.get(11)?,
+                    int: row.get(12)?,
+                    dex: row.get(13)?,
+                    luk: row.get(14)?,
+                    hp: row.get(15)?,
+                    max_hp: row.get(16)?,
+                    sp: row.get(17)?,
+                    max_sp: row.get(18)?,
+                    hair: row.get(19)?,
+                    hair_color: row.get(20)?,
+                    clothes_color: row.get(21)?,
+                    weapon: row.get(22)?,
+                    shield: row.get(23)?,
+                    head_top: row.get(24)?,
+                    head_mid: row.get(25)?,
+                    head_bottom: row.get(26)?,
+                    last_map: row.get(27)?,
+                    last_x: row.get(28)?,
+                    last_y: row.get(29)?,
+                    save_map: row.get(30)?,
+                    save_x: row.get(31)?,
+                    save_y: row.get(32)?,
+                    delete_timer: row.get(33)?,
+                    created_at: row.get(34)?,
+                    updated_at: row.get(35)?,
+                })
+            },
+        )
+    }
+
     /// 加载角色快捷键
     pub fn load_character_hotkeys(&self, char_id: u32) -> Result<Vec<CharacterHotkeyData>> {
         self.query(
@@ -959,5 +1071,88 @@ mod tests {
             .get_character_by_id(char3_id)
             .expect("query failed")
             .is_some());
+    }
+
+    #[test]
+    fn test_mark_and_cancel_character_deletion() {
+        let db = crate::storage::Database::open_memory().unwrap();
+        crate::storage::schema::init_schema(&db).unwrap();
+        let account_id = setup_test_account(&db);
+
+        let char_id = db
+            .create_character(account_id, 0, "DeleteMe", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 标记删除（24小时后）
+        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        assert!(result, "标记删除应成功");
+
+        // 验证 delete_timer 已设置
+        let char = db.get_character_by_id(char_id).unwrap().unwrap();
+        assert!(char.delete_timer > 0, "delete_timer 应大于 0");
+
+        // 取消删除
+        let result = db.cancel_character_deletion(char_id, account_id).unwrap();
+        assert!(result, "取消删除应成功");
+
+        // 验证 delete_timer 已重置
+        let char = db.get_character_by_id(char_id).unwrap().unwrap();
+        assert_eq!(char.delete_timer, 0, "delete_timer 应重置为 0");
+    }
+
+    #[test]
+    fn test_mark_deletion_wrong_account() {
+        let db = crate::storage::Database::open_memory().unwrap();
+        crate::storage::schema::init_schema(&db).unwrap();
+        let account_id = setup_test_account(&db);
+
+        let char_id = db
+            .create_character(account_id, 0, "MyChar", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 用错误的 account_id 尝试标记删除
+        let result = db.mark_character_for_deletion(char_id, 9999, 86400).unwrap();
+        assert!(!result, "错误账户标记删除应失败");
+
+        // 验证角色未被标记
+        let char = db.get_character_by_id(char_id).unwrap().unwrap();
+        assert_eq!(char.delete_timer, 0, "角色不应被错误账户标记删除");
+    }
+
+    #[test]
+    fn test_get_character_by_name() {
+        let db = crate::storage::Database::open_memory().unwrap();
+        crate::storage::schema::init_schema(&db).unwrap();
+        let account_id = setup_test_account(&db);
+
+        db.create_character(account_id, 0, "UniqueName", 5, 5, 5, 5, 5, 5, 1, 0).unwrap();
+
+        // 查找存在的角色
+        let result = db.get_character_by_name("UniqueName").unwrap();
+        assert!(result.is_some(), "应能找到已创建的角色");
+        assert_eq!(result.unwrap().name, "UniqueName");
+
+        // 查找不存在的角色
+        let result = db.get_character_by_name("NonExistent").unwrap();
+        assert!(result.is_none(), "不存在的角色应返回 None");
+    }
+
+    #[test]
+    fn test_double_mark_deletion_fails() {
+        let db = crate::storage::Database::open_memory().unwrap();
+        crate::storage::schema::init_schema(&db).unwrap();
+        let account_id = setup_test_account(&db);
+
+        let char_id = db
+            .create_character(account_id, 0, "DoubleDel", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 第一次标记成功
+        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        assert!(result);
+
+        // 第二次标记应失败（已标记）
+        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        assert!(!result, "重复标记删除应返回 false");
     }
 }
