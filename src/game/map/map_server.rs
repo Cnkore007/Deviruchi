@@ -289,12 +289,45 @@ impl MapServer {
 
         let player = self.map_state.get_player(&player_id)?;
 
-        // Publish skill event
+        // 调用 SkillHandler 执行技能逻辑
+        let result = self.skill_handler.use_skill(
+            Arc::new(player.clone()),
+            skill_pkt.skill_id as u16,
+            1, // 默认技能等级 1
+            skill_pkt.target_id,
+            &self.map_state,
+        );
+
+        match result {
+            Ok(skill_result) => {
+                tracing::info!(
+                    "Player {} used skill {} successfully: {:?}",
+                    player.name,
+                    skill_pkt.skill_id,
+                    skill_result
+                );
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Player {} failed to use skill {}: {:?}",
+                    player.name,
+                    skill_pkt.skill_id,
+                    err
+                );
+                return None;
+            }
+        }
+
+        // 发布技能使用事件（仅在成功后）
         let channel_name = format!("map:{}", player.map_name);
         let event = GameEvent::PlayerUseSkill {
             caster_id: player_id,
             skill_id: skill_pkt.skill_id as u32,
-            target_id: None,
+            target_id: if skill_pkt.target_id != 0 {
+                Some(Uuid::from_u128(skill_pkt.target_id as u128))
+            } else {
+                None
+            },
             x: skill_pkt.target_x,
             y: skill_pkt.target_y,
         };
