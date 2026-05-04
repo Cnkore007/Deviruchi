@@ -1,8 +1,13 @@
-use std::sync::Arc;
+use super::formula::BattleFormula;
 use crate::game::map::Player;
 use crate::game::mob::Mob;
 use crate::game::rand::GameRng;
-use super::formula::BattleFormula;
+use std::sync::Arc;
+
+/// 将 i32 伤害安全转换为 u32，负值 clamp 到 0
+fn safe_damage(damage: i32) -> u32 {
+    damage.max(0) as u32
+}
 
 /// 战斗处理器
 pub struct BattleHandler {
@@ -11,7 +16,9 @@ pub struct BattleHandler {
 
 impl BattleHandler {
     pub fn new(rng: Arc<dyn GameRng>) -> Self {
-        Self { rng: std::sync::Mutex::new(rng) }
+        Self {
+            rng: std::sync::Mutex::new(rng),
+        }
     }
 
     /// 普通攻击
@@ -32,7 +39,7 @@ impl BattleHandler {
             base_damage
         };
 
-        let killed = defender.take_damage(damage as u32);
+        let killed = defender.take_damage(safe_damage(damage));
 
         AttackResult::Hit {
             damage,
@@ -65,7 +72,7 @@ impl BattleHandler {
             base_damage
         };
 
-        let killed = defender.take_damage(damage as u32);
+        let killed = defender.take_damage(safe_damage(damage));
 
         AttackResult::Hit {
             damage,
@@ -84,7 +91,7 @@ impl BattleHandler {
         let matk = (*attacker.int.read() as i32) * 2 + (*attacker.dex.read() as i32) / 3;
         let damage = BattleFormula::magical_damage(attacker, defender, skill_damage, matk);
 
-        let killed = defender.take_damage(damage as u32);
+        let killed = defender.take_damage(safe_damage(damage));
 
         AttackResult::Hit {
             damage,
@@ -105,13 +112,13 @@ impl BattleHandler {
         let damage = BattleFormula::mob_physical_damage(attacker, defender);
 
         // 应用伤害
-        let killed = defender.take_damage(damage as u32);
+        let killed = defender.take_damage(safe_damage(damage));
 
         MobAttackResult::Hit { damage, killed }
     }
 
     fn rand_chance(&self, percent: i32) -> bool {
-        let mut rng = self.rng.lock().unwrap();
+        let rng = self.rng.lock().unwrap();
         let rand_val = rng.rand_range(0, 99);
         (rand_val as i32) < percent
     }
@@ -140,10 +147,7 @@ pub enum AttackResult {
 #[derive(Debug, Clone)]
 pub enum MobAttackResult {
     Miss,
-    Hit {
-        damage: i32,
-        killed: bool,
-    },
+    Hit { damage: i32, killed: bool },
 }
 
 #[cfg(test)]
@@ -179,7 +183,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(min);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(min);
             val.min(max).max(min)
         }
 
@@ -190,7 +198,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val % 2 == 0
         }
 
@@ -201,7 +213,10 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            self.values.get(idx % self.values.len()).copied().unwrap_or(0)
+            self.values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0)
         }
     }
 
@@ -235,5 +250,34 @@ mod tests {
         // Mock returns 50, which is >= 50
         let handler = create_test_handler(vec![50]);
         assert!(!handler.rand_chance(50));
+    }
+
+    #[test]
+    fn test_negative_damage_clamped_to_zero() {
+        let negative_damage: i32 = -100;
+        let safe = safe_damage(negative_damage);
+        assert_eq!(safe, 0);
+    }
+
+    #[test]
+    fn test_positive_damage_preserved() {
+        let damage: i32 = 500;
+        let safe = safe_damage(damage);
+        assert_eq!(safe, 500);
+    }
+
+    #[test]
+    fn test_zero_damage_preserved() {
+        let safe = safe_damage(0);
+        assert_eq!(safe, 0);
+    }
+
+    #[test]
+    fn test_crit_damage_overflow_clamped() {
+        // Simulate overflow: large_base * 140 overflows i32
+        let large_base: i32 = i32::MAX / 2;
+        let crit_damage = (large_base * 140) / 100; // overflows to negative
+        let result = safe_damage(crit_damage);
+        assert_eq!(result, 0);
     }
 }
