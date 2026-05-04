@@ -92,13 +92,13 @@ impl HealService {
             let modifiers = self.get_heal_modifiers(player);
             if current_hp >= hp_threshold || modifiers.ignore_threshold {
                 let base_heal = self.calculate_hp_heal(player, is_sitting);
-                let (_, sp_base) = self.apply_all_modifiers(player, base_heal, 0, is_sitting);
-                new_hp = (current_hp + sp_base).min(max_hp);
+                let (hp_base, _) = self.apply_all_modifiers(player, base_heal, 0, is_sitting);
+                new_hp = (current_hp + hp_base).min(max_hp);
                 changed = true;
                 tracing::trace!(
                     "Player {} healed {} HP (sitting: {})",
                     player.name,
-                    sp_base,
+                    hp_base,
                     is_sitting
                 );
             }
