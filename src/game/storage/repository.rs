@@ -81,33 +81,33 @@ impl StorageRepository {
         let db = self.db.clone();
 
         tokio::task::spawn_blocking(move || {
-            // 删除现有数据
-            db.execute_with_params(
-                "DELETE FROM storage WHERE char_id = ?",
-                [char_id as i64],
-            )?;
-
-            // 插入新数据
-            for slot in slots {
-                db.execute_with_params(
-                    "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    rusqlite::params![
-                        char_id as i64,
-                        slot.index as i32,
-                        slot.item_id as i32,
-                        slot.amount as i32,
-                        slot.identified as i32,
-                        slot.refine as i32,
-                        slot.cards[0] as i32,
-                        slot.cards[1] as i32,
-                        slot.cards[2] as i32,
-                        slot.cards[3] as i32,
-                    ],
+            db.with_transaction(|conn| {
+                conn.execute(
+                    "DELETE FROM storage WHERE char_id = ?",
+                    [char_id as i64],
                 )?;
-            }
 
-            Ok(())
+                for slot in &slots {
+                    conn.execute(
+                        "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        rusqlite::params![
+                            char_id as i64,
+                            slot.index as i32,
+                            slot.item_id as i32,
+                            slot.amount as i32,
+                            slot.identified as i32,
+                            slot.refine as i32,
+                            slot.cards[0] as i32,
+                            slot.cards[1] as i32,
+                            slot.cards[2] as i32,
+                            slot.cards[3] as i32,
+                        ],
+                    )?;
+                }
+
+                Ok(())
+            })
         })
         .await
         .map_err(|e| crate::error::Error::Game(e.to_string()))?

@@ -70,6 +70,25 @@ impl Database {
         let conn = self.conn.lock();
         Ok(conn.last_insert_rowid() as u64)
     }
+
+    /// 在事务中执行一组操作，成功时自动提交，失败时自动回滚
+    pub fn with_transaction<F, R>(&self, f: F) -> Result<R>
+    where
+        F: FnOnce(&Connection) -> Result<R>,
+    {
+        let conn = self.conn.lock();
+        conn.execute_batch("BEGIN IMMEDIATE")?;
+        match f(&conn) {
+            Ok(result) => {
+                conn.execute_batch("COMMIT")?;
+                Ok(result)
+            }
+            Err(e) => {
+                conn.execute_batch("ROLLBACK").ok();
+                Err(e)
+            }
+        }
+    }
 }
 
 impl Clone for Database {

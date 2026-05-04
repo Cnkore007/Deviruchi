@@ -249,35 +249,39 @@ impl Database {
         Ok(Storage::from_db_format(char_id, max_size, items))
     }
 
-    /// 保存角色仓库
+    /// 保存角色仓库（事务包裹）
     pub fn save_storage(&self, storage: &Storage) -> Result<()> {
         let char_id = storage.char_id();
+        let slots: Vec<_> = storage.slots().iter().filter(|s| !s.is_empty()).cloned().collect();
 
-        // 先删除该角色的所有仓库物品
-        self.execute_with_params("DELETE FROM storage WHERE char_id = ?1", params![char_id])?;
-
-        // 插入当前物品
-        for slot in storage.slots().iter().filter(|s| !s.is_empty()) {
-            self.execute_with_params(
-                "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine,
-                                     card0, card1, card2, card3)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![
-                    char_id as i64,
-                    slot.index as i64,
-                    slot.item_id as i64,
-                    slot.amount as i64,
-                    slot.identified as i64,
-                    slot.refine as i64,
-                    slot.cards[0] as i64,
-                    slot.cards[1] as i64,
-                    slot.cards[2] as i64,
-                    slot.cards[3] as i64,
-                ],
+        self.with_transaction(|conn| {
+            conn.execute(
+                "DELETE FROM storage WHERE char_id = ?1",
+                params![char_id],
             )?;
-        }
 
-        Ok(())
+            for slot in &slots {
+                conn.execute(
+                    "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine,
+                                         card0, card1, card2, card3)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    params![
+                        char_id as i64,
+                        slot.index as i64,
+                        slot.item_id as i64,
+                        slot.amount as i64,
+                        slot.identified as i64,
+                        slot.refine as i64,
+                        slot.cards[0] as i64,
+                        slot.cards[1] as i64,
+                        slot.cards[2] as i64,
+                        slot.cards[3] as i64,
+                    ],
+                )?;
+            }
+
+            Ok(())
+        })
     }
 
     /// ==================== 玩家数据持久化 ====================
@@ -310,49 +314,89 @@ impl Database {
     ) -> Result<()> {
         let now = chrono_now();
 
-        // 1. 更新 characters 表基础数据
-        self.execute_with_params(
-            "UPDATE characters SET
-                last_map = ?1, last_x = ?2, last_y = ?3,
-                hp = ?4, max_hp = ?5, sp = ?6, max_sp = ?7,
-                base_exp = ?8, job_exp = ?9,
-                base_level = ?10, job_level = ?11,
-                zeny = ?12,
-                str = ?13, agi = ?14, vit = ?15, int = ?16, dex = ?17, luk = ?18,
-                updated_at = ?19
-             WHERE char_id = ?20",
-            params![
-                last_map,
-                last_x,
-                last_y,
-                hp,
-                max_hp,
-                sp,
-                max_sp,
-                base_exp as i64,
-                job_exp as i64,
-                base_level,
-                job_level,
-                zeny,
-                str,
-                agi,
-                vit,
-                int,
-                dex,
-                luk,
-                now,
-                char_id
-            ],
-        )?;
+        self.with_transaction(|conn| {
+            // 1. 更新 characters 表基础数据
+            conn.execute(
+                "UPDATE characters SET
+                    last_map = ?1, last_x = ?2, last_y = ?3,
+                    hp = ?4, max_hp = ?5, sp = ?6, max_sp = ?7,
+                    base_exp = ?8, job_exp = ?9,
+                    base_level = ?10, job_level = ?11,
+                    zeny = ?12,
+                    str = ?13, agi = ?14, vit = ?15, int = ?16, dex = ?17, luk = ?18,
+                    updated_at = ?19
+                 WHERE char_id = ?20",
+                params![
+                    last_map, last_x, last_y, hp, max_hp, sp, max_sp,
+                    base_exp as i64, job_exp as i64, base_level, job_level, zeny,
+                    str, agi, vit, int, dex, luk, now, char_id
+                ],
+            )?;
 
-        // 2. 保存状态效果
-        self.save_character_status(char_id, status_effects)?;
+            // 2. 保存状态效果
+            conn.execute(
+                "DELETE FROM character_status WHERE char_id = ?1",
+                params![char_id],
+            )?;
+            for effect in status_effects {
+                let source_type = match effect.source {
+                    StatusSource::Skill(_) => 0u8,
+                    StatusSource::Item(_) => 1,
+                    StatusSource::Passive => 2,
+                    StatusSource::Quest => 3,
+                    StatusSource::Environment => 4,
+                };
+                let source_id = match effect.source {
+                    StatusSource::Skill(id) => id,
+                    StatusSource::Item(id) => id,
+                    _ => 0,
+                };
+                conn.execute(
+                    "INSERT INTO character_status
+                        (char_id, status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    params![
+                        char_id, effect.id as u32, effect.val1, effect.val2, effect.val3,
+                        effect.stack, effect.duration_ms as i64,
+                        effect.started_at.elapsed().as_millis() as i64,
+                        source_type, source_id
+                    ],
+                )?;
+            }
 
-        // 3. 保存物品栏
-        self.save_character_inventory(char_id, inventory)?;
+            // 3. 保存物品栏
+            conn.execute(
+                "DELETE FROM character_inventory WHERE char_id = ?1",
+                params![char_id],
+            )?;
+            for item in inventory {
+                conn.execute(
+                    "INSERT INTO character_inventory
+                        (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    params![
+                        char_id, item.index, item.item_id, item.amount,
+                        item.identified as i32, item.refine,
+                        item.cards[0], item.cards[1], item.cards[2], item.cards[3]
+                    ],
+                )?;
+            }
 
-        // 4. 保存快捷键
-        self.save_character_hotkeys(char_id, hotkeys)?;
+            // 4. 保存快捷键
+            conn.execute(
+                "DELETE FROM character_hotkeys WHERE char_id = ?1",
+                params![char_id],
+            )?;
+            for hotkey in hotkeys {
+                conn.execute(
+                    "INSERT INTO character_hotkeys (char_id, hotkey_id, type, item_or_skill_id)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    params![char_id, hotkey.hotkey_id, hotkey.type_, hotkey.item_or_skill_id],
+                )?;
+            }
+
+            Ok(())
+        })?;
 
         tracing::debug!("Saved character {} data successfully", char_id);
         Ok(())
