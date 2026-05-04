@@ -176,3 +176,179 @@ impl Clone for StorageRepository {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::schema::init_schema;
+
+    /// 创建测试用内存数据库，包含必要的外键数据
+    fn setup_db() -> Arc<Database> {
+        let db = Arc::new(Database::open_memory().expect("创建内存数据库失败"));
+        init_schema(&db).expect("初始化 schema 失败");
+
+        // 创建测试账户（外键约束需要）
+        db.execute(
+            "INSERT INTO accounts (account_id, user_id, password_hash, sex, created_at)
+             VALUES (1, 'test', 'hash', 0, 0)",
+        )
+        .expect("创建测试账户失败");
+        // 创建测试角色（外键约束需要）
+        db.execute(
+            "INSERT INTO characters (char_id, account_id, char_num, name, created_at, updated_at)
+             VALUES (1, 1, 0, 'Test', 0, 0)",
+        )
+        .expect("创建测试角色失败");
+
+        db
+    }
+
+    /// 保存后加载往返一致性
+    #[tokio::test]
+    async fn save_and_load_roundtrip() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(501, 10);
+        storage.add_item(601, 1);
+
+        repo.save(&storage).await.unwrap();
+
+        let loaded = repo.load(1).await.unwrap();
+        assert!(loaded.is_some());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.get_slot(0).unwrap().item_id, 501);
+        assert_eq!(loaded.get_slot(0).unwrap().amount, 10);
+        assert_eq!(loaded.get_slot(1).unwrap().item_id, 601);
+    }
+
+    /// 加载不存在的角色返回 None
+    #[tokio::test]
+    async fn load_returns_none_for_empty() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        let loaded = repo.load(999).await.unwrap();
+        assert!(loaded.is_none());
+    }
+
+    /// 保存精炼和卡片数据不丢失
+    #[tokio::test]
+    async fn save_preserves_refine_and_cards() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item_full(1101, 1, true, 7, [4001, 4002, 0, 0]);
+
+        repo.save(&storage).await.unwrap();
+
+        let loaded = repo.load(1).await.unwrap().unwrap();
+        let slot = loaded.get_slot(0).unwrap();
+        assert_eq!(slot.item_id, 1101);
+        assert_eq!(slot.refine, 7);
+        assert_eq!(slot.cards, [4001, 4002, 0, 0]);
+    }
+
+    /// 重复保存覆盖旧数据
+    #[tokio::test]
+    async fn save_overwrites_existing_data() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        // 第一次保存
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(501, 10);
+        repo.save(&storage).await.unwrap();
+
+        // 第二次保存（不同物品）
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(601, 5);
+        repo.save(&storage).await.unwrap();
+
+        let loaded = repo.load(1).await.unwrap().unwrap();
+        assert_eq!(loaded.get_slot(0).unwrap().item_id, 601);
+        assert_eq!(loaded.get_slot(0).unwrap().amount, 5);
+        // 旧数据不应存在
+        assert!(loaded.find_item_slot(501).is_none());
+    }
+
+    /// 删除仓库数据
+    #[tokio::test]
+    async fn delete_removes_storage() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(501, 10);
+        repo.save(&storage).await.unwrap();
+
+        assert!(repo.exists(1).await.unwrap());
+
+        repo.delete(1).await.unwrap();
+
+        assert!(!repo.exists(1).await.unwrap());
+        assert!(repo.load(1).await.unwrap().is_none());
+    }
+
+    /// 删除不存在的角色不报错
+    #[tokio::test]
+    async fn delete_nonexistent_is_noop() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        // 删除不存在的角色，不应报错
+        repo.delete(999).await.unwrap();
+    }
+
+    /// exists 正确反映仓库存在状态
+    #[tokio::test]
+    async fn exists_returns_correctly() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        assert!(!repo.exists(1).await.unwrap());
+
+        // 空仓库 save 后 storage 表无记录，但 storage_meta 有记录
+        let storage = Storage::new(100).with_char_id(1);
+        repo.save(&storage).await.unwrap();
+
+        // 添加物品后 save
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(501, 1);
+        repo.save(&storage).await.unwrap();
+
+        assert!(repo.exists(1).await.unwrap());
+    }
+
+    /// 保存并恢复 max_size
+    #[tokio::test]
+    async fn save_load_preserves_max_size() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db);
+
+        let mut storage = Storage::new(200).with_char_id(1);
+        storage.add_item(501, 1);
+        repo.save(&storage).await.unwrap();
+
+        let loaded = repo.load(1).await.unwrap().unwrap();
+        assert_eq!(loaded.max_size(), 200);
+    }
+
+    /// clone 共享同一数据库连接
+    #[tokio::test]
+    async fn clone_shares_same_db() {
+        let db = setup_db();
+        let repo = StorageRepository::new(db.clone());
+        let repo2 = repo.clone();
+
+        let mut storage = Storage::new(100).with_char_id(1);
+        storage.add_item(501, 10);
+        repo.save(&storage).await.unwrap();
+
+        // 通过 clone 出的 repo 也能读到数据
+        let loaded = repo2.load(1).await.unwrap().unwrap();
+        assert_eq!(loaded.get_slot(0).unwrap().item_id, 501);
+    }
+}
