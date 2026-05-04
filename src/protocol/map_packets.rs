@@ -150,7 +150,7 @@ impl Packed for CHMakeChar {
     fn from_slice(slice: &[u8]) -> Option<Self> {
         let mut offset = 0;
         let name = parse_fixed_string(slice, &mut offset, NAME_LENGTH)?;
-        if slice.len() < offset + 6 {
+        if slice.len() < offset + 10 {
             return None;
         }
         Some(Self {
@@ -319,5 +319,27 @@ mod tests {
         assert_eq!(pkt.account_id, 1);
         assert_eq!(pkt.target_id, 2);
         assert_eq!(pkt.action_type, 7);
+    }
+
+    #[test]
+    fn test_ch_make_char_truncated_returns_none() {
+        // NAME_LENGTH bytes for name + 6 stat bytes, but missing the two u16 fields (4 bytes).
+        // Before the fix this would panic; now it should return None.
+        let data = vec![0u8; NAME_LENGTH + 6];
+        assert!(CHMakeChar::from_slice(&data).is_none());
+    }
+
+    #[test]
+    fn test_ch_make_char_exact_minimum_parses() {
+        // NAME_LENGTH bytes for name + 6 u8 stats + 2 u16 fields = NAME_LENGTH + 10 bytes.
+        let mut data = vec![0u8; NAME_LENGTH + 10];
+        // Set hair_color (u16 LE at offset+6) and hair (u16 LE at offset+8).
+        data[NAME_LENGTH + 6] = 0x0A;
+        data[NAME_LENGTH + 7] = 0x00;
+        data[NAME_LENGTH + 8] = 0x14;
+        data[NAME_LENGTH + 9] = 0x00;
+        let pkt = CHMakeChar::from_slice(&data).unwrap();
+        assert_eq!(pkt.hair_color, 0x000A);
+        assert_eq!(pkt.hair, 0x0014);
     }
 }
