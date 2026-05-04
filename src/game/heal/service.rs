@@ -122,10 +122,11 @@ impl HealService {
             }
         }
 
-        // 一次性写入
+        // 一次性写入（单次获取写锁，避免 HP/SP 之间被其他线程插入修改）
         if changed {
-            player.combat_mut().hp = new_hp;
-            player.combat_mut().sp = new_sp;
+            let mut c = player.combat_mut();
+            c.hp = new_hp;
+            c.sp = new_sp;
         }
     }
 

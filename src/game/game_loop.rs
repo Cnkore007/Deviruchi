@@ -104,8 +104,9 @@ impl GameLoop {
                     let new_sp = (current_sp + food_sp).min(max_sp);
 
                     if new_hp != current_hp || new_sp != current_sp {
-                        player.combat_mut().hp = new_hp;
-                        player.combat_mut().sp = new_sp;
+                        let mut c = player.combat_mut();
+                        c.hp = new_hp;
+                        c.sp = new_sp;
                         tracing::trace!(
                             "Player {} food effect: +{} HP, +{} SP",
                             player.name,
