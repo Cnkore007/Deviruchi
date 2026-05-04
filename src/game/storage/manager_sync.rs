@@ -177,6 +177,8 @@ impl StorageSyncManager {
     }
 
     /// 调整仓库大小
+    ///
+    /// 更新内存中的仓库格子数，并持久化到数据库。
     pub async fn resize_storage(&self, char_id: u32, new_size: u16) -> StorageResponse {
         let storage_arc = match self.storage_manager.get(char_id) {
             Some(s) => s,
@@ -191,12 +193,13 @@ impl StorageSyncManager {
             .task_sender()
             .try_send(SyncTask::MarkDirty(char_id))
         {
-            tracing::error!("Storage sync channel full or closed, data may be lost: {}", e);
+            tracing::error!("仓库同步通道已满或已关闭，数据可能丢失: {}", e);
         }
 
-        // 重新创建仓库 (保持现有数据)
-        let mut current_slots: Vec<_> = storage_arc.read().slots().to_vec();
-        current_slots.resize_with(new_size as usize, || super::data::StorageSlot::empty(0));
+        // 重新创建仓库（保持现有数据）
+        let current_slots: Vec<_> = storage_arc.read().slots().to_vec();
+        let mut new_slots: Vec<_> = current_slots.clone();
+        new_slots.resize_with(new_size as usize, || super::data::StorageSlot::empty(0));
 
         // 更新内存
         {
@@ -204,7 +207,7 @@ impl StorageSyncManager {
             *storage = super::data::Storage::from_db_format(
                 char_id,
                 new_size,
-                current_slots
+                new_slots
                     .iter()
                     .enumerate()
                     .map(|(i, s)| {
@@ -221,7 +224,24 @@ impl StorageSyncManager {
             );
         }
 
-        StorageResponse::success(char_id)
+        // 持久化到数据库
+        let storage = storage_arc.read().clone();
+        match self.repository.save(&storage).await {
+            Ok(()) => {
+                if let Err(e) = self
+                    .scheduler
+                    .task_sender()
+                    .try_send(SyncTask::MarkClean(char_id))
+                {
+                    tracing::error!("仓库同步通道已满或已关闭: {}", e);
+                }
+                StorageResponse::success(char_id)
+            }
+            Err(e) => {
+                tracing::error!("仓库大小调整持久化失败: char_id={}, error={}", char_id, e);
+                StorageResponse::error(char_id, format!("Resize persist failed: {}", e))
+            }
+        }
     }
 
     /// 解锁仓库
