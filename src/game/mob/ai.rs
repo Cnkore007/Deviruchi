@@ -417,7 +417,7 @@ impl Default for MobAI {
 mod tests {
     use super::*;
     use crate::game::map::{MapState, Player};
-    use crate::game::mob::data::MobPathManager;
+    use crate::game::mob::data::{MobPathManager, MobPosition};
     use crate::game::rand::{GameRng, MockRng};
 
     fn create_test_mob_ai(values: Vec<u32>) -> MobAI {
@@ -458,8 +458,7 @@ mod tests {
             id: Uuid::new_v4(),
             mob_id: 1001,
             name: "TestMob".to_string(),
-            pos_x: parking_lot::RwLock::new(position.0),
-            pos_y: parking_lot::RwLock::new(position.1),
+            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
             map_name: "test_map".to_string(),
             level,
             hp: parking_lot::RwLock::new(500),
@@ -605,8 +604,7 @@ mod tests {
             id: Uuid::new_v4(),
             mob_id: 1001,
             name: "PassiveMob".to_string(),
-            pos_x: parking_lot::RwLock::new(position.0),
-            pos_y: parking_lot::RwLock::new(position.1),
+            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
             map_name: "test_map".to_string(),
             level: 5,
             hp: parking_lot::RwLock::new(500),

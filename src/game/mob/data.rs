@@ -141,6 +141,13 @@ pub struct MobSkill {
     pub cooldown_ms: u64,
 }
 
+/// 怪物坐标（保证 x/y 原子性读写）
+#[derive(Debug, Clone, Copy)]
+pub struct MobPosition {
+    pub x: u16,
+    pub y: u16,
+}
+
 /// 怪物AI状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MobAIState {
@@ -158,8 +165,7 @@ pub struct Mob {
     pub id: Uuid,
     pub mob_id: u16,
     pub name: String,
-    pub pos_x: RwLock<u16>,
-    pub pos_y: RwLock<u16>,
+    pub pos: RwLock<MobPosition>,
     pub map_name: String,
 
     // 属性
@@ -228,8 +234,7 @@ impl Mob {
             id: Uuid::new_v4(),
             mob_id,
             name: format!("Mob_{}", mob_id),
-            pos_x: RwLock::new(x),
-            pos_y: RwLock::new(y),
+            pos: RwLock::new(MobPosition { x, y }),
             map_name: map.to_string(),
             level: 1,
             hp: RwLock::new(100),
@@ -277,8 +282,7 @@ impl Mob {
             id: Uuid::new_v4(),
             mob_id,
             name: template.name.to_string(),
-            pos_x: RwLock::new(x),
-            pos_y: RwLock::new(y),
+            pos: RwLock::new(MobPosition { x, y }),
             map_name: map.to_string(),
             level: template.level,
             hp: RwLock::new(template.hp),
@@ -321,12 +325,12 @@ impl Mob {
     }
 
     pub fn get_position(&self) -> (u16, u16) {
-        (*self.pos_x.read(), *self.pos_y.read())
+        let p = self.pos.read();
+        (p.x, p.y)
     }
 
     pub fn move_to(&self, x: u16, y: u16) {
-        *self.pos_x.write() = x;
-        *self.pos_y.write() = y;
+        *self.pos.write() = MobPosition { x, y };
     }
 
     pub fn take_damage(&self, damage: u32) -> bool {
@@ -351,8 +355,7 @@ impl Mob {
     pub fn respawn(&self) {
         *self.hp.write() = self.max_hp;
         *self.sp.write() = self.max_sp;
-        *self.pos_x.write() = self.spawn_x;
-        *self.pos_y.write() = self.spawn_y;
+        *self.pos.write() = MobPosition { x: self.spawn_x, y: self.spawn_y };
         *self.ai_state.write() = MobAIState::Idle;
         *self.target_id.write() = None;
         *self.death_time.write() = None;

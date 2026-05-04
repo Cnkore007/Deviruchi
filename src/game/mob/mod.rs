@@ -7,6 +7,6 @@ pub mod pathfinder;
 pub mod spawn;
 
 pub use ai::MobAI;
-pub use data::{Mob, MobAIState, MobBehavior, MobDatabase, MobSkill, MobType};
+pub use data::{Mob, MobAIState, MobBehavior, MobDatabase, MobPosition, MobSkill, MobType};
 pub use droptable::{DropResolver, DropTableEntry, DropTableLoader, MVPResolver, MobDropTable};
 pub use spawn::MobSpawnManager;

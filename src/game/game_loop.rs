@@ -227,8 +227,7 @@ mod tests {
 
     #[test]
     fn test_game_loop_full_mob_death_respawn_cycle() {
-        use crate::game::mob::Mob;
-        use crate::game::mob::MobAIState;
+        use crate::game::mob::{Mob, MobAIState, MobPosition};
         use std::time::Instant;
 
         let game_loop = create_test_game_loop();
@@ -238,8 +237,7 @@ mod tests {
             id: Uuid::new_v4(),
             mob_id: 1001,
             name: "TestPoring".to_string(),
-            pos_x: parking_lot::RwLock::new(100),
-            pos_y: parking_lot::RwLock::new(100),
+            pos: parking_lot::RwLock::new(MobPosition { x: 100, y: 100 }),
             map_name: "prontera".to_string(),
             level: 1,
             hp: parking_lot::RwLock::new(50),

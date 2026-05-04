@@ -242,7 +242,7 @@ impl BattleFormula {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::mob::data::MobPathManager;
+    use crate::game::mob::data::{MobPathManager, MobPosition};
     use crate::game::rand::{GameRng, MockRng};
     use parking_lot::RwLock;
     use std::sync::Arc;
@@ -315,8 +315,7 @@ mod tests {
             id: Uuid::new_v4(),
             mob_id: 1001,
             name: "TestMob".to_string(),
-            pos_x: RwLock::new(100),
-            pos_y: RwLock::new(100),
+            pos: RwLock::new(MobPosition { x: 100, y: 100 }),
             map_name: "test_map".to_string(),
             level,
             hp: RwLock::new(500),
