@@ -167,6 +167,84 @@ impl Packed for CHMakeChar {
     }
 }
 
+/// 客户端请求删除角色 (0x0068)
+#[derive(Debug, Clone)]
+pub struct CHDeleteChar {
+    pub char_id: u32,
+    pub email: String,
+}
+
+impl Packed for CHDeleteChar {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0068)
+            .put_u32(self.char_id)
+            .put_fixed_str(&self.email, 40)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let char_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let mut offset = 4;
+        let email = parse_fixed_string(slice, &mut offset, 40)?;
+        Some(Self { char_id, email })
+    }
+}
+
+/// 服务器确认角色删除已安排 (0x006C)
+#[derive(Debug, Clone)]
+pub struct HCDeleteCharOk {
+    pub char_id: u32,
+}
+
+impl Packed for HCDeleteCharOk {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x006C).put_u32(self.char_id).build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端取消角色删除 (0x01F8)
+#[derive(Debug, Clone)]
+pub struct CHCancelDelete {
+    pub char_id: u32,
+}
+
+impl Packed for CHCancelDelete {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x01F8).put_u32(self.char_id).build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 4 {
+            return None;
+        }
+        let char_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        Some(Self { char_id })
+    }
+}
+
+/// 服务器确认取消删除 (0x006D)
+#[derive(Debug, Clone)]
+pub struct HCCancelDeleteOk {
+    pub char_id: u32,
+}
+
+impl Packed for HCCancelDeleteOk {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x006D).put_u32(self.char_id).build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
 /// Char Server 通知客户端连接 Map Server (0x0083)
 #[derive(Debug, Clone)]
 pub struct HCNotifyZoneServer {
@@ -502,6 +580,39 @@ mod tests {
         let pkt = CHMakeChar::from_slice(&data).unwrap();
         assert_eq!(pkt.hair_color, 0x000A);
         assert_eq!(pkt.hair, 0x0014);
+    }
+
+    #[test]
+    fn test_ch_delete_char_parse() {
+        let mut data = vec![0u8; 4 + 40];
+        // char_id = 42
+        data[0] = 42;
+        // email = "test@email.com" + null padding
+        let email_bytes = b"test@email.com";
+        data[4..4 + email_bytes.len()].copy_from_slice(email_bytes);
+
+        let pkt = CHDeleteChar::from_slice(&data).unwrap();
+        assert_eq!(pkt.char_id, 42);
+        assert_eq!(pkt.email, "test@email.com");
+    }
+
+    #[test]
+    fn test_ch_delete_char_truncated() {
+        let data = vec![0u8; 2];
+        assert!(CHDeleteChar::from_slice(&data).is_none());
+    }
+
+    #[test]
+    fn test_ch_cancel_delete_parse() {
+        let data = vec![100, 0, 0, 0]; // char_id = 100
+        let pkt = CHCancelDelete::from_slice(&data).unwrap();
+        assert_eq!(pkt.char_id, 100);
+    }
+
+    #[test]
+    fn test_ch_cancel_delete_truncated() {
+        let data = vec![0u8; 2];
+        assert!(CHCancelDelete::from_slice(&data).is_none());
     }
 }
 
