@@ -15,10 +15,23 @@ impl StorageRepository {
     }
 
     /// 加载仓库数据
+    ///
+    /// 优先从 storage_meta 表读取 max_size，如果元数据不存在则回退到 100。
     pub async fn load(&self, char_id: u32) -> Result<Option<Storage>> {
         let db = self.db.clone();
 
         tokio::task::spawn_blocking(move || {
+            // 1. 尝试从 storage_meta 读取 max_size
+            let max_size: u16 = db
+                .query_row_optional(
+                    "SELECT max_size FROM storage_meta WHERE char_id = ?",
+                    [char_id as i64],
+                    |row| row.get::<_, i32>(0),
+                )?
+                .map(|v| v as u16)
+                .unwrap_or(100); // 默认 100 格
+
+            // 2. 加载物品数据
             let slots: Vec<(i32, i32, i32, i32, i32, i32, i32, i32, i32)> = db.query(
                 "SELECT slot_index, item_id, amount, identified, refine, card0, card1, card2, card3
                  FROM storage WHERE char_id = ? ORDER BY slot_index",
@@ -42,8 +55,6 @@ impl StorageRepository {
                 return Ok(None);
             }
 
-            // 确定仓库大小
-            let max_size = slots.len() as u16;
             let storage_slots: Vec<StorageSlot> = slots
                 .into_iter()
                 .map(
@@ -68,9 +79,13 @@ impl StorageRepository {
         .map_err(|e| crate::error::Error::Game(e.to_string()))?
     }
 
-    /// 保存仓库数据
+    /// 保存仓库数据（在单个事务中原子性完成）
+    ///
+    /// 在单个 IMMEDIATE 事务中：先清理旧记录，再插入新记录，
+    /// 同时保存 max_size 到 storage_meta 表。
     pub async fn save(&self, storage: &Storage) -> Result<()> {
         let char_id = storage.char_id();
+        let max_size = storage.max_size();
         let slots: Vec<_> = storage
             .slots()
             .iter()
@@ -82,11 +97,13 @@ impl StorageRepository {
 
         tokio::task::spawn_blocking(move || {
             db.with_transaction(|conn| {
+                // 清理旧记录
                 conn.execute(
                     "DELETE FROM storage WHERE char_id = ?",
-                    [char_id as i64],
+                    rusqlite::params![char_id as i64],
                 )?;
 
+                // 插入新记录
                 for slot in &slots {
                     conn.execute(
                         "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
@@ -105,6 +122,14 @@ impl StorageRepository {
                         ],
                     )?;
                 }
+
+                // 保存仓库元数据（max_size）
+                conn.execute(
+                    "INSERT INTO storage_meta (char_id, max_size)
+                     VALUES (?, ?)
+                     ON CONFLICT(char_id) DO UPDATE SET max_size = excluded.max_size",
+                    rusqlite::params![char_id as i64, max_size as i32],
+                )?;
 
                 Ok(())
             })

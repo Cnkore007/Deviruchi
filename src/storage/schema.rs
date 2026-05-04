@@ -119,6 +119,15 @@ pub fn init_schema(db: &Database) -> Result<()> {
         )",
     )?;
 
+    // 仓库元数据表（存储 max_size 等配置）
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS storage_meta (
+            char_id INTEGER PRIMARY KEY,
+            max_size INTEGER NOT NULL DEFAULT 100,
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
     // 公会表
     db.execute(
         "CREATE TABLE IF NOT EXISTS guilds (
