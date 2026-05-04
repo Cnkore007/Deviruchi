@@ -501,24 +501,7 @@ impl MapServer {
                 }
             };
 
-            // Transfer items from player1 to player2
-            Self::transfer_items(
-                &player1,
-                &player2,
-                &execution.items_for_player2,
-            );
-
-            // Transfer items from player2 to player1
-            Self::transfer_items(
-                &player2,
-                &player1,
-                &execution.items_for_player1,
-            );
-
-            // 物品转移后重新计算双方负重
-            Self::recalc_inventory_weight(&player1, &item_db);
-            Self::recalc_inventory_weight(&player2, &item_db);
-
+            // Transfer zeny first (validate before moving items to avoid partial-failure corruption)
             // Transfer zeny: player1 -> player2
             if execution.zeny_from_player1 > 0 {
                 if !ZenyManager::sub(&player1, execution.zeny_from_player1) {
@@ -545,6 +528,11 @@ impl MapServer {
                         execution.zeny_from_player2,
                         player2.name
                     );
+                    // Rollback: restore player1's zeny
+                    if execution.zeny_from_player1 > 0 {
+                        ZenyManager::sub(&player2, execution.zeny_from_player1);
+                        ZenyManager::add(&player1, execution.zeny_from_player1);
+                    }
                     self.cancel_trade_session(
                         session_id,
                         trade_session.player1_id,
@@ -554,6 +542,23 @@ impl MapServer {
                 }
                 ZenyManager::add(&player1, execution.zeny_from_player2);
             }
+
+            // Transfer items (zeny already validated, so this cannot leave partial state)
+            Self::transfer_items(
+                &player1,
+                &player2,
+                &execution.items_for_player2,
+            );
+
+            Self::transfer_items(
+                &player2,
+                &player1,
+                &execution.items_for_player1,
+            );
+
+            // 物品转移后重新计算双方负重
+            Self::recalc_inventory_weight(&player1, &item_db);
+            Self::recalc_inventory_weight(&player2, &item_db);
 
             // Send commit notification to both players
             let commit_pkt = ZCTradeCommit.to_packet();
