@@ -2,10 +2,10 @@
 //!
 //! 提供 `GameRng` trait，允许在测试时注入可控的 RNG 实现。
 
-use std::sync::Arc;
-use rand::rngs::StdRng;
 use rand::Rng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
+use std::sync::Arc;
 
 /// 可注入的随机数生成器 trait
 pub trait GameRng: Send + Sync {
@@ -22,7 +22,7 @@ pub trait GameRng: Send + Sync {
 }
 
 /// 使用 `StdRng` 的生产实现 (Send + Sync)
-pub struct ThreadRng(std::sync::Mutex<StdRng>);
+pub struct ThreadRng(parking_lot::Mutex<StdRng>);
 
 impl ThreadRng {
     pub fn new() -> Self {
@@ -31,7 +31,7 @@ impl ThreadRng {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
-        Self(std::sync::Mutex::new(StdRng::seed_from_u64(seed)))
+        Self(parking_lot::Mutex::new(StdRng::seed_from_u64(seed)))
     }
 }
 
@@ -43,17 +43,17 @@ impl Default for ThreadRng {
 
 impl GameRng for ThreadRng {
     fn rand_range(&self, min: u32, max: u32) -> u32 {
-        self.0.lock().unwrap().gen_range(min..=max)
+        self.0.lock().gen_range(min..=max)
     }
 
     fn rand_bool(&self, probability: f32) -> bool {
         let normalized = probability.clamp(0.0, 100.0) / 100.0;
-        self.0.lock().unwrap().gen_bool(normalized as f64)
+        self.0.lock().gen_bool(normalized as f64)
     }
 
     fn rand_bp(&self, _chance: u32) -> u32 {
         // Generate random value in [0, 10000] range for basis points
-        self.0.lock().unwrap().gen_range(0..=10000)
+        self.0.lock().gen_range(0..=10000)
     }
 }
 
@@ -94,7 +94,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(min);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(min);
             val.min(max).max(min)
         }
 
@@ -105,7 +109,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val % 2 == 0
         }
 
@@ -116,7 +124,10 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            self.values.get(idx % self.values.len()).copied().unwrap_or(0)
+            self.values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0)
         }
     }
 

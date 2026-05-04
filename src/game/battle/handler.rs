@@ -11,13 +11,13 @@ fn safe_damage(damage: i32) -> u32 {
 
 /// 战斗处理器
 pub struct BattleHandler {
-    rng: std::sync::Mutex<Arc<dyn GameRng>>,
+    rng: parking_lot::Mutex<Arc<dyn GameRng>>,
 }
 
 impl BattleHandler {
     pub fn new(rng: Arc<dyn GameRng>) -> Self {
         Self {
-            rng: std::sync::Mutex::new(rng),
+            rng: parking_lot::Mutex::new(rng),
         }
     }
 
@@ -118,7 +118,7 @@ impl BattleHandler {
     }
 
     fn rand_chance(&self, percent: i32) -> bool {
-        let rng = self.rng.lock().unwrap();
+        let rng = self.rng.lock();
         let rand_val = rng.rand_range(0, 99);
         (rand_val as i32) < percent
     }

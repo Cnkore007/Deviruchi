@@ -1,7 +1,8 @@
+use crate::error::Result;
 use rusqlite::{Connection, OptionalExtension, Row};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use crate::error::Result;
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
@@ -24,12 +25,12 @@ impl Database {
     }
 
     pub fn execute(&self, sql: &str) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         Ok(conn.execute(sql, [])?)
     }
 
     pub fn execute_with_params<T: rusqlite::Params>(&self, sql: &str, params: T) -> Result<usize> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         Ok(conn.execute(sql, params)?)
     }
 
@@ -38,7 +39,7 @@ impl Database {
         P: rusqlite::Params,
         F: FnMut(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
     {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map(params, |row| f(row))?;
         rows.collect::<std::result::Result<Vec<_>, _>>()
@@ -50,7 +51,7 @@ impl Database {
         P: rusqlite::Params,
         F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
     {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut stmt = conn.prepare(sql)?;
         stmt.query_row(params, f).map_err(|e| e.into())
     }
@@ -60,15 +61,13 @@ impl Database {
         P: rusqlite::Params,
         F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
     {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut stmt = conn.prepare(sql)?;
-        stmt.query_row(params, f)
-            .optional()
-            .map_err(|e| e.into())
+        stmt.query_row(params, f).optional().map_err(|e| e.into())
     }
 
     pub fn last_insert_rowid(&self) -> Result<u64> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         Ok(conn.last_insert_rowid() as u64)
     }
 }
