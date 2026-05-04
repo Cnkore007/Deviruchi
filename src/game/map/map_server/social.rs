@@ -353,10 +353,21 @@ impl MapServer {
         let inv_index = pkt.inventory_index as usize;
         let inv_item = inventory.get(inv_index)?;
 
+        // 校验：请求的数量必须 > 0 且不超过实际持有量
+        let requested = pkt.amount as u16;
+        if requested == 0 || requested > inv_item.amount {
+            tracing::warn!(
+                player_id = %player_id,
+                "Trade add item rejected: requested {} but have {}",
+                requested, inv_item.amount
+            );
+            return None;
+        }
+
         let trade_item = TradeItem {
             inventory_index: pkt.inventory_index,
             item_id: inv_item.item_id,
-            amount: pkt.amount as u16,
+            amount: requested,
         };
 
         // Add item to the trade session
