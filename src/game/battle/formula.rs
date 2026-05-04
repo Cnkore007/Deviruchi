@@ -19,7 +19,7 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let agi = *attacker.agi.read() as i32;
 
-            (base_level * 2 + str + dex / 2 + agi / 3) as i32
+            base_level * 2 + str + dex / 2 + agi / 3
         };
 
         let weapon_atk = weapon_type * 2;
@@ -46,7 +46,7 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let agi = *attacker.agi.read() as i32;
 
-            (base_level * 2 + str + dex / 2 + agi / 3) as i32
+            base_level * 2 + str + dex / 2 + agi / 3
         };
 
         let weapon_atk = weapon_type * 2;
@@ -118,14 +118,14 @@ impl BattleFormula {
     }
 
     /// 计算闪避率
-    pub fn flee_rate(player: &Player, mob: &Mob) -> i32 {
+    pub fn flee_rate(player: &Player, _mob: &Mob) -> i32 {
         let agi = *player.agi.read() as i32;
         let base_level = *player.base_level.read() as i32;
         80 + agi - (base_level * 2)
     }
 
     /// 计算暴击率
-    pub fn crit_rate(attacker: &Player, defender: &Mob) -> i32 {
+    pub fn crit_rate(attacker: &Player, _defender: &Mob) -> i32 {
         let base_crit = 0;
         let luk = *attacker.luk.read() as i32;
         base_crit + luk / 3
@@ -150,9 +150,8 @@ impl BattleFormula {
         let player_def = 0;
 
         // 防御减免 (rAthena 风格)
-        let reduced_damage = (base_damage - player_def).max(1);
 
-        reduced_damage
+        (base_damage - player_def).max(1)
     }
 
     /// 计算 Mob 对 Player 的命中率
@@ -175,11 +174,11 @@ impl BattleFormula {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::rand::GameRng;
     use crate::game::mob::data::MobPathManager;
-    use std::sync::Arc;
-    use std::cell::UnsafeCell;
+    use crate::game::rand::GameRng;
     use parking_lot::RwLock;
+    use std::cell::UnsafeCell;
+    use std::sync::Arc;
     use uuid::Uuid;
 
     /// Test-only mock RNG for BattleFormula tests
@@ -209,7 +208,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(min);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(min);
             val.min(max).max(min)
         }
 
@@ -220,7 +223,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val % 2 == 0
         }
 
@@ -231,7 +238,10 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            self.values.get(idx % self.values.len()).copied().unwrap_or(0)
+            self.values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0)
         }
     }
 
@@ -273,18 +283,22 @@ mod tests {
             max_weight: RwLock::new(20000),
             equipment: RwLock::new(crate::game::item::Equipment::new()),
             is_sitting: RwLock::new(false),
+            status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new("test_map".to_string()),
+            save_x: RwLock::new(50),
+            save_y: RwLock::new(50),
+            job: RwLock::new(0),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
         };
         Arc::new(player)
     }
 
     /// Helper to create a test Mob with specified stats
-    fn make_mob(
-        level: u16,
-        defense: u16,
-        magic_defense: u16,
-        hit: i16,
-        flee: i16,
-    ) -> Mob {
+    fn make_mob(level: u16, defense: u16, magic_defense: u16, hit: i16, flee: i16) -> Mob {
         Mob {
             id: Uuid::new_v4(),
             mob_id: 1001,
@@ -376,7 +390,8 @@ mod tests {
 
         // Base damage = 40, variance = 90 + 10 = 100
         // Final = 40 * 100 / 100 = 40
-        let damage = BattleFormula::physical_damage_with_variance(&player, &mob, 100, 1, rng.as_ref());
+        let damage =
+            BattleFormula::physical_damage_with_variance(&player, &mob, 100, 1, rng.as_ref());
         assert_eq!(damage, 40);
     }
 
@@ -526,25 +541,59 @@ mod level_penalty_tests {
         // Case 2: diff <= 15 -> 75% exp
         let (player_level, mob_level) = (50, 36); // diff = 14
         let level_diff = player_level as i32 - mob_level as i32;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.75);
 
         // Case 3: diff <= 20 -> 50% exp
         let (player_level, mob_level) = (50, 31); // diff = 19
         let level_diff = player_level as i32 - mob_level as i32;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.5);
 
         // Case 4: diff <= 25 -> 25% exp
         let (player_level, mob_level) = (50, 26); // diff = 24
         let level_diff = player_level as i32 - mob_level as i32;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else if level_diff <= 25 { 0.25 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else if level_diff <= 25 {
+            0.25
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.25);
 
         // Case 5: diff > 25 -> 10% exp
         let (player_level, mob_level) = (50, 20); // diff = 30
         let level_diff = player_level as i32 - mob_level as i32;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else if level_diff <= 25 { 0.25 } else { 0.1 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else if level_diff <= 25 {
+            0.25
+        } else {
+            0.1
+        };
         assert_eq!(penalty, 0.1);
     }
 
@@ -560,49 +609,107 @@ mod level_penalty_tests {
     fn level_penalty_boundary_11() {
         // Just above 10 level difference
         let level_diff = 11;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.75);
     }
 
     #[test]
     fn level_penalty_boundary_15() {
         let level_diff = 15;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.75);
     }
 
     #[test]
     fn level_penalty_boundary_16() {
         let level_diff = 16;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.5);
     }
 
     #[test]
     fn level_penalty_boundary_20() {
         let level_diff = 20;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.5);
     }
 
     #[test]
     fn level_penalty_boundary_21() {
         let level_diff = 21;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else if level_diff <= 25 { 0.25 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else if level_diff <= 25 {
+            0.25
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.25);
     }
 
     #[test]
     fn level_penalty_boundary_25() {
         let level_diff = 25;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else if level_diff <= 25 { 0.25 } else { 0.0 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else if level_diff <= 25 {
+            0.25
+        } else {
+            0.0
+        };
         assert_eq!(penalty, 0.25);
     }
 
     #[test]
     fn level_penalty_boundary_26() {
         let level_diff = 26;
-        let penalty = if level_diff <= 10 { 1.0 } else if level_diff <= 15 { 0.75 } else if level_diff <= 20 { 0.5 } else if level_diff <= 25 { 0.25 } else { 0.1 };
+        let penalty = if level_diff <= 10 {
+            1.0
+        } else if level_diff <= 15 {
+            0.75
+        } else if level_diff <= 20 {
+            0.5
+        } else if level_diff <= 25 {
+            0.25
+        } else {
+            0.1
+        };
         assert_eq!(penalty, 0.1);
     }
 }

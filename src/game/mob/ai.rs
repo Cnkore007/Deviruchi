@@ -1,15 +1,16 @@
+use crate::game::battle::{BattleHandler, ExpDistributor};
+use crate::game::map::data::MapDatabase;
+use crate::game::map::{ChannelBus, DropManager, GameEvent, MapState};
+use crate::game::mob::droptable::{DropResolver, MVPResolver, MobDropTable};
+use crate::game::mob::{Mob, MobAIState, MobSpawnManager};
+use crate::game::party::PartyManager;
+use crate::game::rand::GameRng;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
-use crate::game::mob::{Mob, MobAIState, MobSpawnManager};
-use crate::game::map::{MapState, ChannelBus, GameEvent, DropManager};
-use crate::game::map::data::MapDatabase;
-use crate::game::party::PartyManager;
-use crate::game::battle::{BattleHandler, ExpDistributor};
-use crate::game::rand::GameRng;
-use crate::game::mob::droptable::{DropResolver, MobDropTable, MVPResolver};
 
 /// 怪物AI处理器
+#[allow(dead_code)]
 pub struct MobAI {
     spawn_manager: Arc<MobSpawnManager>,
     channel_bus: Arc<ChannelBus>,
@@ -49,10 +50,7 @@ impl MobAI {
     pub fn load_drop_tables(&mut self, path: &str) {
         // DropTableLoader 加载后返回 HashMap<u32, MobDropTable>，需要转换为 u16
         let tables = crate::game::mob::droptable::DropTableLoader::load_from_yaml(path);
-        self.drop_tables = tables
-            .into_iter()
-            .map(|(k, v)| (k as u16, v))
-            .collect();
+        self.drop_tables = tables.into_iter().map(|(k, v)| (k as u16, v)).collect();
     }
 
     /// 设置掉落表（用于测试）
@@ -82,7 +80,7 @@ impl MobAI {
             let (px, py) = player.get_position();
             let distance = Self::calculate_distance(x, y, px, py);
 
-            if distance <= mob.sight_range as u16 {
+            if distance <= mob.sight_range {
                 *mob.ai_state.write() = MobAIState::Chase;
                 *mob.target_id.write() = Some(player.id);
                 return;
@@ -104,7 +102,7 @@ impl MobAI {
     }
 
     fn update_chase(&self, mob: &Arc<Mob>, map_state: &MapState) {
-        let target_id = mob.target_id.read().clone();
+        let target_id = *mob.target_id.read();
 
         if let Some(target_id) = target_id {
             if let Some(target) = map_state.get_player(&target_id) {
@@ -123,17 +121,15 @@ impl MobAI {
                     let mut pm = mob.path_manager.write();
 
                     // 检查是否需要重新计算路径
-                    let needs_recalc = !pm.is_chasing
-                        || pm.target_pos != Some((tx, ty))
-                        || pm.path_invalid;
+                    let needs_recalc =
+                        !pm.is_chasing || pm.target_pos != Some((tx, ty)) || pm.path_invalid;
 
                     if needs_recalc {
                         // 获取地图数据
                         if let Some(map_data) = self.map_database.get(&mob.map_name) {
                             // 创建可通行性检查闭包
-                            let is_walkable = |wx: u16, wy: u16| -> bool {
-                                map_data.is_walkable(wx, wy)
-                            };
+                            let is_walkable =
+                                |wx: u16, wy: u16| -> bool { map_data.is_walkable(wx, wy) };
 
                             // 计算新路径
                             if let Some(path) = crate::game::mob::pathfinder::Pathfinder::find_path(
@@ -182,7 +178,7 @@ impl MobAI {
     }
 
     fn update_attack(&self, mob: &Arc<Mob>, map_state: &MapState) {
-        let target_id = mob.target_id.read().clone();
+        let target_id = *mob.target_id.read();
 
         if let Some(target_id) = target_id {
             if let Some(target) = map_state.get_player(&target_id) {
@@ -279,8 +275,9 @@ impl MobAI {
         }
 
         // 检查是否可以重生
-        let should_respawn = mob.death_time.read().map_or(false, |death_time| {
-            Instant::now().duration_since(death_time) >= Duration::from_millis(mob.respawn_time as u64)
+        let should_respawn = mob.death_time.read().is_some_and(|death_time| {
+            Instant::now().duration_since(death_time)
+                >= Duration::from_millis(mob.respawn_time as u64)
         });
 
         if should_respawn {
@@ -289,6 +286,7 @@ impl MobAI {
     }
 
     /// 处理怪物掉落
+    #[allow(dead_code)]
     fn process_drops(&self, mob: &Arc<Mob>) {
         if mob.drops.is_empty() {
             return;
@@ -303,17 +301,14 @@ impl MobAI {
                 let amount = if drop.min_amount >= drop.max_amount {
                     drop.min_amount
                 } else {
-                    drop.min_amount + (self.rand_u32() % ((drop.max_amount - drop.min_amount + 1) as u32)) as u16
+                    drop.min_amount
+                        + (self.rand_u32() % ((drop.max_amount - drop.min_amount + 1) as u32))
+                            as u16
                 };
 
                 // 添加掉落物到地图
-                self.drop_manager.add(
-                    drop.item_id,
-                    amount,
-                    mob_x,
-                    mob_y,
-                    &mob.spawn_map,
-                );
+                self.drop_manager
+                    .add(drop.item_id, amount, mob_x, mob_y, &mob.spawn_map);
 
                 // 发布 ItemDrop 事件
                 let drop_event = GameEvent::ItemDrop {
@@ -344,12 +339,9 @@ impl MobAI {
         drop(damage_log);
 
         // 使用 DropResolver 解析掉落
-        let drops = self.drop_resolver.resolve(
-            table,
-            self.rng.as_ref(),
-            mob.level,
-            mvp_id,
-        );
+        let drops = self
+            .drop_resolver
+            .resolve(table, self.rng.as_ref(), mob.level, mvp_id);
 
         let (mob_x, mob_y) = mob.get_position();
 
@@ -378,6 +370,7 @@ impl MobAI {
     }
 
     /// 返回随机 u32
+    #[allow(dead_code)]
     fn rand_u32(&self) -> u32 {
         self.rng.rand_range(u32::MIN, u32::MAX)
     }
@@ -407,9 +400,9 @@ impl Default for MobAI {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::rand::GameRng;
     use crate::game::map::{MapState, Player};
     use crate::game::mob::data::MobPathManager;
+    use crate::game::rand::GameRng;
     use std::cell::UnsafeCell;
 
     /// Test-only mock RNG for MobAI tests
@@ -439,7 +432,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(min);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(min);
             val.min(max).max(min)
         }
 
@@ -450,7 +447,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val % 2 == 0
         }
 
@@ -461,7 +462,10 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            self.values.get(idx % self.values.len()).copied().unwrap_or(0)
+            self.values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0)
         }
     }
 
@@ -522,6 +526,8 @@ mod tests {
             atk_range: 1,
             ai_state: parking_lot::RwLock::new(MobAIState::Idle),
             target_id: parking_lot::RwLock::new(None),
+            behavior: crate::game::mob::MobBehavior::Passive,
+            skills: Vec::new(),
             sight_range: 10,
             chase_range: 20,
             aggro_rate: 0,
@@ -571,6 +577,16 @@ mod tests {
             max_weight: parking_lot::RwLock::new(20000),
             equipment: parking_lot::RwLock::new(crate::game::item::Equipment::new()),
             is_sitting: parking_lot::RwLock::new(false),
+            status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
+            shop_id: parking_lot::RwLock::new(None),
+            inventory: parking_lot::RwLock::new(Vec::new()),
+            hotkeys: parking_lot::RwLock::new(Vec::new()),
+            save_map: parking_lot::RwLock::new("test_map".to_string()),
+            save_x: parking_lot::RwLock::new(50),
+            save_y: parking_lot::RwLock::new(50),
+            job: parking_lot::RwLock::new(0),
+            in_combat: parking_lot::RwLock::new(false),
+            group_id: parking_lot::RwLock::new(0),
         })
     }
 
@@ -853,6 +869,16 @@ mod tests {
             max_weight: parking_lot::RwLock::new(20000),
             equipment: parking_lot::RwLock::new(crate::game::item::Equipment::new()),
             is_sitting: parking_lot::RwLock::new(false),
+            status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
+            shop_id: parking_lot::RwLock::new(None),
+            inventory: parking_lot::RwLock::new(Vec::new()),
+            hotkeys: parking_lot::RwLock::new(Vec::new()),
+            save_map: parking_lot::RwLock::new("other_map".to_string()),
+            save_x: parking_lot::RwLock::new(50),
+            save_y: parking_lot::RwLock::new(50),
+            job: parking_lot::RwLock::new(0),
+            in_combat: parking_lot::RwLock::new(false),
+            group_id: parking_lot::RwLock::new(0),
         });
 
         let map_state = create_test_map_state();

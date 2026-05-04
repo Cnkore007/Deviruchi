@@ -4,8 +4,8 @@
 //! - Normal: 返回存储点（save point）或者地图默认点
 //! - InstantCall: 返回地图出生点
 
-use std::collections::HashMap;
 use crate::game::map::player::Player;
+use std::collections::HashMap;
 
 /// 复活类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,7 +65,8 @@ impl RespawnService {
 
     /// 添加地图默认复活点
     pub fn add_map_default(&mut self, map: &str, x: u16, y: u16) {
-        self.map_defaults.insert(map.to_string(), RespawnPoint::new(map, x, y));
+        self.map_defaults
+            .insert(map.to_string(), RespawnPoint::new(map, x, y));
     }
 
     /// 获取玩家的复活位置
@@ -73,7 +74,11 @@ impl RespawnService {
     /// 根据复活类型返回合适的复活坐标：
     /// - Normal: 返回玩家的存储点，如果没有则返回地图默认点，最后才用全局默认
     /// - InstantCall: 返回地图的出生点（spawn point，等同于地图默认点）
-    pub fn get_respawn_position(&self, player: &Player, respawn_type: RespawnType) -> (u16, u16, String) {
+    pub fn get_respawn_position(
+        &self,
+        player: &Player,
+        respawn_type: RespawnType,
+    ) -> (u16, u16, String) {
         let player_map = &player.map_name;
 
         match respawn_type {
@@ -89,7 +94,7 @@ impl RespawnService {
 
                 // 尝试使用玩家当前位置作为复活点（模拟存储点效果）
                 let (x, y) = player.get_position();
-                return (x, y, player_map.clone());
+                (x, y, player_map.clone())
             }
             RespawnType::InstantCall => {
                 // InstantCall 返回地图的出生点（spawn point）
@@ -100,7 +105,7 @@ impl RespawnService {
 
                 // 如果没有地图默认点，使用玩家当前位置
                 let (x, y) = player.get_position();
-                return (x, y, player_map.clone());
+                (x, y, player_map.clone())
             }
         }
     }
@@ -159,6 +164,16 @@ mod tests {
             max_weight: RwLock::new(20000),
             equipment: RwLock::new(crate::game::item::Equipment::new()),
             is_sitting: RwLock::new(false),
+            status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new(map.to_string()),
+            save_x: RwLock::new(50),
+            save_y: RwLock::new(50),
+            job: RwLock::new(0),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
         }
     }
 

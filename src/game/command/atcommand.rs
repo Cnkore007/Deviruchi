@@ -1,16 +1,11 @@
-use std::collections::HashMap;
-use std::sync::Arc;
 use parking_lot::RwLock;
-use uuid::Uuid;
+use std::collections::HashMap;
 
-use crate::game::map::{Player, MapState};
+use crate::game::map::{MapState, Player};
 
 /// 命令处理器类型
-pub type CommandHandler = fn(
-    player: &mut Player,
-    args: &[String],
-    map_state: &MapState,
-) -> CommandResult;
+pub type CommandHandler =
+    fn(player: &mut Player, args: &[String], map_state: &MapState) -> CommandResult;
 
 /// 命令结果
 #[derive(Debug, Clone)]
@@ -79,7 +74,11 @@ impl AtCommandHandler {
         };
 
         if !self.check_permission(player, info.min_level) {
-            tracing::warn!("Player {} attempted command @{} without permission", player.name, cmd_name);
+            tracing::warn!(
+                "Player {} attempted command @{} without permission",
+                player.name,
+                cmd_name
+            );
             return CommandResult::NoPermission;
         }
 
@@ -94,14 +93,15 @@ impl AtCommandHandler {
 
     /// 获取玩家权限等级
     fn get_player_level(&self, player: &Player) -> u8 {
-        // TODO: 从数据库或缓存获取实际权限等级
-        // 目前返回 10 (GM) 以便测试
-        10
+        *player.group_id.read() as u8
     }
 
     /// 获取权限等级名称
     pub fn get_level_name(&self, level: u8) -> &'static str {
-        self.permission_levels.get(&level).copied().unwrap_or("Unknown")
+        self.permission_levels
+            .get(&level)
+            .copied()
+            .unwrap_or("Unknown")
     }
 
     /// 获取所有命令列表
@@ -259,6 +259,9 @@ mod tests {
             last_map: "test".to_string(),
             last_x: 100,
             last_y: 100,
+            save_map: "test".to_string(),
+            save_x: 100,
+            save_y: 100,
             delete_timer: 0,
             created_at: 0,
             updated_at: 0,

@@ -1,7 +1,10 @@
-use parking_lot::RwLock;
-use uuid::Uuid;
-use crate::storage::Character;
 use crate::game::item::Equipment;
+use crate::game::status::{PlayerStatus, StatusChange, StatusEffect, StatusSource};
+use crate::storage::Character;
+use crate::storage::character::{CharacterHotkeyData, CharacterInventoryData};
+use parking_lot::RwLock;
+use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayerState {
@@ -38,6 +41,26 @@ pub struct Player {
     pub max_weight: RwLock<u32>,
     pub equipment: RwLock<Equipment>,
     pub is_sitting: RwLock<bool>,
+    /// 状态效果管理器
+    pub status: PlayerStatus,
+    /// 当前摆摊商店ID
+    pub shop_id: RwLock<Option<Uuid>>,
+    /// 物品栏数据
+    pub inventory: RwLock<Vec<CharacterInventoryData>>,
+    /// 快捷键数据
+    pub hotkeys: RwLock<Vec<CharacterHotkeyData>>,
+    /// 存档点 - 地图名
+    pub save_map: RwLock<String>,
+    /// 存档点 - X坐标
+    pub save_x: RwLock<u16>,
+    /// 存档点 - Y坐标
+    pub save_y: RwLock<u16>,
+    /// 职业ID
+    pub job: RwLock<u16>,
+    /// 是否处于战斗中
+    pub in_combat: RwLock<bool>,
+    /// 账户权限等级 (0=玩家, 10=GM, 50=Admin, 99=SuperAdmin)
+    pub group_id: RwLock<i32>,
 }
 
 impl Clone for Player {
@@ -71,6 +94,16 @@ impl Clone for Player {
             max_weight: RwLock::new(*self.max_weight.read()),
             equipment: RwLock::new(self.equipment.read().clone()),
             is_sitting: RwLock::new(*self.is_sitting.read()),
+            status: self.status.clone(),
+            shop_id: RwLock::new(*self.shop_id.read()),
+            inventory: RwLock::new(self.inventory.read().clone()),
+            hotkeys: RwLock::new(self.hotkeys.read().clone()),
+            save_map: RwLock::new(self.save_map.read().clone()),
+            save_x: RwLock::new(*self.save_x.read()),
+            save_y: RwLock::new(*self.save_y.read()),
+            job: RwLock::new(*self.job.read()),
+            in_combat: RwLock::new(*self.in_combat.read()),
+            group_id: RwLock::new(*self.group_id.read()),
         }
     }
 }
@@ -85,7 +118,7 @@ impl Player {
             name: char.name,
             pos_x: RwLock::new(char.last_x as u16),
             pos_y: RwLock::new(char.last_y as u16),
-            map_name: char.last_map,
+            map_name: char.last_map.clone(),
             hp: RwLock::new(char.hp),
             max_hp: RwLock::new(char.max_hp),
             sp: RwLock::new(char.sp),
@@ -102,12 +135,100 @@ impl Player {
             dex: RwLock::new(char.dex),
             luk: RwLock::new(char.luk),
             walk_speed: RwLock::new(150),
-            zeny: RwLock::new(char.zeny as u32),
+            zeny: RwLock::new(char.zeny),
             current_weight: RwLock::new(0),
             max_weight: RwLock::new(20000 + (char.str as u32) * 200),
             equipment: RwLock::new(Equipment::new()),
             is_sitting: RwLock::new(false),
+            status: PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new(char.save_map.clone()),
+            save_x: RwLock::new(char.save_x as u16),
+            save_y: RwLock::new(char.save_y as u16),
+            job: RwLock::new(char.class),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
         }
+    }
+
+    /// 从 CharacterData 创建 Player
+    #[allow(dead_code)]
+    pub fn from_character_data(
+        _db: &crate::storage::Database,
+        char: crate::game::map::CharacterData,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            id: Uuid::new_v4(),
+            char_id: char.char_id,
+            account_id: char.account_id,
+            name: char.name.clone(),
+            pos_x: RwLock::new(char.last_x as u16),
+            pos_y: RwLock::new(char.last_y as u16),
+            map_name: char.last_map.clone(),
+            hp: RwLock::new(char.hp),
+            max_hp: RwLock::new(char.max_hp),
+            sp: RwLock::new(char.sp),
+            max_sp: RwLock::new(char.max_sp),
+            base_level: RwLock::new(char.base_level),
+            job_level: RwLock::new(char.job_level),
+            base_exp: RwLock::new(char.base_exp),
+            job_exp: RwLock::new(char.job_exp),
+            state: RwLock::new(PlayerState::Alive),
+            str: RwLock::new(char.str),
+            agi: RwLock::new(char.agi),
+            vit: RwLock::new(char.vit),
+            int: RwLock::new(char.int),
+            dex: RwLock::new(char.dex),
+            luk: RwLock::new(char.luk),
+            walk_speed: RwLock::new(150),
+            zeny: RwLock::new(char.zeny),
+            current_weight: RwLock::new(0),
+            max_weight: RwLock::new(20000 + (char.str as u32) * 200),
+            equipment: RwLock::new(Equipment::new()),
+            is_sitting: RwLock::new(false),
+            status: PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new(char.save_map.clone()),
+            save_x: RwLock::new(char.save_x as u16),
+            save_y: RwLock::new(char.save_y as u16),
+            job: RwLock::new(char.job),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
+        })
+    }
+
+    // ==================== 存档点相关 ====================
+
+    /// 获取存档点坐标
+    #[allow(dead_code)]
+    pub fn get_save_point(&self) -> (u16, u16) {
+        (*self.save_x.read(), *self.save_y.read())
+    }
+
+    /// 获取存档点地图
+    #[allow(dead_code)]
+    pub fn get_save_map(&self) -> String {
+        self.save_map.read().clone()
+    }
+
+    /// 设置存档点
+    #[allow(dead_code)]
+    pub fn set_save_point(&self) {
+        *self.save_map.write() = self.map_name.clone();
+        *self.save_x.write() = *self.pos_x.read();
+        *self.save_y.write() = *self.pos_y.read();
+    }
+
+    /// 设置存档点（指定位置）
+    #[allow(dead_code)]
+    pub fn set_save_point_at(&self, map: &str, x: u16, y: u16) {
+        *self.save_map.write() = map.to_string();
+        *self.save_x.write() = x;
+        *self.save_y.write() = y;
     }
 
     /// 移动到指定位置
@@ -160,6 +281,28 @@ impl Player {
     /// 是否存活
     pub fn is_alive(&self) -> bool {
         *self.state.read() == PlayerState::Alive
+    }
+
+    /// 是否在战斗中
+    pub fn is_in_combat(&self) -> bool {
+        *self.in_combat.read()
+    }
+
+    /// 设置战斗状态
+    #[allow(dead_code)]
+    pub fn set_combat(&self, in_combat: bool) {
+        *self.in_combat.write() = in_combat;
+    }
+
+    /// 获取职业ID
+    pub fn get_job(&self) -> u16 {
+        *self.job.read()
+    }
+
+    /// 设置职业ID
+    #[allow(dead_code)]
+    pub fn set_job(&self, job: u16) {
+        *self.job.write() = job;
     }
 
     /// 坐下
@@ -237,11 +380,221 @@ impl Player {
         let max = *self.max_weight.read();
         current > max * 90 / 100
     }
+
+    // ==================== 状态效果管理 ====================
+
+    /// 添加状态效果
+    pub fn add_status(&self, effect: StatusEffect) -> Option<StatusEffect> {
+        self.status.add_status(effect)
+    }
+
+    /// 移除状态效果
+    pub fn remove_status(&self, status: StatusChange) -> Option<StatusEffect> {
+        self.status.remove_status(status)
+    }
+
+    /// 检查是否有指定状态
+    pub fn has_status(&self, status: StatusChange) -> bool {
+        self.status.has_status(status)
+    }
+
+    /// 获取状态效果
+    pub fn get_status(&self, status: StatusChange) -> Option<StatusEffect> {
+        self.status.get_status(status)
+    }
+
+    /// 清除所有状态效果
+    pub fn clear_all_status(&self) {
+        self.status.clear_all();
+    }
+
+    /// 清除所有指定分类的状态
+    pub fn clear_status_by_category(&self, category: crate::game::status::StatusCategory) {
+        self.status.clear_by_category(category);
+    }
+
+    /// 获取所有活跃状态
+    pub fn get_all_statuses(&self) -> Vec<StatusEffect> {
+        self.status.get_all_statuses()
+    }
+
+    /// 是否有战斗限制状态（眩晕、冰冻、睡眠、石化、混乱）
+    pub fn has_combat_restriction(&self) -> bool {
+        self.status.has_combat_restriction()
+    }
+
+    /// 是否被沉默
+    pub fn is_silenced(&self) -> bool {
+        self.status.is_silenced()
+    }
+
+    /// 是否无敌
+    pub fn is_invincible(&self) -> bool {
+        self.status.is_invincible()
+    }
+
+    /// 是否隐身
+    pub fn is_invisible(&self) -> bool {
+        self.status.is_invisible()
+    }
+
+    /// 清除所有已过期的状态
+    pub fn cleanup_expired_status(&self) -> Vec<StatusChange> {
+        self.status.cleanup_expired()
+    }
+
+    /// 应用常见BUFF（快捷方法）
+    pub fn apply_blessing(&self, level: u8) {
+        let effect = StatusEffect::with_values(
+            StatusChange::Blessing,
+            (level as u64 * 30000).min(300000), // 30秒 * 等级，最大5分钟
+            StatusSource::Skill(9),             // SM_BLESSING skill ID
+            level as i32,
+            0,
+            0,
+        );
+        self.add_status(effect);
+    }
+
+    /// 应用加速术
+    pub fn apply_haste(&self, level: u8) {
+        let effect = StatusEffect::with_values(
+            StatusChange::Haste,
+            (level as u64 * 30000).min(300000),
+            StatusSource::Skill(29), // AC_CONCENTRATION or HASTE skill ID
+            level as i32 * 10,
+            0,
+            0,
+        );
+        self.add_status(effect);
+    }
+
+    /// 应用治愈术
+    pub fn apply_heal(&self, amount: u32) {
+        let current_hp = *self.hp.read();
+        let max_hp = *self.max_hp.read();
+        let heal_amount = amount.min(max_hp - current_hp);
+        *self.hp.write() = current_hp + heal_amount;
+    }
+
+    /// 检查是否可以执行动作（考虑状态限制）
+    pub fn can_act(&self) -> bool {
+        if !self.is_alive() {
+            return false;
+        }
+        !self.has_combat_restriction()
+    }
+
+    /// 检查是否可以攻击
+    pub fn can_attack(&self) -> bool {
+        self.can_act() && !self.has_status(StatusChange::Silence)
+    }
+
+    /// 检查是否可以移动
+    pub fn can_move(&self) -> bool {
+        self.can_act()
+    }
+
+    /// 检查是否可以施放技能
+    pub fn can_cast(&self) -> bool {
+        self.can_act() && !self.is_silenced()
+    }
+
+    /// ==================== 数据持久化 ====================
+    /// 转换为可保存的数据格式
+    pub fn to_save_data(&self) -> PlayerSaveData {
+        PlayerSaveData {
+            char_id: self.char_id,
+            last_map: self.map_name.clone(),
+            last_x: *self.pos_x.read() as i32,
+            last_y: *self.pos_y.read() as i32,
+            hp: *self.hp.read(),
+            max_hp: *self.max_hp.read(),
+            sp: *self.sp.read(),
+            max_sp: *self.max_sp.read(),
+            base_exp: *self.base_exp.read(),
+            job_exp: *self.job_exp.read(),
+            base_level: *self.base_level.read(),
+            job_level: *self.job_level.read(),
+            zeny: *self.zeny.read(),
+            str: *self.str.read(),
+            agi: *self.agi.read(),
+            vit: *self.vit.read(),
+            int: *self.int.read(),
+            dex: *self.dex.read(),
+            luk: *self.luk.read(),
+            status_effects: self.status.get_all_statuses(),
+            inventory: self.inventory.read().clone(),
+            hotkeys: self.hotkeys.read().clone(),
+        }
+    }
+
+    /// 保存到数据库
+    pub fn save_to_db(&self, db: &crate::storage::Database) -> anyhow::Result<()> {
+        let save_data = self.to_save_data();
+
+        db.save_character(
+            save_data.char_id,
+            &save_data.last_map,
+            save_data.last_x,
+            save_data.last_y,
+            save_data.hp,
+            save_data.max_hp,
+            save_data.sp,
+            save_data.max_sp,
+            save_data.base_exp,
+            save_data.job_exp,
+            save_data.base_level,
+            save_data.job_level,
+            save_data.zeny,
+            save_data.str,
+            save_data.agi,
+            save_data.vit,
+            save_data.int,
+            save_data.dex,
+            save_data.luk,
+            &save_data.status_effects,
+            &save_data.inventory,
+            &save_data.hotkeys,
+        )?;
+
+        tracing::debug!("Player {} saved to database", self.name);
+        Ok(())
+    }
+}
+
+/// 玩家保存数据结构
+#[derive(Debug, Clone)]
+pub struct PlayerSaveData {
+    pub char_id: u32,
+    pub last_map: String,
+    pub last_x: i32,
+    pub last_y: i32,
+    pub hp: u32,
+    pub max_hp: u32,
+    pub sp: u32,
+    pub max_sp: u32,
+    pub base_exp: u64,
+    pub job_exp: u64,
+    pub base_level: u16,
+    pub job_level: u16,
+    pub zeny: u32,
+    pub str: u16,
+    pub agi: u16,
+    pub vit: u16,
+    pub int: u16,
+    pub dex: u16,
+    pub luk: u16,
+    pub status_effects: Vec<crate::game::status::effect::StatusEffect>,
+    pub inventory: Vec<CharacterInventoryData>,
+    pub hotkeys: Vec<CharacterHotkeyData>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::status::effect::StatusSource;
+    use crate::game::status::types::StatusChange;
 
     fn make_player() -> Player {
         Player {
@@ -273,6 +626,16 @@ mod tests {
             max_weight: RwLock::new(20000),
             equipment: RwLock::new(Equipment::new()),
             is_sitting: RwLock::new(false),
+            status: PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new("test_map".to_string()),
+            save_x: RwLock::new(50),
+            save_y: RwLock::new(50),
+            job: RwLock::new(0),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
         }
     }
 
@@ -302,7 +665,7 @@ mod tests {
     fn test_player_die_small_exp_clamped_to_zero() {
         let player = make_player();
         *player.base_exp.write() = 50; // 1% = 0, saturating_sub keeps 50
-        *player.job_exp.write() = 30;  // 1% = 0, saturating_sub keeps 30
+        *player.job_exp.write() = 30; // 1% = 0, saturating_sub keeps 30
 
         player.die();
 
@@ -320,7 +683,7 @@ mod tests {
         player.respawn(50, 60);
         assert!(player.is_alive());
         assert_eq!(*player.hp.read(), 100); // max_hp
-        assert_eq!(*player.sp.read(), 50);  // max_sp
+        assert_eq!(*player.sp.read(), 50); // max_sp
         assert_eq!(player.get_position(), (50, 60));
     }
 
@@ -402,5 +765,70 @@ mod tests {
         // 101 / 2 = 50 (floor division)
         assert_eq!(dropped, 50);
         assert_eq!(*player.zeny.read(), 51);
+    }
+
+    // ==================== 持久化测试 ====================
+
+    #[test]
+    fn test_to_save_data_captures_all_fields() {
+        let player = make_player();
+        *player.hp.write() = 500;
+        *player.max_hp.write() = 1000;
+        *player.sp.write() = 100;
+        *player.max_sp.write() = 200;
+        *player.base_exp.write() = 10000;
+        *player.job_exp.write() = 5000;
+        *player.base_level.write() = 50;
+        *player.job_level.write() = 30;
+        *player.zeny.write() = 100000;
+        *player.str.write() = 50;
+        *player.agi.write() = 40;
+        *player.vit.write() = 30;
+        *player.int.write() = 20;
+        *player.dex.write() = 60;
+        *player.luk.write() = 10;
+
+        let save_data = player.to_save_data();
+
+        assert_eq!(save_data.char_id, 1);
+        assert_eq!(save_data.last_map, "test_map");
+        assert_eq!(save_data.last_x, 100);
+        assert_eq!(save_data.last_y, 100);
+        assert_eq!(save_data.hp, 500);
+        assert_eq!(save_data.max_hp, 1000);
+        assert_eq!(save_data.sp, 100);
+        assert_eq!(save_data.max_sp, 200);
+        assert_eq!(save_data.base_exp, 10000);
+        assert_eq!(save_data.job_exp, 5000);
+        assert_eq!(save_data.base_level, 50);
+        assert_eq!(save_data.job_level, 30);
+        assert_eq!(save_data.zeny, 100000);
+        assert_eq!(save_data.str, 50);
+        assert_eq!(save_data.agi, 40);
+        assert_eq!(save_data.vit, 30);
+        assert_eq!(save_data.int, 20);
+        assert_eq!(save_data.dex, 60);
+        assert_eq!(save_data.luk, 10);
+    }
+
+    #[test]
+    fn test_player_save_data_with_status_effects() {
+        let mut player = make_player();
+
+        // 添加状态效果
+        let effect = StatusEffect::with_values(
+            StatusChange::Blessing,
+            60000,
+            StatusSource::Skill(9),
+            10,
+            0,
+            0,
+        );
+        player.add_status(effect);
+
+        let save_data = player.to_save_data();
+
+        assert_eq!(save_data.status_effects.len(), 1);
+        assert_eq!(save_data.status_effects[0].id, StatusChange::Blessing);
     }
 }

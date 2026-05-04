@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use uuid::Uuid;
 use super::player::Player;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 pub struct MapState {
     players: RwLock<HashMap<Uuid, Player>>,
@@ -68,7 +68,8 @@ impl MapState {
     /// 获取指定位置一定范围内的所有玩家
     pub fn get_players_near(&self, map_name: &str, x: u16, y: u16, radius: u16) -> Vec<Player> {
         let players = self.get_players_on_map(map_name);
-        players.into_iter()
+        players
+            .into_iter()
             .filter(|p| {
                 let (px, py) = p.get_position();
                 let dx = (px as i32 - x as i32).unsigned_abs() as u16;
@@ -103,10 +104,10 @@ impl MapState {
                 list.retain(|id| id != player_id);
             }
             by_map.entry(new_map.to_string()).or_default();
-            if let Some(list) = by_map.get_mut(new_map) {
-                if !list.contains(player_id) {
-                    list.push(*player_id);
-                }
+            if let Some(list) = by_map.get_mut(new_map)
+                && !list.contains(player_id)
+            {
+                list.push(*player_id);
             }
         }
 
@@ -122,10 +123,10 @@ impl MapState {
         }
         // 添加到新地图
         by_map.entry(new_map.to_string()).or_default();
-        if let Some(players) = by_map.get_mut(new_map) {
-            if !players.contains(player_id) {
-                players.push(*player_id);
-            }
+        if let Some(players) = by_map.get_mut(new_map)
+            && !players.contains(player_id)
+        {
+            players.push(*player_id);
         }
     }
 
@@ -164,12 +165,23 @@ impl MapState {
 
     /// 检查位置是否可通行（简化版本，始终返回 true）
     pub fn is_walkable(&self, _map_name: &str, _x: u16, _y: u16) -> bool {
-        true // TODO: 实现实际碰撞检测
+        tracing::debug!("is_walkable check not yet implemented, returning true");
+        true
     }
 
     /// 获取所有唯一地图名称
     pub fn get_all_map_names(&self) -> Vec<String> {
         self.players_by_map.read().keys().cloned().collect()
+    }
+
+    /// 获取所有在线玩家的 ID 列表
+    pub fn get_all_player_ids(&self) -> Vec<Uuid> {
+        self.players.read().keys().cloned().collect()
+    }
+
+    /// 获取所有玩家的克隆
+    pub fn get_all_players(&self) -> Vec<Player> {
+        self.players.read().values().cloned().collect()
     }
 }
 
@@ -182,9 +194,9 @@ impl Default for MapState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use parking_lot::RwLock;
     use crate::game::item::Equipment;
     use crate::game::map::player::PlayerState;
+    use parking_lot::RwLock;
 
     fn create_test_player(x: u16, y: u16, map: &str) -> Player {
         Player {
@@ -216,6 +228,16 @@ mod tests {
             max_weight: RwLock::new(20000 + 200),
             equipment: RwLock::new(Equipment::new()),
             is_sitting: RwLock::new(false),
+            status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
+            shop_id: RwLock::new(None),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            save_map: RwLock::new(map.to_string()),
+            save_x: RwLock::new(50),
+            save_y: RwLock::new(50),
+            job: RwLock::new(0),
+            in_combat: RwLock::new(false),
+            group_id: RwLock::new(0),
         }
     }
 
@@ -226,10 +248,10 @@ mod tests {
 
         // 添加不同位置的测试玩家
         // 中心点 (100, 100)，半径 100
-        let player1 = create_test_player(100, 100, map);  // 距离 0，在范围内
-        let player2 = create_test_player(150, 100, map);  // 距离 50，在范围内
-        let player3 = create_test_player(250, 250, map);  // 距离约 212，超出范围
-        let player4 = create_test_player(100, 100, "other_map");  // 不同地图
+        let player1 = create_test_player(100, 100, map); // 距离 0，在范围内
+        let player2 = create_test_player(150, 100, map); // 距离 50，在范围内
+        let player3 = create_test_player(250, 250, map); // 距离约 212，超出范围
+        let player4 = create_test_player(100, 100, "other_map"); // 不同地图
 
         state.add_player(player1.clone());
         state.add_player(player2.clone());

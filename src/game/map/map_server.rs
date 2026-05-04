@@ -1,26 +1,30 @@
 //! MapServer - 地图服务器核心，处理客户端数据包
 
-use std::sync::Arc;
-use parking_lot::RwLock;
-use uuid::Uuid;
-use crate::network::session::Session;
-use crate::game::token::TokenStore;
-use crate::game::map::MapState;
-use crate::game::map::channel::{ChannelBus, GameEvent, ChatType};
-use crate::game::map::drop_item::DropManager;
-use crate::game::party::PartyManager;
-use crate::game::trade::TradeManager;
 use crate::game::guild::GuildManager;
-use crate::game::map::teleport::{TeleportManager, WarpService, TeleportAction};
+use crate::game::item::{ItemDatabase, ItemEffectDatabase, ItemIntegrationHandler, ItemUseResult};
+use crate::game::map::MapState;
+use crate::game::map::channel::{ChannelBus, ChatType, GameEvent};
+use crate::game::map::drop_item::DropManager;
+use crate::game::map::teleport::{TeleportAction, TeleportManager, WarpService};
+use crate::game::party::PartyManager;
+use crate::game::skill::SkillHandler;
+use crate::game::storage::StorageManager;
+use crate::game::token::TokenStore;
+use crate::game::trade::TradeManager;
+use crate::network::packet::id::*;
+use crate::network::session::Session;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
-use crate::protocol::map_packets::{CZRequestAction, CZUseItem, CZRequestPickupItem, CZContactNpc};
-use crate::protocol::party_packets::{CZMakeParty, CZReqPartyInvite, CZReqPartyJoin, CZPartyChat, CZChatMessage};
+use crate::protocol::guild_packets::*;
+use crate::protocol::map_packets::{CZContactNpc, CZRequestAction, CZRequestPickupItem, CZUseItem};
+use crate::protocol::packet_builder::Packed;
+use crate::protocol::party_packets::{
+    CZChatMessage, CZMakeParty, CZPartyChat, CZReqPartyInvite, CZReqPartyJoin,
+};
 use crate::protocol::storage_packets::*;
 use crate::protocol::teleport_packets::*;
-use crate::protocol::guild_packets::*;
-use crate::protocol::packet_builder::Packed;
-use crate::network::packet::id::*;
-use crate::game::storage::{StorageManager, Storage};
+use parking_lot::RwLock;
+use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct MapServer {
     pub db: Arc<crate::storage::Database>,
@@ -35,6 +39,9 @@ pub struct MapServer {
     pub teleport_manager: Arc<RwLock<TeleportManager>>,
     pub warp_service: Arc<WarpService>,
     pub death_drop_items: bool,
+    pub map_server_id: u32,
+    pub skill_handler: Arc<SkillHandler>,
+    pub item_integration_handler: Arc<ItemIntegrationHandler>,
 }
 
 impl MapServer {
@@ -52,6 +59,12 @@ impl MapServer {
         warp_service: Arc<WarpService>,
         death_drop_items: bool,
     ) -> Self {
+        // 初始化物品和技能系统
+        let effect_db = Arc::new(ItemEffectDatabase::new());
+        let item_db = Arc::new(ItemDatabase::new());
+        let skill_handler = Arc::new(SkillHandler::new());
+        let item_integration_handler = Arc::new(ItemIntegrationHandler::new(effect_db, item_db));
+
         Self {
             db,
             token_store,
@@ -65,11 +78,26 @@ impl MapServer {
             teleport_manager,
             warp_service,
             death_drop_items,
+            map_server_id: 1,
+            skill_handler,
+            item_integration_handler,
         }
     }
 
+    /// 设置 Map Server ID
+    #[allow(dead_code)]
+    pub fn with_server_id(mut self, server_id: u32) -> Self {
+        self.map_server_id = server_id;
+        self
+    }
+
     /// Handle incoming packet
-    pub fn handle_packet(&self, packet_id: u16, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub fn handle_packet(
+        &self,
+        packet_id: u16,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         match packet_id {
             0x007C => self.handle_enter(data, session),
             0x0085 => self.handle_move(data, session),
@@ -119,11 +147,25 @@ impl MapServer {
         }
         let account_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
         let char_id = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-        let token_len = if data.len() > 8 { (data.len() - 8).min(32) } else { 0 };
+        let token_len = if data.len() > 8 {
+            (data.len() - 8).min(32)
+        } else {
+            0
+        };
         let token = String::from_utf8_lossy(&data[8..8 + token_len]).to_string();
 
-        // Verify token
-        if !self.token_store.verify(&token, account_id, char_id) {
+        // Verify token and get the expected map server ID
+        // Token verification includes map_server_id check
+        if !self
+            .token_store
+            .verify(&token, account_id, char_id, self.map_server_id)
+        {
+            tracing::warn!(
+                "Token verification failed for account_id={}, char_id={}, map_server_id={}",
+                account_id,
+                char_id,
+                self.map_server_id
+            );
             return None;
         }
 
@@ -133,6 +175,11 @@ impl MapServer {
         // Create player
         let mut player = crate::game::map::Player::from_character(character);
         player.account_id = account_id;
+
+        // Load account group_id for permission checks
+        if let Ok(Some(account)) = self.db.get_account_by_id(account_id) {
+            *player.group_id.write() = account.group_id;
+        }
 
         let player_id = player.id;
         let pos_x = *player.pos_x.read();
@@ -148,7 +195,8 @@ impl MapServer {
         // Subscribe to map channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
             let channel_name = format!("map:{}", map_name);
-            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), pos_x, pos_y);
+            self.channel_bus
+                .subscribe(&channel_name, player_id, tx.clone(), pos_x, pos_y);
         }
 
         // Return accept packet (simplified)
@@ -162,13 +210,14 @@ impl MapServer {
 
         let move_pkt = CZRequestMove::from_slice(data)?;
 
-        let from_x = *player.pos_x.read();
-        let from_y = *player.pos_y.read();
+        let _from_x = *player.pos_x.read();
+        let _from_y = *player.pos_y.read();
         player.move_to(move_pkt.pos_x, move_pkt.pos_y);
 
         // Update channel position
         let channel_name = format!("map:{}", player.map_name);
-        self.channel_bus.update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
+        self.channel_bus
+            .update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
 
         // Check for warp trigger
         if let Some(warp_action) = self.warp_service.handle_move_with_warp_on_map(
@@ -227,9 +276,81 @@ impl MapServer {
 
     /// Handle use item (0x009B)
     fn handle_use_item(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
-        let _player_id = session.player_id?;
-        let _item_pkt = CZUseItem::from_slice(data)?;
-        // Simplified - actual item use logic handled elsewhere
+        let player_id = session.player_id?;
+        let item_pkt = CZUseItem::from_slice(data)?;
+
+        let player = self.map_state.get_player(&player_id)?;
+
+        // 创建临时物品栏用于处理物品使用
+        let item_db = self.item_integration_handler.item_db();
+        let inv_data = player.inventory.read().clone();
+        let mut inventory =
+            crate::game::item::Inventory::from_character_inventory(&inv_data, item_db);
+
+        // 使用 ItemIntegrationHandler 处理物品使用
+        let result = self.item_integration_handler.use_item(
+            &player,
+            &mut inventory,
+            item_pkt.item_id as u16,
+            &self.warp_service,
+            &self.skill_handler,
+            &self.map_state,
+        );
+
+        match result {
+            ItemUseResult::Success(msg) => {
+                tracing::info!(
+                    "Player {} used item {}: {}",
+                    player.name,
+                    item_pkt.item_id,
+                    msg
+                );
+                // 更新玩家物品栏数据
+                *player.inventory.write() = inventory.to_character_inventory();
+            }
+            ItemUseResult::Failure(msg) => {
+                tracing::warn!(
+                    "Player {} failed to use item {}: {}",
+                    player.name,
+                    item_pkt.item_id,
+                    msg
+                );
+            }
+            ItemUseResult::Teleport { map, x, y } => {
+                // 执行传送
+                tracing::info!(
+                    "Player {} teleporting to {} ({}, {})",
+                    player.name,
+                    map,
+                    x,
+                    y
+                );
+                // 更新玩家物品栏数据
+                *player.inventory.write() = inventory.to_character_inventory();
+            }
+            ItemUseResult::SkillUsed { skill_id } => {
+                // 触发技能
+                tracing::info!("Player {} used skill {} from item", player.name, skill_id);
+                // 更新玩家物品栏数据
+                *player.inventory.write() = inventory.to_character_inventory();
+            }
+            ItemUseResult::CooldownActive { remaining_ms } => {
+                tracing::debug!(
+                    "Player {} item on cooldown: {}ms remaining",
+                    player.name,
+                    remaining_ms
+                );
+            }
+            ItemUseResult::RequirementsNotMet(reason) => {
+                tracing::debug!(
+                    "Player {} item requirements not met: {}",
+                    player.name,
+                    reason
+                );
+            }
+            _ => {}
+        }
+
         None
     }
 
@@ -241,7 +362,10 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
 
         // Find drop at position
-        if let Some(drop) = self.drop_manager.find_at_position(pickup_pkt.x, pickup_pkt.y, &player.map_name) {
+        if let Some(drop) =
+            self.drop_manager
+                .find_at_position(pickup_pkt.x, pickup_pkt.y, &player.map_name)
+        {
             self.drop_manager.pickup(&drop.id);
 
             let channel_name = format!("map:{}", player.map_name);
@@ -275,13 +399,16 @@ impl MapServer {
         }
 
         let player = self.map_state.get_player(&player_id)?;
-        let party = self.party_manager.create_party(&pkt.party_name, player_id, player.name.clone());
+        let party =
+            self.party_manager
+                .create_party(&pkt.party_name, player_id, player.name.clone());
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
             let channel_name = format!("party:{}", party.id);
             let (x, y) = player.get_position();
-            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), x, y);
+            self.channel_bus
+                .subscribe(&channel_name, player_id, tx.clone(), x, y);
         }
 
         None
@@ -307,13 +434,15 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
         let party_id = Uuid::from_u128(pkt.party_id as u128);
 
-        self.party_manager.join_party(&party_id, player_id, player.name.clone())?;
+        self.party_manager
+            .join_party(&party_id, player_id, player.name.clone())?;
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
             let channel_name = format!("party:{}", party_id);
             let (x, y) = player.get_position();
-            self.channel_bus.subscribe(&channel_name, player_id, tx.clone(), x, y);
+            self.channel_bus
+                .subscribe(&channel_name, player_id, tx.clone(), x, y);
         }
 
         None
@@ -332,7 +461,7 @@ impl MapServer {
         let pkt = CZPartyChat::from_slice(data)?;
 
         if let Some(party) = self.party_manager.get_player_party(&player_id) {
-            let player = self.map_state.get_player(&player_id)?;
+            let _player = self.map_state.get_player(&player_id)?;
             let channel_name = format!("party:{}", party.id);
 
             let event = GameEvent::PlayerChat {
@@ -373,7 +502,8 @@ impl MapServer {
         let storage = storage.read();
 
         // Build item list
-        let items: Vec<_> = storage.slots()
+        let items: Vec<_> = storage
+            .slots()
             .iter()
             .filter(|s| !s.is_empty())
             .map(|s| StorageItem {
@@ -388,7 +518,8 @@ impl MapServer {
         let items_packet = ZCStorageItems {
             count: items.len() as u16,
             items,
-        }.to_packet();
+        }
+        .to_packet();
 
         Some(items_packet)
     }
@@ -396,12 +527,12 @@ impl MapServer {
     /// Handle storage close request (0x0214)
     fn handle_storage_close(&self, session: &Session) -> Option<Vec<u8>> {
         // Save storage to database
-        if let Some(char_id) = session.char_id {
-            if let Some(storage) = self.storage_manager.get(char_id) {
-                let storage = storage.read();
-                if let Err(e) = self.db.save_storage(&storage) {
-                    tracing::error!("Failed to save storage for char {}: {}", char_id, e);
-                }
+        if let Some(char_id) = session.char_id
+            && let Some(storage) = self.storage_manager.get(char_id)
+        {
+            let storage = storage.read();
+            if let Err(e) = self.db.save_storage(&storage) {
+                tracing::error!("Failed to save storage for char {}: {}", char_id, e);
             }
         }
 
@@ -422,16 +553,19 @@ impl MapServer {
             // 2. Add to storage
             // For now, just simulate
             let mut s = storage.write();
-            if s.add_item(req.from_index as u16, req.amount) {
+            if s.add_item(req.from_index, req.amount) {
                 // Find the slot
                 for slot in s.slots() {
-                    if slot.item_id == req.from_index as u16 {
-                        return Some(ZCStorageItemAdd {
-                            index: slot.index,
-                            item_id: slot.item_id,
-                            amount: slot.amount,
-                            identified: slot.identified,
-                        }.to_packet());
+                    if slot.item_id == req.from_index {
+                        return Some(
+                            ZCStorageItemAdd {
+                                index: slot.index,
+                                item_id: slot.item_id,
+                                amount: slot.amount,
+                                identified: slot.identified,
+                            }
+                            .to_packet(),
+                        );
                     }
                 }
             }
@@ -441,10 +575,13 @@ impl MapServer {
             if s.remove_item(req.from_index, req.amount) {
                 // Simplified: just acknowledge
                 // In real implementation, add to inventory
-                return Some(ZCStorageItemRemove {
-                    index: req.from_index,
-                    amount: req.amount,
-                }.to_packet());
+                return Some(
+                    ZCStorageItemRemove {
+                        index: req.from_index,
+                        amount: req.amount,
+                    }
+                    .to_packet(),
+                );
             }
         }
 
@@ -467,7 +604,8 @@ impl MapServer {
         let notify = ZCTradeRequest {
             requester_id: pkt.target_account_id,
             requester_name,
-        }.to_packet();
+        }
+        .to_packet();
 
         Some(notify)
     }
@@ -480,9 +618,7 @@ impl MapServer {
         let pkt = CZTradeAck::from_packet(data)?;
 
         // Send acknowledgement response
-        let response = ZCTradeAck {
-            accept: pkt.accept,
-        }.to_packet();
+        let response = ZCTradeAck { accept: pkt.accept }.to_packet();
 
         Some(response)
     }
@@ -502,7 +638,8 @@ impl MapServer {
             damaged: false,
             refine: 0,
             cards: [0; 4],
-        }.to_packet();
+        }
+        .to_packet();
 
         Some(notify)
     }
@@ -515,9 +652,7 @@ impl MapServer {
         let pkt = CZTradeAddZeny::from_packet(data)?;
 
         // Notify partner about added zeny
-        let notify = ZCTradeAddZeny {
-            amount: pkt.amount,
-        }.to_packet();
+        let notify = ZCTradeAddZeny { amount: pkt.amount }.to_packet();
 
         Some(notify)
     }
@@ -542,7 +677,12 @@ impl MapServer {
         {
             let tm = self.teleport_manager.read();
             if !tm.can_warp(player_id) {
-                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+                return Some(
+                    ZCWarpError {
+                        error_code: ZCWarpError::COOLDOWN,
+                    }
+                    .to_packet(),
+                );
             }
         }
 
@@ -566,10 +706,18 @@ impl MapServer {
                 // Send warp acknowledgment
                 Some(ZCWarpAck { warp_type: 2 }.to_packet())
             }
-            Err(_) => {
-                Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
-            }
+            Err(_) => Some(
+                ZCWarpError {
+                    error_code: ZCWarpError::INVALID_MAP,
+                }
+                .to_packet(),
+            ),
         }
+    }
+
+    /// 检查 GM 权限
+    fn check_gm_permission(player: &crate::game::map::Player, min_level: i32) -> bool {
+        *player.group_id.read() >= min_level
     }
 
     /// Handle GM warp command (0x0138)
@@ -578,14 +726,24 @@ impl MapServer {
         let pkt = CZGmWarp::from_slice(data)?;
         let player_id = session.player_id?;
 
-        // Check GM permissions (simplified - in real implementation check account level)
-        // For now, allow all for testing
+        // Check GM permissions
+        if let Some(player) = self.map_state.get_player(&player_id) {
+            if !Self::check_gm_permission(&player, 10) {
+                tracing::warn!("Player {} attempted GM warp without permission", player.name);
+                return None;
+            }
+        }
 
         // Check warp cooldown
         {
             let tm = self.teleport_manager.read();
             if !tm.can_warp(player_id) {
-                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+                return Some(
+                    ZCWarpError {
+                        error_code: ZCWarpError::COOLDOWN,
+                    }
+                    .to_packet(),
+                );
             }
         }
 
@@ -599,12 +757,13 @@ impl MapServer {
         };
 
         match self.warp_service.execute_warp(session, warp_action) {
-            Ok(_) => {
-                Some(ZCWarpAck { warp_type: 3 }.to_packet())
-            }
-            Err(_) => {
-                Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
-            }
+            Ok(_) => Some(ZCWarpAck { warp_type: 3 }.to_packet()),
+            Err(_) => Some(
+                ZCWarpError {
+                    error_code: ZCWarpError::INVALID_MAP,
+                }
+                .to_packet(),
+            ),
         }
     }
 
@@ -614,11 +773,24 @@ impl MapServer {
         let pkt = CZGmGoto::from_slice(data)?;
         let player_id = session.player_id?;
 
+        // Check GM permissions
+        if let Some(player) = self.map_state.get_player(&player_id) {
+            if !Self::check_gm_permission(&player, 10) {
+                tracing::warn!("Player {} attempted GM goto without permission", player.name);
+                return None;
+            }
+        }
+
         // Check warp cooldown
         {
             let tm = self.teleport_manager.read();
             if !tm.can_warp(player_id) {
-                return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+                return Some(
+                    ZCWarpError {
+                        error_code: ZCWarpError::COOLDOWN,
+                    }
+                    .to_packet(),
+                );
             }
         }
 
@@ -637,15 +809,21 @@ impl MapServer {
             };
 
             match self.warp_service.execute_warp(session, warp_action) {
-                Ok(_) => {
-                    Some(ZCWarpAck { warp_type: 3 }.to_packet())
-                }
-                Err(_) => {
-                    Some(ZCWarpError { error_code: ZCWarpError::INVALID_MAP }.to_packet())
-                }
+                Ok(_) => Some(ZCWarpAck { warp_type: 3 }.to_packet()),
+                Err(_) => Some(
+                    ZCWarpError {
+                        error_code: ZCWarpError::INVALID_MAP,
+                    }
+                    .to_packet(),
+                ),
             }
         } else {
-            Some(ZCWarpError { error_code: ZCWarpError::TARGET_NOT_FOUND }.to_packet())
+            Some(
+                ZCWarpError {
+                    error_code: ZCWarpError::TARGET_NOT_FOUND,
+                }
+                .to_packet(),
+            )
         }
     }
 
@@ -655,9 +833,14 @@ impl MapServer {
         let pkt = CZGmSummon::from_slice(data)?;
         let player_id = session.player_id?;
 
+        // Check GM permissions
         let player = self.map_state.get_player(&player_id)?;
-        let player_pos = player.get_position();
-        let player_map = player.map_name.clone();
+        if !Self::check_gm_permission(&player, 10) {
+            tracing::warn!("Player {} attempted GM summon without permission", player.name);
+            return None;
+        }
+        let _player_pos = player.get_position();
+        let _player_map = player.map_name.clone();
 
         // Find target player by name
         let target = self.map_state.find_player_by_name(&pkt.target_name);
@@ -669,7 +852,12 @@ impl MapServer {
             {
                 let tm = self.teleport_manager.read();
                 if !tm.can_warp(target_id) {
-                    return Some(ZCWarpError { error_code: ZCWarpError::COOLDOWN }.to_packet());
+                    return Some(
+                        ZCWarpError {
+                            error_code: ZCWarpError::COOLDOWN,
+                        }
+                        .to_packet(),
+                    );
                 }
             }
 
@@ -678,7 +866,12 @@ impl MapServer {
             // For now, return success acknowledgment
             Some(ZCWarpAck { warp_type: 3 }.to_packet())
         } else {
-            Some(ZCWarpError { error_code: ZCWarpError::TARGET_NOT_FOUND }.to_packet())
+            Some(
+                ZCWarpError {
+                    error_code: ZCWarpError::TARGET_NOT_FOUND,
+                }
+                .to_packet(),
+            )
         }
     }
 
@@ -688,7 +881,13 @@ impl MapServer {
         let player_id = session.player_id?;
         let char_id = session.char_id?;
 
+        // Check GM permissions
         let player = self.map_state.get_player(&player_id)?;
+        if !Self::check_gm_permission(&player, 10) {
+            tracing::warn!("Player {} attempted GM savepoint without permission", player.name);
+            return None;
+        }
+
         let (x, y) = player.get_position();
 
         // Set save point
@@ -698,11 +897,14 @@ impl MapServer {
         }
 
         // Notify player
-        Some(ZCSavePointSet {
-            map_name: player.map_name.clone(),
-            x,
-            y,
-        }.to_packet())
+        Some(
+            ZCSavePointSet {
+                map_name: player.map_name.clone(),
+                x,
+                y,
+            }
+            .to_packet(),
+        )
     }
 
     /// Handle restart (0x00B2) - 玩家死亡后重生到存储点
@@ -717,17 +919,19 @@ impl MapServer {
         }
 
         // 获取存储点（默认回到 new_1-1.gat 的出生点）
-        let save_point = self.warp_service.get_save_point(char_id)
-            .unwrap_or_else(|| {
-                crate::game::map::teleport::SavePoint::new("new_1-1.gat", 53, 111)
-            });
+        let save_point = self
+            .warp_service
+            .get_save_point(char_id)
+            .unwrap_or_else(|| crate::game::map::teleport::SavePoint::new("new_1-1.gat", 53, 111));
 
         // 更新玩家运行时状态（通过 MapState 原子更新）
-        self.map_state.respawn_player(&player_id, save_point.x, save_point.y, &save_point.map_name);
+        self.map_state
+            .respawn_player(&player_id, save_point.x, save_point.y, &save_point.map_name);
 
         // 更新 ChannelBus 中的位置
         let new_channel = format!("map:{}", save_point.map_name);
-        self.channel_bus.update_position(&new_channel, &player_id, save_point.x, save_point.y);
+        self.channel_bus
+            .update_position(&new_channel, &player_id, save_point.x, save_point.y);
 
         // 发布重生事件
         let revive_event = GameEvent::PlayerRevive {
@@ -735,13 +939,16 @@ impl MapServer {
             x: save_point.x,
             y: save_point.y,
         };
-        self.channel_bus.publish(&new_channel, &revive_event, vec![]);
+        self.channel_bus
+            .publish(&new_channel, &revive_event, vec![]);
 
         // 更新数据库位置（best effort）
-        let _ = self.db.execute_with_params(
+        if let Err(e) = self.db.execute_with_params(
             "UPDATE characters SET last_map = ?1, last_x = ?2, last_y = ?3, hp = ?4, sp = ?5 WHERE char_id = ?6",
             rusqlite::params![save_point.map_name, save_point.x as i32, save_point.y as i32, *player.max_hp.read(), *player.max_sp.read(), char_id],
-        );
+        ) {
+            tracing::warn!("Failed to update character position in DB: {}", e);
+        }
 
         None
     }
@@ -752,17 +959,40 @@ impl MapServer {
         let pkt = CZGuildCreate::from_slice(data)?;
 
         if self.guild_manager.get_player_guild(&player_id).is_some() {
-            return Some(ZCGuildCreated { result: 2, guild_id: 0 }.to_packet());
+            return Some(
+                ZCGuildCreated {
+                    result: 2,
+                    guild_id: 0,
+                }
+                .to_packet(),
+            );
         }
 
         let player = self.map_state.get_player(&player_id)?;
-        match self.guild_manager.create_guild(pkt.name.clone(), player.name.clone()) {
+        match self
+            .guild_manager
+            .create_guild(pkt.name.clone(), player.name.clone())
+        {
             Some(guild_id) => {
-                self.guild_manager.join_guild(guild_id, player_id, player.name.clone());
-                self.guild_manager.set_member_position_direct(&guild_id, &player_id, 0);
-                Some(ZCGuildCreated { result: 0, guild_id: 0 }.to_packet())
+                self.guild_manager
+                    .join_guild(guild_id, player_id, player.name.clone());
+                self.guild_manager
+                    .set_member_position_direct(&guild_id, &player_id, 0);
+                Some(
+                    ZCGuildCreated {
+                        result: 0,
+                        guild_id: 0,
+                    }
+                    .to_packet(),
+                )
             }
-            None => Some(ZCGuildCreated { result: 1, guild_id: 0 }.to_packet()),
+            None => Some(
+                ZCGuildCreated {
+                    result: 1,
+                    guild_id: 0,
+                }
+                .to_packet(),
+            ),
         }
     }
 
@@ -786,11 +1016,14 @@ impl MapServer {
         }
 
         // 发送邀请通知给目标 (简化实现，直接返回ack)
-        Some(ZCGuildInvite {
-            guild_id: 0,
-            guild_name: guild.name.clone(),
-            inviter_name: player.name.clone(),
-        }.to_packet())
+        Some(
+            ZCGuildInvite {
+                guild_id: 0,
+                guild_name: guild.name.clone(),
+                inviter_name: player.name.clone(),
+            }
+            .to_packet(),
+        )
     }
 
     /// Handle guild join reply (0x0169)
@@ -805,7 +1038,10 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
         let guild_id = uuid::Uuid::from_u128(pkt.guild_id as u128);
 
-        if self.guild_manager.join_guild(guild_id, player_id, player.name.clone()) {
+        if self
+            .guild_manager
+            .join_guild(guild_id, player_id, player.name.clone())
+        {
             Some(ZCGuildLeaveResult { result: 0 }.to_packet())
         } else {
             Some(ZCGuildLeaveResult { result: 1 }.to_packet())
@@ -834,18 +1070,27 @@ impl MapServer {
         let target = self.map_state.find_player_by_name(&pkt.target_name)?;
         let target_id = target.id;
 
-        if self.guild_manager.expel_member(guild_id, &player_id, &target_id) {
-            Some(ZCGuildExpelResult {
-                result: 0,
-                target_name: pkt.target_name,
-                reason: pkt.reason,
-            }.to_packet())
+        if self
+            .guild_manager
+            .expel_member(guild_id, &player_id, &target_id)
+        {
+            Some(
+                ZCGuildExpelResult {
+                    result: 0,
+                    target_name: pkt.target_name,
+                    reason: pkt.reason,
+                }
+                .to_packet(),
+            )
         } else {
-            Some(ZCGuildExpelResult {
-                result: 1,
-                target_name: pkt.target_name,
-                reason: String::new(),
-            }.to_packet())
+            Some(
+                ZCGuildExpelResult {
+                    result: 1,
+                    target_name: pkt.target_name,
+                    reason: String::new(),
+                }
+                .to_packet(),
+            )
         }
     }
 
@@ -858,7 +1103,8 @@ impl MapServer {
         let guild = self.guild_manager.get_guild(&guild_id)?;
 
         if guild.has_permission(&player_id, crate::game::guild::GuildPermission::Expel) {
-            self.guild_manager.update_notice(&guild_id, pkt.notice.clone());
+            self.guild_manager
+                .update_notice(&guild_id, pkt.notice.clone());
             return Some(ZCGuildNotice { notice: pkt.notice }.to_packet());
         }
 
@@ -866,20 +1112,23 @@ impl MapServer {
     }
 
     /// Handle guild request info (0x01B7)
-    fn handle_guild_request_info(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    fn handle_guild_request_info(&self, _data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let guild = self.guild_manager.get_player_guild(&player_id)?;
 
-        Some(ZCGuildInfo {
-            guild_id: 0,
-            level: guild.level,
-            member_count: guild.member_count,
-            max_members: guild.max_members,
-            average_level: guild.average_level,
-            exp: guild.exp,
-            max_exp: guild.max_exp,
-            notice: guild.notice.clone(),
-        }.to_packet())
+        Some(
+            ZCGuildInfo {
+                guild_id: 0,
+                level: guild.level,
+                member_count: guild.member_count,
+                max_members: guild.max_members,
+                average_level: guild.average_level,
+                exp: guild.exp,
+                max_exp: guild.max_exp,
+                notice: guild.notice.clone(),
+            }
+            .to_packet(),
+        )
     }
 
     /// Handle guild chat (0x01EC)
@@ -898,10 +1147,13 @@ impl MapServer {
         };
         self.channel_bus.publish(&channel_name, &event, vec![]);
 
-        Some(ZCGuildChat {
-            sender_name: player.name.clone(),
-            message: pkt.message,
-        }.to_packet())
+        Some(
+            ZCGuildChat {
+                sender_name: player.name.clone(),
+                message: pkt.message,
+            }
+            .to_packet(),
+        )
     }
 
     /// Handle set savepoint (0x01B8)
@@ -920,11 +1172,69 @@ impl MapServer {
         }
 
         // Notify player
-        Some(ZCSavePointSet {
-            map_name: player.map_name.clone(),
-            x,
-            y,
-        }.to_packet())
+        Some(
+            ZCSavePointSet {
+                map_name: player.map_name.clone(),
+                x,
+                y,
+            }
+            .to_packet(),
+        )
+    }
+
+    /// ==================== 玩家数据持久化 ====================
+    /// 保存指定玩家到数据库
+    pub fn save_player(&self, player_id: &Uuid) -> Result<(), String> {
+        let player = match self.map_state.get_player(player_id) {
+            Some(p) => p,
+            None => return Err(format!("Player {} not found", player_id)),
+        };
+
+        player.save_to_db(&self.db).map_err(|e| {
+            tracing::error!("Failed to save player {}: {}", player.name, e);
+            e.to_string()
+        })
+    }
+
+    /// 保存所有在线玩家到数据库
+    pub fn save_all_players(&self) -> Result<usize, String> {
+        let player_ids = self.map_state.get_all_player_ids();
+        let mut saved_count = 0;
+
+        for player_id in player_ids {
+            match self.save_player(&player_id) {
+                Ok(_) => saved_count += 1,
+                Err(e) => tracing::warn!("Failed to save player {}: {}", player_id, e),
+            }
+        }
+
+        tracing::info!("Saved {} players to database", saved_count);
+        Ok(saved_count)
+    }
+
+    /// 处理玩家断开连接：保存玩家数据并从地图移除
+    pub fn handle_player_disconnect(&self, player_id: &Uuid) {
+        // 保存玩家数据
+        if let Err(e) = self.save_player(player_id) {
+            tracing::error!("Failed to save player on disconnect: {}", e);
+        }
+
+        // 从地图移除玩家
+        self.map_state.remove_player(player_id);
+
+        tracing::info!("Player {} disconnected and saved", player_id);
+    }
+
+    /// 定期保存定时任务调用（每5分钟调用一次）
+    /// 返回保存的玩家数量
+    pub fn periodic_save(&self) -> usize {
+        match self.save_all_players() {
+            Ok(count) => count,
+            Err(e) => {
+                tracing::error!("Periodic save failed: {}", e);
+                0
+            }
+        }
     }
 }
 
@@ -934,9 +1244,9 @@ mod tests {
 
     #[test]
     fn test_map_server_handles_unknown_packet() {
-        use crate::game::trade::TradeManager;
         use crate::game::guild::GuildManager;
-        use crate::game::map::teleport::{TeleportManager, WarpService, SavePointManager};
+        use crate::game::map::teleport::{SavePointManager, TeleportManager, WarpService};
+        use crate::game::trade::TradeManager;
 
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
         let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
