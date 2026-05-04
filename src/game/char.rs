@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use crate::game::constants;
 
 use crate::game::token::TokenStore;
 use crate::network::session::{Session, SessionManager};
@@ -128,15 +129,12 @@ impl CharServer {
         let slot = self.find_empty_slot(&characters)?;
 
         // 校验属性点：每个属性 1-9，总和 <= 30（rAthena 新角色分配）
-        const MAX_SINGLE_STAT: u8 = 9;
-        const MAX_TOTAL_STATS: u16 = 30;
-
         let stats = [
             make_char.str, make_char.agi, make_char.vit,
             make_char.int, make_char.dex, make_char.luk,
         ];
 
-        if stats.iter().any(|&s| s == 0 || s > MAX_SINGLE_STAT) {
+        if stats.iter().any(|&s| s == 0 || s > constants::MAX_SINGLE_STAT) {
             warn!(
                 "Character creation rejected: stat out of range 1-9 for account_id={}",
                 account_id
@@ -145,10 +143,10 @@ impl CharServer {
         }
 
         let total: u16 = stats.iter().map(|&s| s as u16).sum();
-        if total > MAX_TOTAL_STATS {
+        if total > constants::MAX_TOTAL_STATS {
             warn!(
                 "Character creation rejected: total stats {} > {} for account_id={}",
-                total, MAX_TOTAL_STATS, account_id
+                total, constants::MAX_TOTAL_STATS, account_id
             );
             return Some(vec![0x00]);
         }
