@@ -1,7 +1,9 @@
 //! 社交与经济 handler：队伍、聊天、仓库、交易
 
 use super::MapServer;
+use crate::game::item::ItemDatabase;
 use crate::game::map::channel::{ChatType, GameEvent};
+use crate::game::map::Player;
 use crate::game::trade::TradeItem;
 use crate::game::zeny::ZenyManager;
 use crate::network::session::Session;
@@ -502,6 +504,10 @@ impl MapServer {
                 &execution.items_for_player1,
             );
 
+            // 物品转移后重新计算双方负重
+            Self::recalc_inventory_weight(&player1, &item_db);
+            Self::recalc_inventory_weight(&player2, &item_db);
+
             // Transfer zeny: player1 -> player2
             if execution.zeny_from_player1 > 0 {
                 if !ZenyManager::sub(&player1, execution.zeny_from_player1) {
@@ -556,10 +562,27 @@ impl MapServer {
         None
     }
 
+    /// 重新计算并更新玩家的背包负重
+    fn recalc_inventory_weight(player: &Player, item_db: &ItemDatabase) {
+        let inv = player.inventory.read();
+        let weight: u32 = inv
+            .iter()
+            .map(|slot| {
+                let amount = slot.amount as u32;
+                item_db
+                    .get(slot.item_id)
+                    .map(|i| (i.weight as u32) * amount)
+                    .unwrap_or(0)
+            })
+            .sum();
+        drop(inv);
+        player.economy.write().current_weight = weight;
+    }
+
     /// 将物品从发送者转移到接收者的背包
     fn transfer_items(
-        sender: &crate::game::map::Player,
-        receiver: &crate::game::map::Player,
+        sender: &Player,
+        receiver: &Player,
         items: &[TradeItem],
     ) {
         for item in items {
