@@ -384,4 +384,123 @@ mod tests {
             other => panic!("期望不跳转，实际: {:?}", other),
         }
     }
+
+    #[test]
+    fn test_select_choice_affects_flow() {
+        // 模拟一个 NPC 对话脚本：select 后根据变量跳转
+        // 玩家选择后，脚本设置变量并根据变量值跳转
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            mes "Do you want to warp?";
+            select("Yes","No");
+            set "$choice", 1;
+            goto_if "$choice", 1, "do_warp";
+            mes "Okay, goodbye!";
+            close;
+        do_warp:
+            mes "Warping!";
+            warp "prontera", 150, 183;
+            close;
+            "#,
+        ));
+
+        // 处理 mes
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Message(_)));
+
+        // 处理 select -> 返回 Select 响应
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Select(_)));
+
+        // 模拟玩家选择第 1 项 (Yes)
+        // handle_input 存储选择并执行下一步（set "$choice", 1）
+        let resp = state.handle_input(1);
+        assert!(matches!(resp, DialogueResponse::Continue));
+        assert_eq!(state.last_select(), 1);
+
+        // goto_if "$choice", 1, "do_warp" -> 条件为真，跳转
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Continue));
+
+        // mes "Warping!"
+        let resp = state.process();
+        match resp {
+            DialogueResponse::Message(msg) => assert_eq!(msg, "Warping!"),
+            other => panic!("期望 Message(\"Warping!\"), 实际: {:?}", other),
+        }
+
+        // warp "prontera", 150, 183
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Warp { .. }));
+    }
+
+    #[test]
+    fn test_multi_step_dialogue_with_next() {
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            mes "Step 1";
+            next;
+            mes "Step 2";
+            next;
+            mes "Step 3";
+            close;
+            "#,
+        ));
+
+        // Step 1
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Message(ref s) if s == "Step 1"));
+
+        // next -> Pending -> 继续处理
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Pending));
+
+        // 模拟玩家点击 next
+        let resp = state.handle_input(0);
+        assert!(matches!(resp, DialogueResponse::Message(ref s) if s == "Step 2"));
+
+        // next -> Pending
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Pending));
+
+        // 模拟玩家点击 next
+        let resp = state.handle_input(0);
+        assert!(matches!(resp, DialogueResponse::Message(ref s) if s == "Step 3"));
+
+        // close
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Closed));
+    }
+
+    #[test]
+    fn test_empty_script_returns_closed() {
+        let script = parse_script("");
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
+        let resp = state.process();
+        assert!(matches!(resp, DialogueResponse::Closed));
+    }
+
+    #[test]
+    fn test_goto_loops() {
+        // 测试 goto 跳转到标签的能力
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            set "$i", 0;
+        loop_start:
+            set "$i", 1;
+            goto_if "$i", 3, "loop_end";
+            set "$i", 1;
+            goto "loop_start";
+        loop_end:
+            mes "Loop done";
+            close;
+            "#,
+        ));
+
+        // set $i = 0
+        state.process();
+        // loop_start: set $i = 1
+        state.process();
+        assert_eq!(state.get_variable("$i"), Some(1));
+    }
 }
