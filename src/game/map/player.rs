@@ -18,79 +18,79 @@ pub enum PlayerState {
 /// 战斗相关状态（HP/SP/状态/移动速度）
 /// 合并为单个锁，避免 TOCTOU：如读 hp 判断后再写 hp 之间被其他线程修改
 pub struct CombatStats {
-    pub hp: u32,
-    pub max_hp: u32,
-    pub sp: u32,
-    pub max_sp: u32,
-    pub state: PlayerState,
-    pub in_combat: bool,
-    pub is_sitting: bool,
-    pub walk_speed: u16,
+    pub(crate) hp: u32,
+    pub(crate) max_hp: u32,
+    pub(crate) sp: u32,
+    pub(crate) max_sp: u32,
+    pub(crate) state: PlayerState,
+    pub(crate) in_combat: bool,
+    pub(crate) is_sitting: bool,
+    pub(crate) walk_speed: u16,
 }
 
 /// 位置（原子更新 x/y）
 pub struct Position {
-    pub x: u16,
-    pub y: u16,
+    pub(crate) x: u16,
+    pub(crate) y: u16,
 }
 
 /// 等级与经验值
 pub struct LevelStats {
-    pub base_level: u16,
-    pub job_level: u16,
-    pub base_exp: u64,
-    pub job_exp: u64,
+    pub(crate) base_level: u16,
+    pub(crate) job_level: u16,
+    pub(crate) base_exp: u64,
+    pub(crate) job_exp: u64,
 }
 
 /// 六维属性
 pub struct Attributes {
-    pub str: u16,
-    pub agi: u16,
-    pub vit: u16,
-    pub int: u16,
-    pub dex: u16,
-    pub luk: u16,
+    pub(crate) str: u16,
+    pub(crate) agi: u16,
+    pub(crate) vit: u16,
+    pub(crate) int: u16,
+    pub(crate) dex: u16,
+    pub(crate) luk: u16,
 }
 
 /// 经济与负重
 pub struct Economy {
-    pub zeny: u32,
-    pub current_weight: u32,
-    pub max_weight: u32,
-    pub job: u16,
-    pub shop_id: Option<Uuid>,
-    pub group_id: i32,
+    pub(crate) zeny: u32,
+    pub(crate) current_weight: u32,
+    pub(crate) max_weight: u32,
+    pub(crate) job: u16,
+    pub(crate) shop_id: Option<Uuid>,
+    pub(crate) group_id: i32,
 }
 
 /// 存档点
 pub struct SavePoint {
-    pub map: String,
-    pub x: u16,
-    pub y: u16,
+    pub(crate) map: String,
+    pub(crate) x: u16,
+    pub(crate) y: u16,
 }
 
 // ==================== Player 主结构 ====================
 
 pub struct Player {
-    pub id: Uuid,
-    pub char_id: u32,
-    pub account_id: u32,
-    pub name: String,
-    pub map_name: String,
+    pub(crate) id: Uuid,
+    pub(crate) char_id: u32,
+    pub(crate) account_id: u32,
+    pub(crate) name: String,
+    pub(crate) map_name: String,
 
     // 分组锁（6 个 RwLock 替代原来 26 个）
-    pub combat: RwLock<CombatStats>,
-    pub pos: RwLock<Position>,
-    pub level: RwLock<LevelStats>,
-    pub attrs: RwLock<Attributes>,
-    pub economy: RwLock<Economy>,
-    pub save_point: RwLock<SavePoint>,
+    pub(crate) combat: RwLock<CombatStats>,
+    pub(crate) pos: RwLock<Position>,
+    pub(crate) level: RwLock<LevelStats>,
+    pub(crate) attrs: RwLock<Attributes>,
+    pub(crate) economy: RwLock<Economy>,
+    pub(crate) save_point: RwLock<SavePoint>,
 
     // 独立锁（复杂类型或低频访问）
-    pub equipment: RwLock<Equipment>,
-    pub status: PlayerStatus,
-    pub inventory: RwLock<Vec<CharacterInventoryData>>,
-    pub hotkeys: RwLock<Vec<CharacterHotkeyData>>,
+    pub(crate) equipment: RwLock<Equipment>,
+    pub(crate) status: PlayerStatus,
+    pub(crate) inventory: RwLock<Vec<CharacterInventoryData>>,
+    pub(crate) hotkeys: RwLock<Vec<CharacterHotkeyData>>,
 }
 
 impl Clone for Player {
