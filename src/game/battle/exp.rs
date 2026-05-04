@@ -328,8 +328,8 @@ mod tests {
 
         let p = map_state.get_player(&player_id).unwrap();
         // level 10 vs mob 5: diff = 5, within 10 -> no penalty
-        assert_eq!(*p.base_exp.read(), 100);
-        assert_eq!(*p.job_exp.read(), 50);
+        assert_eq!(p.base_exp(), 100);
+        assert_eq!(p.job_exp(), 50);
     }
 
     #[test]
@@ -388,8 +388,8 @@ mod tests {
 
         let p = map_state.get_player(&player_id).unwrap();
         // level 30 vs mob 5: diff = 25 -> penalty 0.25
-        assert_eq!(*p.base_exp.read(), 25);
-        assert_eq!(*p.job_exp.read(), 25);
+        assert_eq!(p.base_exp(), 25);
+        assert_eq!(p.job_exp(), 25);
     }
 
     #[test]
@@ -495,9 +495,9 @@ mod tests {
         let p2 = map_state.get_player(&player2_id).unwrap();
 
         // Player1 (killer) gets normal share: 100 exp
-        assert_eq!(*p1.base_exp.read(), 100);
+        assert_eq!(p1.base_exp(), 100);
         // Player2 (MVP) gets bonus: 100 * 1.1 = 110 exp
-        assert_eq!(*p2.base_exp.read(), 110);
+        assert_eq!(p2.base_exp(), 110);
     }
 
     #[test]
@@ -555,6 +555,6 @@ mod tests {
 
         let p = map_state.get_player(&player_id).unwrap();
         // Solo: 100% goes to killer
-        assert_eq!(*p.zeny.read(), 100);
+        assert_eq!(p.zeny(), 100);
     }
 }

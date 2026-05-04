@@ -130,7 +130,7 @@ impl Default for RespawnService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::map::player::{Player, PlayerState};
+    use crate::game::map::player::{Player, PlayerState, CombatStats, Position, LevelStats, Attributes, Economy, SavePoint};
     use parking_lot::RwLock;
     use uuid::Uuid;
 
@@ -140,40 +140,49 @@ mod tests {
             char_id: 1,
             account_id: 1,
             name: "TestPlayer".to_string(),
-            pos_x: RwLock::new(x),
-            pos_y: RwLock::new(y),
             map_name: map.to_string(),
-            hp: RwLock::new(100),
-            max_hp: RwLock::new(100),
-            sp: RwLock::new(50),
-            max_sp: RwLock::new(50),
-            base_level: RwLock::new(10),
-            job_level: RwLock::new(5),
-            base_exp: RwLock::new(0),
-            job_exp: RwLock::new(0),
-            state: RwLock::new(PlayerState::Alive),
-            str: RwLock::new(10),
-            agi: RwLock::new(10),
-            vit: RwLock::new(10),
-            int: RwLock::new(10),
-            dex: RwLock::new(10),
-            luk: RwLock::new(10),
-            walk_speed: RwLock::new(150),
-            zeny: RwLock::new(0),
-            current_weight: RwLock::new(0),
-            max_weight: RwLock::new(20000),
+            combat: RwLock::new(CombatStats {
+                hp: 100,
+                max_hp: 100,
+                sp: 50,
+                max_sp: 50,
+                state: PlayerState::Alive,
+                in_combat: false,
+                is_sitting: false,
+                walk_speed: 150,
+            }),
+            pos: RwLock::new(Position { x, y }),
+            level: RwLock::new(LevelStats {
+                base_level: 10,
+                job_level: 5,
+                base_exp: 0,
+                job_exp: 0,
+            }),
+            attrs: RwLock::new(Attributes {
+                str: 10,
+                agi: 10,
+                vit: 10,
+                int: 10,
+                dex: 10,
+                luk: 10,
+            }),
+            economy: RwLock::new(Economy {
+                zeny: 0,
+                current_weight: 0,
+                max_weight: 20000,
+                job: 0,
+                shop_id: None,
+                group_id: 0,
+            }),
+            save_point: RwLock::new(SavePoint {
+                map: map.to_string(),
+                x: 50,
+                y: 50,
+            }),
             equipment: RwLock::new(crate::game::item::Equipment::new()),
-            is_sitting: RwLock::new(false),
             status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
-            shop_id: RwLock::new(None),
             inventory: RwLock::new(Vec::new()),
             hotkeys: RwLock::new(Vec::new()),
-            save_map: RwLock::new(map.to_string()),
-            save_x: RwLock::new(50),
-            save_y: RwLock::new(50),
-            job: RwLock::new(0),
-            in_combat: RwLock::new(false),
-            group_id: RwLock::new(0),
         }
     }
 

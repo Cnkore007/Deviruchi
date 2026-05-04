@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::data::{EntityType, Instance, InstanceEntity, InstanceObjectiveType, InstanceState};
+use super::data::{EntityType, Instance, InstanceEntity, InstanceObjectiveType, InstanceState, InstanceType};
 use super::template::{InstanceTemplate, InstanceTemplateDatabase};
 
 /// Instance error types

@@ -287,7 +287,7 @@ mod tests {
     fn create_test_player() -> Player {
         let char = Character {
             char_id: 1,
-            account_id: 1,
+            char_num: 0,
             name: "TestPlayer".to_string(),
             base_level: 50,
             job_level: 50,
@@ -304,6 +304,14 @@ mod tests {
             max_hp: 1000,
             sp: 500,
             max_sp: 500,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
             last_map: "prontera".to_string(),
             last_x: 100,
             last_y: 100,
@@ -311,6 +319,9 @@ mod tests {
             save_x: 100,
             save_y: 100,
             zeny: 10000,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         };
         Player::from_character(char)
     }
@@ -428,7 +439,7 @@ mod tests {
         player.add_status(crate::game::status::StatusEffect::new(
             StatusChange::Hunger,
             10000,
-            crate::game::status::StatusSource::Auto,
+            crate::game::status::StatusSource::Environment,
         ));
 
         let modifiers = service.get_heal_modifiers(&player);
@@ -449,7 +460,7 @@ mod tests {
         player.add_status(crate::game::status::StatusEffect::new(
             StatusChange::Poison,
             10000,
-            crate::game::status::StatusSource::Auto,
+            crate::game::status::StatusSource::Environment,
         ));
 
         let modifiers = service.get_heal_modifiers(&player);
@@ -475,7 +486,7 @@ mod tests {
         player.add_status(crate::game::status::StatusEffect::new(
             StatusChange::Regen,
             10000,
-            crate::game::status::StatusSource::Auto,
+            crate::game::status::StatusSource::Environment,
         ));
 
         let modifiers = service.get_heal_modifiers(&player);

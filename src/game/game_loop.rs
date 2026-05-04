@@ -259,6 +259,8 @@ mod tests {
             size: crate::game::battle::element::MobSize::Medium,
             ai_state: parking_lot::RwLock::new(MobAIState::Idle),
             target_id: parking_lot::RwLock::new(None),
+            behavior: crate::game::mob::MobBehavior::Aggressive,
+            skills: Vec::new(),
             sight_range: 12,
             chase_range: 20,
             aggro_rate: 0,

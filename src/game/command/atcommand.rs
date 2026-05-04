@@ -226,6 +226,7 @@ pub fn try_handle_command(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn create_test_character() -> crate::storage::Character {
         crate::storage::Character {

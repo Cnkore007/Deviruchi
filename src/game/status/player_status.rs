@@ -1,6 +1,6 @@
 //! 玩家状态管理器
 
-use super::effect::{StackingRule, StatusEffect};
+use super::effect::{StackingRule, StatusEffect, StatusSource};
 use super::types::StatusChange;
 use parking_lot::RwLock;
 use std::collections::HashMap;

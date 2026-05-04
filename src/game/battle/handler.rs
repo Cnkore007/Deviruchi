@@ -211,7 +211,7 @@ mod tests {
     fn test_crit_damage_overflow_clamped() {
         // Simulate overflow: large_base * 140 overflows i32
         let large_base: i32 = i32::MAX / 2;
-        let crit_damage = (large_base * 140) / 100; // overflows to negative
+        let crit_damage = large_base.wrapping_mul(140) / 100; // overflows to negative
         let result = safe_damage(crit_damage);
         assert_eq!(result, 0);
     }
