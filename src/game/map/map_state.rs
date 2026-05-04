@@ -43,9 +43,10 @@ impl MapState {
     }
 
     /// 获取地图上的所有玩家
+    /// 锁顺序：players → players_by_map（与 add_player/remove_player 一致，避免 ABBA 死锁）
     pub fn get_players_on_map(&self, map_name: &str) -> Vec<Player> {
-        let by_map = self.players_by_map.read();
         let players = self.players.read();
+        let by_map = self.players_by_map.read();
 
         by_map
             .get(map_name)
