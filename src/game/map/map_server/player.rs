@@ -203,6 +203,11 @@ impl MapServer {
             .spawn_manager
             .find_mob_by_id(&player.map_name, &target_id)?;
 
+        // 已死亡的怪物不能重复攻击
+        if mob.is_dead() {
+            return None;
+        }
+
         // 调用 BattleHandler 计算真实伤害
         let result = self.battle_handler.normal_attack(&player, &mob);
 
