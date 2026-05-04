@@ -60,8 +60,18 @@ impl LoginServer {
             login.username, login.version
         );
 
-        // 查询账户
-        let account = self.db.get_account_by_userid(&login.username).ok()??;
+        // 查询账户 —— 区分数据库错误和账号不存在
+        let account = match self.db.get_account_by_userid(&login.username) {
+            Ok(Some(account)) => account,
+            Ok(None) => {
+                warn!("Login failed: account not found, user={}", login.username);
+                return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+            }
+            Err(e) => {
+                error!("Database error during login for user={}: {}", login.username, e);
+                return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+            }
+        };
 
         // 验证密码 (Argon2 哈希验证)
         if !crate::storage::password::verify_password(&login.password, &account.password_hash) {
