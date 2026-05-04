@@ -1,15 +1,16 @@
 //! 登录服务器业务逻辑
 
-use std::sync::Arc;
 use parking_lot::RwLock;
-use tracing::{info, warn, error};
+use std::sync::Arc;
+use tracing::{error, info, warn};
 
-use crate::protocol::login_packets::{CALogin, ACAceptLogin, ACRefuseLogin};
+use crate::network::session::{Session, SessionManager};
+use crate::protocol::login_packets::{ACAceptLogin, ACRefuseLogin, CALogin};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
-use crate::network::session::{SessionManager, Session};
 
 /// 登录服务器
+#[allow(dead_code)]
 pub struct LoginServer {
     db: Arc<Database>,
     session_manager: Arc<SessionManager>,
@@ -34,7 +35,12 @@ impl LoginServer {
     }
 
     /// 根据 packet_id 分发处理
-    pub fn handle_packet(&self, packet_id: u16, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub fn handle_packet(
+        &self,
+        packet_id: u16,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         match packet_id {
             0x0064 => self.handle_ca_login(data, session),
             _ => {
@@ -57,15 +63,18 @@ impl LoginServer {
         // 查询账户
         let account = self.db.get_account_by_userid(&login.username).ok()??;
 
-        // 验证密码 (简单比较)
-        if login.password != account.password_hash {
+        // 验证密码 (Argon2 哈希验证)
+        if !crate::storage::password::verify_password(&login.password, &account.password_hash) {
             warn!("Login failed: invalid password for user={}", login.username);
             return Some(ACRefuseLogin { error_code: 0 }.to_packet());
         }
 
         // 检查账户状态
         if account.state != 0 {
-            warn!("Login failed: account banned or suspended, user={}", login.username);
+            warn!(
+                "Login failed: account banned or suspended, user={}",
+                login.username
+            );
             return Some(ACRefuseLogin { error_code: 3 }.to_packet());
         }
 

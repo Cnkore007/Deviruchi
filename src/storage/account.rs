@@ -1,7 +1,7 @@
-use rusqlite::params;
-use crate::storage::Database;
 use crate::error::Result;
+use crate::storage::Database;
 use crate::storage::chrono_now;
+use rusqlite::params;
 
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -18,8 +18,10 @@ pub struct Account {
 }
 
 impl Database {
-    pub fn create_account(&self, user_id: &str, password_hash: &str, sex: u8) -> Result<u32> {
+    pub fn create_account(&self, user_id: &str, password: &str, sex: u8) -> Result<u32> {
         let created_at = chrono_now();
+        let password_hash = crate::storage::password::hash_password(password)
+            .map_err(|e| crate::error::Error::Game(e))?;
         self.execute_with_params(
             "INSERT INTO accounts (user_id, password_hash, sex, created_at)
              VALUES (?1, ?2, ?3, ?4)",
