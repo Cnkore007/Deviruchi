@@ -7,7 +7,7 @@ use crate::game::token::TokenStore;
 use crate::network::session::{Session, SessionManager};
 use crate::protocol::map_packets::{CHEnter, CHMakeChar, CharInfo, HCNotifyZoneServer, SCCharList};
 use crate::protocol::packet_builder::Packed;
-use crate::storage::Database;
+use crate::storage::{chrono_now, Database};
 #[cfg(test)]
 use crate::storage::{init_schema, Character};
 
@@ -75,10 +75,23 @@ impl CharServer {
 
         info!("Request char list for account_id={}", account_id);
 
+        // 先清理已过期的删除定时器角色
+        let _ = self.db.cleanup_deleted_characters();
+
         let characters = self.db.get_characters_by_account(account_id).ok()?;
 
+        // 过滤掉已标记删除但定时器尚未过期的角色仍然显示，
+        // 但定时器已过期的角色不应再出现（已被 cleanup 清理）
+        // 这里额外过滤 delete_timer > 0 且已过期的角色作为防御性措施
+        let now = chrono_now() as u32;
         let char_infos: Vec<CharInfo> = characters
             .iter()
+            .filter(|c| {
+                // delete_timer == 0 表示未标记删除，正常显示
+                // delete_timer > 0 且 <= now 表示已过期，不显示
+                // delete_timer > 0 且 > now 表示待删除但未过期，仍显示（客户端可取消）
+                c.delete_timer == 0 || c.delete_timer > now
+            })
             .map(|c| self.db.character_to_char_info(c))
             .collect();
 
@@ -154,9 +167,13 @@ impl CharServer {
             enter.char_id, account_id
         );
 
-        // 验证角色是否属于该账户
+        // 验证角色是否属于该账户且未过期删除
         let characters = self.db.get_characters_by_account(account_id).ok()?;
-        let valid_char = characters.iter().any(|c| c.char_id == enter.char_id);
+        let now = chrono_now() as u32;
+        let valid_char = characters.iter().any(|c| {
+            c.char_id == enter.char_id
+                && (c.delete_timer == 0 || c.delete_timer > now)
+        });
 
         if !valid_char {
             warn!(

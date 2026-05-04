@@ -552,6 +552,19 @@ impl Database {
         Ok(())
     }
 
+    /// 清理已过期的删除定时器角色（delete_timer > 0 且已过期）
+    pub fn cleanup_deleted_characters(&self) -> Result<usize> {
+        let now = chrono_now() as u32;
+        let deleted = self.execute_with_params(
+            "DELETE FROM characters WHERE delete_timer > 0 AND delete_timer <= ?1",
+            params![now],
+        )?;
+        if deleted > 0 {
+            tracing::info!("Cleaned up {} expired deleted characters", deleted);
+        }
+        Ok(deleted)
+    }
+
     /// 加载角色快捷键
     pub fn load_character_hotkeys(&self, char_id: u32) -> Result<Vec<CharacterHotkeyData>> {
         self.query(
@@ -844,5 +857,63 @@ mod tests {
         assert_eq!(char.hp, 500);
         assert_eq!(char.max_hp, 1000);
         assert_eq!(char.zeny, 100000);
+    }
+
+    #[test]
+    fn test_cleanup_deleted_characters() {
+        let db =
+            crate::storage::Database::open_memory().expect("Failed to create in-memory database");
+        crate::storage::schema::init_schema(&db).expect("Failed to init schema");
+
+        let account_id = setup_test_account(&db);
+
+        // 创建一个正常角色
+        let char1_id = db
+            .create_character(account_id, 0, "Normal", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+
+        // 创建一个已标记删除且定时器已过期的角色
+        let char2_id = db
+            .create_character(account_id, 1, "Expired", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+        let past_time = (chrono_now() - 3600) as u32; // 1 小时前
+        db.execute_with_params(
+            "UPDATE characters SET delete_timer = ?1 WHERE char_id = ?2",
+            params![past_time, char2_id],
+        )
+        .expect("Failed to set delete_timer");
+
+        // 创建一个已标记删除但定时器未过期的角色
+        let char3_id = db
+            .create_character(account_id, 2, "Pending", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+        let future_time = (chrono_now() + 3600) as u32; // 1 小时后
+        db.execute_with_params(
+            "UPDATE characters SET delete_timer = ?1 WHERE char_id = ?2",
+            params![future_time, char3_id],
+        )
+        .expect("Failed to set delete_timer");
+
+        // 清理已过期的角色
+        let deleted = db
+            .cleanup_deleted_characters()
+            .expect("Failed to cleanup");
+        assert_eq!(deleted, 1, "Should have deleted 1 expired character");
+
+        // 验证：正常角色仍在
+        assert!(db
+            .get_character_by_id(char1_id)
+            .expect("query failed")
+            .is_some());
+        // 验证：已过期角色被删除
+        assert!(db
+            .get_character_by_id(char2_id)
+            .expect("query failed")
+            .is_none());
+        // 验证：待删除但未过期角色仍在
+        assert!(db
+            .get_character_by_id(char3_id)
+            .expect("query failed")
+            .is_some());
     }
 }
