@@ -19,12 +19,16 @@ pub struct Packet {
 }
 
 impl Packet {
-    pub fn new(packet_id: PacketId, data: Vec<u8>) -> Self {
-        let length = (data.len() + 4) as u16; // 4 = header size
-        Self {
+    pub fn new(packet_id: PacketId, data: Vec<u8>) -> Option<Self> {
+        let total = data.len() + 4; // 4 = header size
+        if total > u16::MAX as usize {
+            return None;
+        }
+        let length = total as u16;
+        Some(Self {
             header: PacketHeader { length, packet_id },
             data,
-        }
+        })
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -42,6 +46,10 @@ impl Packet {
 
         let length = u16::from_le_bytes([bytes[0], bytes[1]]);
         let packet_id = u16::from_le_bytes([bytes[2], bytes[3]]);
+
+        if length < 4 {
+            return None;
+        }
 
         if bytes.len() < length as usize {
             return None;
@@ -101,4 +109,44 @@ pub mod id {
     pub const ZC_TRADE_LOCK: PacketId = 0x00EC;
     pub const ZC_TRADE_COMMIT: PacketId = 0x00F0;
     pub const ZC_TRADE_CANCEL: PacketId = 0x00F1;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_packet_new_rejects_oversized_data() {
+        let big_data = vec![0u8; 65533]; // 65533 + 4 = 65537 > u16::MAX
+        let packet = Packet::new(0x0064, big_data);
+        // After fix, should return None for oversized packets
+        assert!(packet.is_none());
+    }
+
+    #[test]
+    fn test_packet_from_bytes_rejects_length_lt_4() {
+        // Malicious packet with length field = 2
+        let mut bytes = vec![2, 0, 0x64, 0x00]; // length=2, packet_id=0x0064
+        bytes.extend_from_slice(&[0, 0]);
+        let result = Packet::from_bytes(&bytes);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_packet_new_accepts_normal_data() {
+        let data = vec![0u8; 100];
+        let packet = Packet::new(0x0064, data);
+        assert!(packet.is_some());
+        assert_eq!(packet.unwrap().header.length, 104);
+    }
+
+    #[test]
+    fn test_packet_from_bytes_normal() {
+        let mut bytes = vec![8, 0, 0x64, 0x00]; // length=8, packet_id=0x0064
+        bytes.extend_from_slice(&[1, 2, 3, 4]); // 4 bytes data
+        let result = Packet::from_bytes(&bytes);
+        assert!(result.is_some());
+        let packet = result.unwrap();
+        assert_eq!(packet.data, vec![1, 2, 3, 4]);
+    }
 }
