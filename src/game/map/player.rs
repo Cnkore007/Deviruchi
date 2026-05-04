@@ -587,7 +587,10 @@ impl Player {
 
     /// 获得 Zeny
     pub fn add_zeny(&self, zeny: u64) {
-        self.economy.write().zeny += zeny as u32;
+        let mut eco = self.economy.write();
+        let amount = zeny.min(u32::MAX as u64) as u32;
+        let can_add = crate::game::zeny::MAX_ZENY - eco.zeny;
+        eco.zeny += amount.min(can_add);
     }
 
     /// 计算最大负重 (基础20000 + STR*200, 单位0.1)

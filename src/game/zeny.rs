@@ -139,4 +139,12 @@ mod tests {
         ZenyManager::set(&player, MAX_ZENY + 100);
         assert_eq!(ZenyManager::get(&player), MAX_ZENY);
     }
+
+    #[test]
+    fn test_player_add_zeny_no_overflow() {
+        let player = create_test_player();
+        player.economy_mut().zeny = MAX_ZENY - 100;
+        player.add_zeny(u64::MAX);
+        assert_eq!(player.zeny(), MAX_ZENY);
+    }
 }
