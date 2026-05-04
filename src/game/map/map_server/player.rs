@@ -173,15 +173,19 @@ impl MapServer {
         }
 
         // 发布技能使用事件（仅在成功后）
+        // target_id 来自客户端是 account_id，需查找实际 player UUID
         let channel_name = format!("map:{}", player.map_name);
+        let target_uuid = if skill_pkt.target_id != 0 {
+            self.map_state
+                .find_player_by_account_id(skill_pkt.target_id)
+                .map(|p| p.id)
+        } else {
+            None
+        };
         let event = GameEvent::PlayerUseSkill {
             caster_id: player_id,
             skill_id: skill_pkt.skill_id as u32,
-            target_id: if skill_pkt.target_id != 0 {
-                Some(Uuid::from_u128(skill_pkt.target_id as u128))
-            } else {
-                None
-            },
+            target_id: target_uuid,
             x: skill_pkt.target_x,
             y: skill_pkt.target_y,
         };
