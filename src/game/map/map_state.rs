@@ -24,10 +24,7 @@ impl MapState {
         self.players.write().insert(player_id, player);
 
         let mut by_map = self.players_by_map.write();
-        by_map.entry(map_name.clone()).or_default();
-        if let Some(players) = by_map.get_mut(&map_name) {
-            players.push(player_id);
-        }
+        by_map.entry(map_name).or_default().push(player_id);
     }
 
     /// 从地图移除玩家
@@ -109,10 +106,8 @@ impl MapState {
             if let Some(list) = by_map.get_mut(&old_map) {
                 list.retain(|id| id != player_id);
             }
-            by_map.entry(new_map.to_string()).or_default();
-            if let Some(list) = by_map.get_mut(new_map)
-                && !list.contains(player_id)
-            {
+            let list = by_map.entry(new_map.to_string()).or_default();
+            if !list.contains(player_id) {
                 list.push(*player_id);
             }
         }
@@ -128,11 +123,9 @@ impl MapState {
             players.retain(|id| id != player_id);
         }
         // 添加到新地图
-        by_map.entry(new_map.to_string()).or_default();
-        if let Some(players) = by_map.get_mut(new_map)
-            && !players.contains(player_id)
-        {
-            players.push(*player_id);
+        let list = by_map.entry(new_map.to_string()).or_default();
+        if !list.contains(player_id) {
+            list.push(*player_id);
         }
     }
 
