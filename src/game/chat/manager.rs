@@ -156,19 +156,15 @@ impl ChatManager {
     }
 
     /// Broadcast a map message
-    pub fn broadcast_map(&self, player: &Player, message: &str, _channel_bus: &ChannelBus) {
-        let _event = GameEvent::PlayerChat {
+    pub fn broadcast_map(&self, player: &Player, message: &str, channel_bus: &ChannelBus) {
+        let event = GameEvent::PlayerChat {
             player_id: player.id,
             message: message.to_string(),
             chat_type: ChatType::Map,
         };
 
-        let channel_name = &player.map_name;
-        tracing::debug!(
-            "Broadcasting map chat from {} on {}",
-            player.name,
-            channel_name
-        );
+        let channel_name = format!("map:{}", player.map_name);
+        channel_bus.publish(&channel_name, &event, vec![]);
     }
 }
 
