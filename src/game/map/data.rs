@@ -158,6 +158,53 @@ impl MapDatabase {
     }
 }
 
+impl MapDatabase {
+    /// 从目录加载所有 .gat 文件
+    pub fn load_from_directory<P: AsRef<std::path::Path>>(
+        &mut self,
+        dir: P,
+    ) -> Result<usize, super::gat::GatError> {
+        use super::gat::GatParser;
+
+        let mut loaded = 0;
+        let dir = dir.as_ref();
+
+        if !dir.exists() {
+            tracing::warn!("地图目录不存在: {:?}", dir);
+            return Ok(0);
+        }
+
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.extension().and_then(|e| e.to_str()) == Some("gat") {
+                match GatParser::parse_file(&path) {
+                    Ok(map_data) => {
+                        let name = map_data.name.clone();
+                        tracing::info!("加载地图: {} ({}x{})", name, map_data.width, map_data.height);
+                        self.maps.insert(name, map_data);
+                        loaded += 1;
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载地图失败 {:?}: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        Ok(loaded)
+    }
+
+    /// 从嵌入的字节数据加载地图（用于测试或内嵌资源）
+    pub fn load_from_bytes(&mut self, name: &str, data: &[u8]) -> Result<(), super::gat::GatError> {
+        use super::gat::GatParser;
+        let map_data = GatParser::parse_bytes(data, name)?;
+        self.maps.insert(map_data.name.clone(), map_data);
+        Ok(())
+    }
+}
+
 impl Default for MapDatabase {
     fn default() -> Self {
         Self::new()
