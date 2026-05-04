@@ -6,7 +6,10 @@ use crate::game::map::MapState;
 use crate::game::map::channel::{ChannelBus, ChatType, GameEvent};
 use crate::game::map::drop_item::DropManager;
 use crate::game::map::teleport::{TeleportAction, TeleportManager, WarpService};
+use crate::game::npc::handler::NpcHandler;
 use crate::game::party::PartyManager;
+use crate::game::script::dialogue::{DialogueResponse, NpcDialogueState};
+use crate::game::script::parser::parse_script;
 use crate::game::skill::SkillHandler;
 use crate::game::storage::StorageManager;
 use crate::game::token::TokenStore;
@@ -15,7 +18,11 @@ use crate::network::packet::id::*;
 use crate::network::session::Session;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::guild_packets::*;
-use crate::protocol::map_packets::{CZContactNpc, CZRequestAction, CZRequestPickupItem, CZUseItem};
+use crate::protocol::map_packets::{
+    CZContactNpc, CZRequestAction, CZRequestPickupItem, CZUseItem,
+    CzAckCloseDialog, CzAckNextDialog, CzAckSelectMenu,
+    ZcCloseDialog, ZcMenuList, ZcSayDialog, ZcWaitDialog,
+};
 use crate::protocol::packet_builder::Packed;
 use crate::protocol::party_packets::{
     CZChatMessage, CZMakeParty, CZPartyChat, CZReqPartyInvite, CZReqPartyJoin,
@@ -23,6 +30,7 @@ use crate::protocol::party_packets::{
 use crate::protocol::storage_packets::*;
 use crate::protocol::teleport_packets::*;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -42,6 +50,8 @@ pub struct MapServer {
     pub map_server_id: u32,
     pub skill_handler: Arc<SkillHandler>,
     pub item_integration_handler: Arc<ItemIntegrationHandler>,
+    pub npc_handler: Arc<NpcHandler>,
+    pub active_dialogues: RwLock<HashMap<Uuid, NpcDialogueState>>,
 }
 
 impl MapServer {
@@ -81,6 +91,8 @@ impl MapServer {
             map_server_id: 1,
             skill_handler,
             item_integration_handler,
+            npc_handler: Arc::new(NpcHandler::new()),
+            active_dialogues: RwLock::new(HashMap::new()),
         }
     }
 
@@ -106,6 +118,9 @@ impl MapServer {
             0x009B => self.handle_use_item(data, session),
             0x0090 => self.handle_pickup_item(data, session),
             0x0190 => self.handle_npc_interact(data, session),
+            0x00B9 => self.handle_npc_next(data, session),
+            0x00B8 => self.handle_npc_select(data, session),
+            0x0146 => self.handle_npc_close(data, session),
             0x0100 => self.handle_party_create(data, session),
             0x0101 => self.handle_party_invite(data, session),
             0x0102 => self.handle_party_reply(data, session),
@@ -418,7 +433,111 @@ impl MapServer {
     fn handle_npc_interact(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let npc_pkt = CZContactNpc::from_slice(data)?;
-        tracing::debug!("Player {} interacted with NPC {} (not yet implemented)", player_id, npc_pkt.npc_id);
+        let npc = self.npc_handler.get_npc(npc_pkt.npc_id)?;
+
+        tracing::info!("Player {} interacting with NPC {} ({})", player_id, npc.id, npc.display_name);
+
+        // If NPC has a script, start dialogue
+        if let Some(script_text) = &npc.script {
+            let script_node = parse_script(script_text);
+            let dialogue = NpcDialogueState::new(player_id, npc.id, script_node);
+            self.active_dialogues.write().insert(player_id, dialogue);
+            return self.advance_dialogue(player_id, npc.id);
+        }
+
+        // Otherwise, handle by NPC type (shop, etc.)
+        match npc.type_ {
+            crate::game::npc::data::NpcType::Shop => {
+                let msg = ZcSayDialog { npc_id: npc.id, message: format!("Welcome to {}!", npc.display_name) };
+                Some(msg.to_packet())
+            }
+            _ => {
+                let msg = ZcSayDialog { npc_id: npc.id, message: format!("{}: Hello!", npc.display_name) };
+                Some(msg.to_packet())
+            }
+        }
+    }
+
+    /// Advance NPC dialogue for a player, returning the appropriate packet.
+    /// Processes consecutive script commands (e.g. mes followed by next)
+    /// until reaching a command that requires user input or ends the dialogue.
+    fn advance_dialogue(&self, player_id: Uuid, npc_id: u32) -> Option<Vec<u8>> {
+        let mut dialogues = self.active_dialogues.write();
+        let dialogue = dialogues.get_mut(&player_id)?;
+
+        // Process commands in a loop to handle sequences like mes -> next -> mes -> close
+        // where `next` produces a Pending that should be skipped for the next mes.
+        let mut last_response = dialogue.process();
+
+        loop {
+            match &last_response {
+                DialogueResponse::Continue => {
+                    // Script wants to continue immediately; process next command
+                    last_response = dialogue.process();
+                }
+                DialogueResponse::Pending => {
+                    // "next" command - skip and continue processing
+                    last_response = dialogue.process();
+                }
+                _ => break,
+            }
+        }
+
+        match last_response {
+            DialogueResponse::Message(text) => {
+                let pkt = ZcSayDialog { npc_id, message: text };
+                Some(pkt.to_packet())
+            }
+            DialogueResponse::Select(options) => {
+                let menu_text = options.join(":");
+                let pkt = ZcMenuList { npc_id, menu_text };
+                Some(pkt.to_packet())
+            }
+            DialogueResponse::Closed => {
+                dialogues.remove(&player_id);
+                let pkt = ZcCloseDialog { npc_id };
+                Some(pkt.to_packet())
+            }
+            DialogueResponse::Warp { map, x, y } => {
+                dialogues.remove(&player_id);
+                tracing::info!("NPC dialogue warp to {} ({}, {})", map, x, y);
+                let pkt = ZcCloseDialog { npc_id };
+                Some(pkt.to_packet())
+            }
+            // These are unreachable due to the loop above, but handle defensively
+            DialogueResponse::Continue | DialogueResponse::Pending => {
+                let pkt = ZcWaitDialog { npc_id };
+                Some(pkt.to_packet())
+            }
+        }
+    }
+
+    /// Handle NPC next dialog (0x00B9)
+    fn handle_npc_next(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CzAckNextDialog::from_slice(data)?;
+        self.advance_dialogue(player_id, pkt.npc_id)
+    }
+
+    /// Handle NPC select menu (0x00B8)
+    fn handle_npc_select(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CzAckSelectMenu::from_slice(data)?;
+
+        let mut dialogues = self.active_dialogues.write();
+        let dialogue = dialogues.get_mut(&player_id)?;
+        dialogue.handle_input(pkt.select as usize);
+
+        drop(dialogues);
+        self.advance_dialogue(player_id, pkt.npc_id)
+    }
+
+    /// Handle NPC close dialog (0x0146)
+    fn handle_npc_close(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+        let pkt = CzAckCloseDialog::from_slice(data)?;
+        self.active_dialogues.write().remove(&player_id);
+        tracing::debug!("Player {} closed NPC {} dialogue", player_id, pkt.npc_id);
         None
     }
 

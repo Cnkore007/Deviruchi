@@ -39,6 +39,9 @@ pub struct Npc {
 
     // 技能列表 (如果是技能训练师)
     pub skills: RwLock<Vec<NpcSkill>>,
+
+    // NPC脚本 (如果有)
+    pub script: Option<String>,
 }
 
 impl Npc {
@@ -56,6 +59,7 @@ impl Npc {
             flags: 0,
             shop_items: RwLock::new(Vec::new()),
             skills: RwLock::new(Vec::new()),
+            script: None,
         }
     }
 
@@ -139,6 +143,14 @@ impl NpcDatabase {
         npc.add_shop_item(501, 50, 25); // Red Potion
         npc.add_shop_item(502, 40, 20); // Yellow Potion
         npc.add_shop_item(503, 50, 25); // Blue Potion
+        npc.script = Some(
+            r#"mes "[Poring Merchant]"
+mes "Welcome to my shop!"
+mes "What would you like to do?"
+next
+select "Buy:Sell:Talk:Leave"
+close"#.to_string(),
+        );
         npc
     }
 
