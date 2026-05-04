@@ -7,6 +7,7 @@ pub mod timer;
 pub mod version;
 
 use crate::game::heal;
+use crate::game::status::{StatusTickConfig, StatusTickService};
 
 pub use crate::game::AtCommandHandler;
 pub use config::{Config, HotReloadConfig};
@@ -85,6 +86,10 @@ impl Core {
 
         // 启动 HP/SP 回复服务
         self.heal_service.start(self.map_state.clone());
+
+        // 启动状态效果周期处理服务
+        let tick_service = StatusTickService::new(StatusTickConfig::default());
+        tick_service.start(self.map_state.clone());
 
         // 初始化数据库
         let db = Arc::new(Database::open(&self.config.database.path)?);
