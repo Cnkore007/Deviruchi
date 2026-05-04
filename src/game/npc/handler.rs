@@ -2,17 +2,22 @@ use super::data::Npc;
 use crate::game::item::Inventory;
 use crate::game::map::Player;
 use crate::game::zeny::ZenyManager;
+use parking_lot::RwLock;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// NPC交互处理器
 pub struct NpcHandler {
     npcs: std::collections::HashMap<u32, Arc<Npc>>,
+    /// 已学习技能表: char_id -> Set<skill_id>
+    learned_skills: RwLock<HashMap<u32, HashSet<u16>>>,
 }
 
 impl NpcHandler {
     pub fn new() -> Self {
         let mut handler = Self {
             npcs: std::collections::HashMap::new(),
+            learned_skills: RwLock::new(HashMap::new()),
         };
         handler.init_default_npcs();
         handler
@@ -178,13 +183,15 @@ impl NpcHandler {
         }
     }
 
-    /// 学习技能
-    pub fn learn_skill(&self, _player: &Player, npc_id: u32, skill_id: u16) -> LearnResult {
+    /// 学习技能（完整流程：验证 NPC -> 检查技能 -> 检查已学习 -> 扣除 Zeny）
+    pub fn learn_skill(&self, player: &Player, npc_id: u32, skill_id: u16) -> LearnResult {
+        // 1. 检查 NPC 存在
         let npc = match self.get_npc(npc_id) {
             Some(n) => n,
             None => return LearnResult::NpcNotFound,
         };
 
+        // 2. 检查 NPC 上有该技能
         let npc_skill = npc
             .skills
             .read()
@@ -192,10 +199,39 @@ impl NpcHandler {
             .find(|s| s.skill_id == skill_id)
             .copied();
 
-        match npc_skill {
-            Some(_) => LearnResult::Success { skill_id },
-            None => LearnResult::SkillNotFound,
+        let npc_skill = match npc_skill {
+            Some(s) => s,
+            None => return LearnResult::SkillNotFound,
+        };
+
+        // 3. 检查是否已学习
+        {
+            let learned = self.learned_skills.read();
+            if let Some(skills) = learned.get(&player.char_id) {
+                if skills.contains(&skill_id) {
+                    return LearnResult::AlreadyLearned;
+                }
+            }
         }
+
+        // 4. 检查 Zeny 是否足够
+        if !ZenyManager::can_spend(player, npc_skill.price) {
+            return LearnResult::NotEnoughZeny;
+        }
+
+        // 5. 扣除 Zeny
+        ZenyManager::sub(player, npc_skill.price);
+
+        // 6. 记录已学习
+        {
+            let mut learned = self.learned_skills.write();
+            learned
+                .entry(player.char_id)
+                .or_insert_with(HashSet::new)
+                .insert(skill_id);
+        }
+
+        LearnResult::Success { skill_id }
     }
 }
 
@@ -359,5 +395,69 @@ mod tests {
         let player = create_test_player();
         let response = handler.interact(&player, 9999);
         assert!(matches!(response, NpcResponse::NotFound));
+    }
+
+    #[test]
+    fn test_learn_skill_success() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+
+        // NPC 2 是技能训练师，技能 1 (Bash) 价格 1000
+        let result = handler.learn_skill(&player, 2, 1);
+        assert!(matches!(result, LearnResult::Success { skill_id: 1 }));
+    }
+
+    #[test]
+    fn test_learn_skill_not_enough_zeny() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+        // 设置 Zeny 为 0
+        crate::game::zeny::ZenyManager::set(&player, 0);
+
+        let result = handler.learn_skill(&player, 2, 1);
+        assert!(matches!(result, LearnResult::NotEnoughZeny));
+    }
+
+    #[test]
+    fn test_learn_skill_deducts_zeny() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+        let initial_zeny = crate::game::zeny::ZenyManager::get(&player);
+
+        handler.learn_skill(&player, 2, 1); // Bash, price 1000
+
+        let remaining = crate::game::zeny::ZenyManager::get(&player);
+        assert_eq!(remaining, initial_zeny - 1000);
+    }
+
+    #[test]
+    fn test_learn_skill_already_learned() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+
+        // 第一次学习
+        handler.learn_skill(&player, 2, 1);
+        // 第二次学习应返回已学习
+        let result = handler.learn_skill(&player, 2, 1);
+        assert!(matches!(result, LearnResult::AlreadyLearned));
+    }
+
+    #[test]
+    fn test_learn_skill_not_found_on_npc() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+
+        // NPC 1 是商店，没有技能
+        let result = handler.learn_skill(&player, 1, 1);
+        assert!(matches!(result, LearnResult::SkillNotFound));
+    }
+
+    #[test]
+    fn test_learn_skill_npc_not_found() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+
+        let result = handler.learn_skill(&player, 9999, 1);
+        assert!(matches!(result, LearnResult::NpcNotFound));
     }
 }
