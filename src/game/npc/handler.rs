@@ -24,11 +24,30 @@ impl NpcHandler {
     }
 
     fn init_default_npcs(&mut self) {
-        // 加载所有 NPC 模板（ID 1-7）
-        for id in 1..=7 {
-            if let Some(npc) = super::data::NpcDatabase::get_npc(id) {
-                self.npcs.insert(id, Arc::new(npc));
-            }
+        // 从 NpcDatabase 加载所有 NPC
+        let db = super::data::NpcDatabase::default_instance();
+        for (id, npc_ref) in db.all() {
+            // Npc 没有 Clone，直接存引用会导致生命周期问题
+            // 因此重新构造一个 Npc 副本
+            let npc = super::data::Npc {
+                id: npc_ref.id,
+                name: npc_ref.name.clone(),
+                display_name: npc_ref.display_name.clone(),
+                type_: npc_ref.type_,
+                pos_x: npc_ref.pos_x,
+                pos_y: npc_ref.pos_y,
+                map_name: npc_ref.map_name.clone(),
+                sprite_id: npc_ref.sprite_id,
+                level: npc_ref.level,
+                flags: npc_ref.flags,
+                shop_items: parking_lot::RwLock::new(npc_ref.shop_items.read().clone()),
+                skills: parking_lot::RwLock::new(npc_ref.skills.read().clone()),
+                script: npc_ref.script.clone(),
+                dest_map: npc_ref.dest_map.clone(),
+                dest_x: npc_ref.dest_x,
+                dest_y: npc_ref.dest_y,
+            };
+            self.npcs.insert(*id, Arc::new(npc));
         }
     }
 

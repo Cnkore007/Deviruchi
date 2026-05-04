@@ -134,21 +134,78 @@ pub struct NpcSkill {
     pub price: u32,
 }
 
-/// NPC数据库
-pub struct NpcDatabase;
+/// NPC数据库（支持 YAML 加载 + 硬编码回退）
+pub struct NpcDatabase {
+    npcs: std::collections::HashMap<u32, Npc>,
+}
 
 impl NpcDatabase {
-    pub fn get_npc(id: u32) -> Option<Npc> {
-        match id {
-            1 => Some(Self::create_poring_merchant()),
-            2 => Some(Self::create_basilisk_warrior()),
-            3 => Some(Self::create_prontera_warp()),
-            4 => Some(Self::create_quest_npc()),
-            5 => Some(Self::create_cash_shop_npc()),
-            6 => Some(Self::create_geffen_warp()),
-            7 => Some(Self::create_healing_nurse()),
-            _ => None,
+    /// 创建 NPC 数据库，优先从 YAML 加载，失败则使用硬编码数据
+    pub fn new() -> Self {
+        let mut db = Self {
+            npcs: std::collections::HashMap::new(),
+        };
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["db/npc_db.yml", "rathena/db/npc_db.yml"];
+
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match crate::game::npc::yaml_loader::load_npc_db(path) {
+                    Ok(npcs) => {
+                        let count = npcs.len();
+                        db.npcs = npcs;
+                        tracing::info!("从 {} 加载了 {} 个 NPC", path, count);
+                        return db;
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
         }
+
+        // 回退到硬编码数据
+        tracing::info!("使用硬编码 NPC 数据");
+        db.init_hardcoded();
+        db
+    }
+
+    /// 初始化硬编码 NPC
+    fn init_hardcoded(&mut self) {
+        self.npcs.insert(1, Self::create_poring_merchant());
+        self.npcs.insert(2, Self::create_basilisk_warrior());
+        self.npcs.insert(3, Self::create_prontera_warp());
+        self.npcs.insert(4, Self::create_quest_npc());
+        self.npcs.insert(5, Self::create_cash_shop_npc());
+        self.npcs.insert(6, Self::create_geffen_warp());
+        self.npcs.insert(7, Self::create_healing_nurse());
+    }
+
+    /// 获取 NPC（返回引用）
+    pub fn get(&self, id: u32) -> Option<&Npc> {
+        self.npcs.get(&id)
+    }
+
+    /// 获取所有 NPC 的迭代器
+    pub fn all(&self) -> impl Iterator<Item = (&u32, &Npc)> {
+        self.npcs.iter()
+    }
+
+    /// 获取指定地图上的所有 NPC
+    pub fn get_npcs_on_map(&self, map_name: &str) -> Vec<&Npc> {
+        self.npcs.values().filter(|n| n.map_name == map_name).collect()
+    }
+
+    /// 获取全局默认数据库实例
+    pub fn default_instance() -> &'static NpcDatabase {
+        static INSTANCE: std::sync::OnceLock<NpcDatabase> = std::sync::OnceLock::new();
+        INSTANCE.get_or_init(|| NpcDatabase::new())
+    }
+
+    /// 兼容旧接口：通过 ID 获取 NPC
+    pub fn get_npc(id: u32) -> Option<&'static Npc> {
+        Self::default_instance().get(id)
     }
 
     fn create_poring_merchant() -> Npc {
@@ -256,5 +313,11 @@ select("Heal me:Learn Skills:Leave")
 close"#.to_string(),
         );
         npc
+    }
+}
+
+impl Default for NpcDatabase {
+    fn default() -> Self {
+        Self::new()
     }
 }
