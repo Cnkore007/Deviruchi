@@ -166,6 +166,11 @@ impl Storage {
         self.slots.iter().filter(|s| !s.is_empty()).count()
     }
 
+    /// 检查仓库是否已满（所有格子都被占用）
+    pub fn is_full(&self) -> bool {
+        self.slots.iter().all(|s| !s.is_empty())
+    }
+
     pub fn to_db_format(&self) -> Vec<(u16, u16, u16, bool, u8, [u16; 4])> {
         self.slots
             .iter()
@@ -231,5 +236,384 @@ impl Storage {
         if index < self.slots.len() {
             self.slots[index] = slot;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========== StorageSlot 测试 ==========
+
+    /// 空格子的默认值验证
+    #[test]
+    fn empty_slot_has_zero_item_id() {
+        let slot = StorageSlot::empty(5);
+        assert_eq!(slot.index, 5);
+        assert_eq!(slot.item_id, 0);
+        assert_eq!(slot.amount, 0);
+        assert!(!slot.identified);
+        assert_eq!(slot.refine, 0);
+        assert_eq!(slot.cards, [0; 4]);
+        assert!(slot.is_empty());
+    }
+
+    // ========== Storage 基础测试 ==========
+
+    /// 新建仓库的初始状态
+    #[test]
+    fn new_storage_has_correct_size() {
+        let storage = Storage::new(100);
+        assert_eq!(storage.len(), 100);
+        assert_eq!(storage.max_size(), 100);
+        assert_eq!(storage.used_count(), 0);
+    }
+
+    /// with_char_id 设置角色 ID
+    #[test]
+    fn with_char_id_sets_correctly() {
+        let storage = Storage::new(10).with_char_id(42);
+        assert_eq!(storage.char_id(), 42);
+    }
+
+    /// 空仓库 is_full 应返回 false
+    #[test]
+    fn is_full_returns_false_for_empty_storage() {
+        let storage = Storage::new(10);
+        assert!(!storage.is_full());
+    }
+
+    /// 所有格子占满时 is_full 应返回 true
+    #[test]
+    fn is_full_returns_true_when_all_slots_used() {
+        let mut storage = Storage::new(3);
+        storage.add_item(501, 1);
+        storage.add_item(502, 1);
+        storage.add_item(503, 1);
+        assert!(storage.is_full());
+    }
+
+    /// 部分格子占用时 is_full 应返回 false
+    #[test]
+    fn is_full_returns_false_when_some_slots_used() {
+        let mut storage = Storage::new(100);
+        storage.add_item(501, 1);
+        assert!(!storage.is_full());
+    }
+
+    // ========== get_slot / get_slot_mut 测试 ==========
+
+    /// 越界索引返回 None
+    #[test]
+    fn get_slot_returns_none_for_out_of_bounds() {
+        let storage = Storage::new(10);
+        assert!(storage.get_slot(10).is_none());
+        assert!(storage.get_slot(100).is_none());
+    }
+
+    /// 正常索引返回格子引用
+    #[test]
+    fn get_slot_returns_slot_within_bounds() {
+        let storage = Storage::new(10);
+        let slot = storage.get_slot(0).unwrap();
+        assert!(slot.is_empty());
+    }
+
+    /// 通过 get_slot_mut 修改格子数据
+    #[test]
+    fn get_slot_mut_modifies_slot() {
+        let mut storage = Storage::new(10);
+        let slot = storage.get_slot_mut(0).unwrap();
+        slot.item_id = 501;
+        slot.amount = 10;
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 501);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 10);
+    }
+
+    // ========== add_item 测试 ==========
+
+    /// 向空仓库添加物品
+    #[test]
+    fn add_item_to_empty_storage() {
+        let mut storage = Storage::new(10);
+        assert!(storage.add_item(501, 5));
+        assert_eq!(storage.used_count(), 1);
+        let slot = storage.get_slot(0).unwrap();
+        assert_eq!(slot.item_id, 501);
+        assert_eq!(slot.amount, 5);
+        assert!(slot.identified); // 默认已鉴定
+    }
+
+    /// 相同物品自动堆叠
+    #[test]
+    fn add_item_stacks_same_item() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 10);
+        storage.add_item(501, 20);
+        assert_eq!(storage.used_count(), 1);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 30);
+    }
+
+    /// 堆叠溢出时放入新格子
+    #[test]
+    fn add_item_does_not_exceed_max_stack() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 29000);
+        // 再加 2000 会导致堆叠溢出，应放到新格子
+        assert!(storage.add_item(501, 2000));
+        assert_eq!(storage.used_count(), 2);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 29000);
+        assert_eq!(storage.get_slot(1).unwrap().amount, 2000);
+    }
+
+    /// 仓库满且无相同物品可堆叠时返回 false
+    #[test]
+    fn add_item_returns_false_when_full() {
+        let mut storage = Storage::new(2);
+        assert!(storage.add_item(501, 1));
+        assert!(storage.add_item(502, 1));
+        // 仓库已满，不同物品无法添加
+        assert!(!storage.add_item(503, 1));
+    }
+
+    /// 仓库满但相同物品仍可堆叠
+    #[test]
+    fn add_item_same_item_can_still_stack_when_full() {
+        let mut storage = Storage::new(2);
+        storage.add_item(501, 1);
+        storage.add_item(502, 1);
+        // 相同物品如果能堆叠，仍然可以添加
+        assert!(storage.add_item(501, 5));
+        assert_eq!(storage.get_slot(0).unwrap().amount, 6);
+    }
+
+    /// 物品放入第一个空格子
+    #[test]
+    fn add_item_fills_first_empty_slot() {
+        let mut storage = Storage::new(5);
+        storage.add_item(501, 1); // slot 0
+        storage.add_item(502, 1); // slot 1
+        storage.remove_item(0, 1); // slot 0 清空
+        storage.add_item(503, 1); // 应该放到 slot 0
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 503);
+    }
+
+    // ========== remove_item 测试 ==========
+
+    /// 减少物品数量
+    #[test]
+    fn remove_item_decreases_amount() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 10);
+        assert!(storage.remove_item(0, 3));
+        assert_eq!(storage.get_slot(0).unwrap().amount, 7);
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 501);
+    }
+
+    /// 数量归零时清空格子
+    #[test]
+    fn remove_item_clears_slot_when_amount_reaches_zero() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5);
+        assert!(storage.remove_item(0, 5));
+        assert!(storage.get_slot(0).unwrap().is_empty());
+    }
+
+    /// 数量不足时返回 false
+    #[test]
+    fn remove_item_returns_false_for_insufficient_amount() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5);
+        assert!(!storage.remove_item(0, 10));
+        // 数量不变
+        assert_eq!(storage.get_slot(0).unwrap().amount, 5);
+    }
+
+    /// 越界索引返回 false
+    #[test]
+    fn remove_item_returns_false_for_out_of_bounds() {
+        let mut storage = Storage::new(10);
+        assert!(!storage.remove_item(10, 1));
+        assert!(!storage.remove_item(100, 1));
+    }
+
+    /// 空格子移除返回 false
+    #[test]
+    fn remove_item_returns_false_for_empty_slot() {
+        let mut storage = Storage::new(10);
+        assert!(!storage.remove_item(0, 1));
+    }
+
+    // ========== move_item 测试 ==========
+
+    /// 交换两个格子的物品
+    #[test]
+    fn move_item_swaps_two_slots() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5); // slot 0
+        storage.add_item(502, 3); // slot 1
+
+        assert!(storage.move_item(0, 1));
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 502);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 3);
+        assert_eq!(storage.get_slot(1).unwrap().item_id, 501);
+        assert_eq!(storage.get_slot(1).unwrap().amount, 5);
+    }
+
+    /// 相同物品移动时合并
+    #[test]
+    fn move_item_merges_same_item() {
+        // 手动设置两个格子为相同物品，避免 add_item 自动堆叠
+        let mut storage = Storage::new(10);
+        storage.get_slot_mut(0).unwrap().item_id = 501;
+        storage.get_slot_mut(0).unwrap().amount = 5;
+        storage.get_slot_mut(1).unwrap().item_id = 501;
+        storage.get_slot_mut(1).unwrap().amount = 3;
+
+        assert!(storage.move_item(0, 1));
+        assert!(storage.get_slot(0).unwrap().is_empty());
+        assert_eq!(storage.get_slot(1).unwrap().amount, 8);
+    }
+
+    /// 移动到自身是空操作
+    #[test]
+    fn move_item_same_index_is_noop() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5);
+        assert!(storage.move_item(0, 0));
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 501);
+    }
+
+    /// 越界索引返回 false
+    #[test]
+    fn move_item_returns_false_for_out_of_bounds() {
+        let mut storage = Storage::new(10);
+        assert!(!storage.move_item(0, 10));
+        assert!(!storage.move_item(10, 0));
+    }
+
+    /// 移动到空格子
+    #[test]
+    fn move_item_to_empty_slot() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5); // slot 0
+        assert!(storage.move_item(0, 5));
+        assert!(storage.get_slot(0).unwrap().is_empty());
+        assert_eq!(storage.get_slot(5).unwrap().item_id, 501);
+        assert_eq!(storage.get_slot(5).unwrap().amount, 5);
+    }
+
+    // ========== find_item_slot 测试 ==========
+
+    /// 查找已存在的物品
+    #[test]
+    fn find_item_slot_finds_existing_item() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5);
+        storage.add_item(502, 3);
+        let slot = storage.find_item_slot(502).unwrap();
+        assert_eq!(slot.index, 1);
+        assert_eq!(slot.amount, 3);
+    }
+
+    /// 查找不存在的物品返回 None
+    #[test]
+    fn find_item_slot_returns_none_for_missing() {
+        let storage = Storage::new(10);
+        assert!(storage.find_item_slot(501).is_none());
+    }
+
+    // ========== 序列化/反序列化测试 ==========
+
+    /// to_db_format 只包含非空格子
+    #[test]
+    fn to_db_format_only_includes_non_empty() {
+        let mut storage = Storage::new(10);
+        storage.add_item(501, 5);
+        storage.add_item(502, 3);
+        let db_data = storage.to_db_format();
+        assert_eq!(db_data.len(), 2);
+        assert_eq!(db_data[0].1, 501); // item_id
+        assert_eq!(db_data[1].1, 502);
+    }
+
+    /// from_db_format 往返一致性
+    #[test]
+    fn from_db_format_roundtrip() {
+        let mut storage = Storage::new(10).with_char_id(42);
+        storage.add_item(501, 5);
+        storage.add_item(502, 3);
+        let db_data = storage.to_db_format();
+
+        let restored = Storage::from_db_format(42, 10, db_data);
+        assert_eq!(restored.char_id(), 42);
+        assert_eq!(restored.get_slot(0).unwrap().item_id, 501);
+        assert_eq!(restored.get_slot(0).unwrap().amount, 5);
+        assert_eq!(restored.get_slot(1).unwrap().item_id, 502);
+    }
+
+    /// from_slots 往返一致性（注意：from_slots 按 vec 位置放置，不按 index 字段）
+    #[test]
+    fn from_slots_roundtrip() {
+        let slots = vec![
+            StorageSlot { index: 0, item_id: 501, amount: 5, identified: true, refine: 0, cards: [0; 4] },
+            StorageSlot { index: 1, item_id: 601, amount: 1, identified: true, refine: 7, cards: [4001, 0, 0, 0] },
+        ];
+        let storage = Storage::from_slots(42, 10, slots);
+        assert_eq!(storage.used_count(), 2);
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 501);
+        assert!(storage.get_slot(2).unwrap().is_empty());
+        assert_eq!(storage.get_slot(1).unwrap().item_id, 601);
+        assert_eq!(storage.get_slot(1).unwrap().refine, 7);
+    }
+
+    /// from_slots 忽略超出 max_size 的数据
+    #[test]
+    fn from_slots_ignores_out_of_bounds() {
+        let slots = vec![
+            StorageSlot { index: 0, item_id: 501, amount: 1, identified: true, refine: 0, cards: [0; 4] },
+            StorageSlot { index: 1, item_id: 502, amount: 1, identified: true, refine: 0, cards: [0; 4] },
+            StorageSlot { index: 2, item_id: 503, amount: 1, identified: true, refine: 0, cards: [0; 4] },
+        ];
+        // max_size=2，第三个元素应被忽略
+        let storage = Storage::from_slots(1, 2, slots);
+        assert_eq!(storage.used_count(), 2);
+    }
+
+    // ========== slots() 测试 ==========
+
+    /// slots() 返回所有格子
+    #[test]
+    fn slots_returns_all_slots() {
+        let storage = Storage::new(5);
+        assert_eq!(storage.slots().len(), 5);
+    }
+
+    // ========== set_slot 测试 ==========
+
+    /// set_slot 替换格子数据
+    #[test]
+    fn set_slot_replaces_slot_data() {
+        let mut storage = Storage::new(10);
+        let slot = StorageSlot {
+            index: 3,
+            item_id: 601,
+            amount: 1,
+            identified: true,
+            refine: 10,
+            cards: [4001, 4002, 4003, 4004],
+        };
+        storage.set_slot(3, slot);
+        assert_eq!(storage.get_slot(3).unwrap().item_id, 601);
+        assert_eq!(storage.get_slot(3).unwrap().refine, 10);
+    }
+
+    /// set_slot 越界不 panic
+    #[test]
+    fn set_slot_ignores_out_of_bounds() {
+        let mut storage = Storage::new(5);
+        let slot = StorageSlot::empty(0);
+        // 不应该 panic
+        storage.set_slot(10, slot);
     }
 }
