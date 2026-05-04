@@ -6,7 +6,10 @@ use crate::game::constants;
 
 use crate::game::token::TokenStore;
 use crate::network::session::{Session, SessionManager};
-use crate::protocol::map_packets::{CHEnter, CHMakeChar, CharInfo, HCNotifyZoneServer, SCCharList};
+use crate::protocol::map_packets::{
+    CHEnter, CHDeleteChar, CHCancelDelete, CHMakeChar, CharInfo,
+    HCNotifyZoneServer, HCDeleteCharOk, HCCancelDeleteOk, SCCharList,
+};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::{chrono_now, Database};
 #[cfg(test)]
@@ -63,6 +66,8 @@ impl CharServer {
             0x0066 => self.handle_request_char_list(session),
             0x0067 => self.handle_make_char(data, session),
             0x0065 => self.handle_select_char(data, session),
+            0x0068 => self.handle_delete_char(data, session),
+            0x01F8 => self.handle_cancel_delete(data, session),
             _ => {
                 warn!("Unknown char packet id: 0x{:04X}", packet_id);
                 None
@@ -241,6 +246,112 @@ impl CharServer {
         )
     }
 
+    /// 处理请求删除角色 (0x0068)
+    /// rAthena 协议：发送 delete_timer 标记，客户端收到后显示倒计时
+    /// 默认删除延迟 86400 秒 (24 小时)
+    fn handle_delete_char(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let account_id = session.account_id?;
+
+        let delete_req = CHDeleteChar::from_slice(data)?;
+
+        info!(
+            "Delete char request: char_id={}, account_id={}",
+            delete_req.char_id, account_id
+        );
+
+        // 验证角色是否属于该账户
+        let characters = self.db.get_characters_by_account(account_id).ok()?;
+        let char_exists = characters.iter().any(|c| c.char_id == delete_req.char_id);
+
+        if !char_exists {
+            warn!(
+                "Delete char rejected: char_id={} not owned by account_id={}",
+                delete_req.char_id, account_id
+            );
+            return Some(vec![0x00]); // 失败响应
+        }
+
+        // 标记角色删除（24小时后删除）
+        match self.db.mark_character_for_deletion(delete_req.char_id, account_id, 86400) {
+            Ok(true) => {
+                info!(
+                    "Character {} marked for deletion (account_id={})",
+                    delete_req.char_id, account_id
+                );
+                Some(
+                    HCDeleteCharOk {
+                        char_id: delete_req.char_id,
+                    }
+                    .to_packet(),
+                )
+            }
+            Ok(false) => {
+                warn!(
+                    "Failed to mark character {} for deletion (already marked or not found)",
+                    delete_req.char_id
+                );
+                Some(vec![0x00]) // 失败响应
+            }
+            Err(e) => {
+                error!("Database error deleting character {}: {}", delete_req.char_id, e);
+                Some(vec![0x00]) // 失败响应
+            }
+        }
+    }
+
+    /// 处理取消删除角色 (0x01F8)
+    fn handle_cancel_delete(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let account_id = session.account_id?;
+
+        let cancel_req = CHCancelDelete::from_slice(data)?;
+
+        info!(
+            "Cancel delete request: char_id={}, account_id={}",
+            cancel_req.char_id, account_id
+        );
+
+        // 验证角色是否属于该账户
+        let characters = self.db.get_characters_by_account(account_id).ok()?;
+        let char_exists = characters.iter().any(|c| c.char_id == cancel_req.char_id);
+
+        if !char_exists {
+            warn!(
+                "Cancel delete rejected: char_id={} not owned by account_id={}",
+                cancel_req.char_id, account_id
+            );
+            return Some(vec![0x00]); // 失败响应
+        }
+
+        match self.db.cancel_character_deletion(cancel_req.char_id, account_id) {
+            Ok(true) => {
+                info!(
+                    "Character {} deletion cancelled (account_id={})",
+                    cancel_req.char_id, account_id
+                );
+                Some(
+                    HCCancelDeleteOk {
+                        char_id: cancel_req.char_id,
+                    }
+                    .to_packet(),
+                )
+            }
+            Ok(false) => {
+                warn!(
+                    "Failed to cancel deletion for character {} (not marked)",
+                    cancel_req.char_id
+                );
+                Some(vec![0x00]) // 失败响应
+            }
+            Err(e) => {
+                error!(
+                    "Database error cancelling deletion for {}: {}",
+                    cancel_req.char_id, e
+                );
+                Some(vec![0x00]) // 失败响应
+            }
+        }
+    }
+
     /// 查找空槽位 (0-8)
     fn find_empty_slot(&self, characters: &[crate::storage::Character]) -> Option<u8> {
         let used_slots: std::collections::HashSet<u8> =
@@ -259,7 +370,7 @@ impl CharServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::map_packets::{CHEnter, CHMakeChar};
+    use crate::protocol::map_packets::{CHEnter, CHDeleteChar, CHCancelDelete, CHMakeChar};
 
     fn create_test_server() -> CharServer {
         let db = Arc::new(Database::open_memory().unwrap());
@@ -533,5 +644,124 @@ mod tests {
 
         assert!(result.is_some());
         // HCNotifyZoneServer 包包含服务器信息
+    }
+
+    #[test]
+    fn test_handle_delete_char_success() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 先创建一个角色
+        let char_id = server
+            .db
+            .create_character(1, 0, "DeleteMe", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 请求删除
+        let data = CHDeleteChar {
+            char_id,
+            email: String::new(),
+        }
+        .to_packet();
+
+        let result = server.handle_delete_char(&data[4..], &mut session);
+        assert!(result.is_some(), "删除请求应返回响应");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006C, "应返回 HCDeleteCharOk (0x006C)");
+    }
+
+    #[test]
+    fn test_handle_delete_char_wrong_account() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 创建角色属于 account 1
+        let char_id = server
+            .db
+            .create_character(1, 0, "Owned", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 用 account 2 的 session 尝试删除
+        let mut wrong_session = create_session_with_account(2);
+        // account 2 也需要存在
+        server.db.create_account("other", "pass", 0).unwrap();
+
+        let data = CHDeleteChar {
+            char_id,
+            email: String::new(),
+        }
+        .to_packet();
+
+        let result = server.handle_delete_char(&data[4..], &mut wrong_session);
+        assert!(result.is_some(), "错误账户删除应返回失败响应");
+        assert_eq!(result.unwrap(), vec![0x00], "应返回失败字节");
+    }
+
+    #[test]
+    fn test_handle_cancel_delete_success() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 创建角色
+        let char_id = server
+            .db
+            .create_character(1, 0, "CancelDel", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        // 先标记删除
+        server.db.mark_character_for_deletion(char_id, 1, 86400).unwrap();
+
+        // 取消删除
+        let data = CHCancelDelete { char_id }.to_packet();
+        let result = server.handle_cancel_delete(&data[4..], &mut session);
+        assert!(result.is_some(), "取消删除应返回响应");
+
+        let response = result.unwrap();
+        let packet_id = u16::from_le_bytes([response[2], response[3]]);
+        assert_eq!(packet_id, 0x006D, "应返回 HCCancelDeleteOk (0x006D)");
+    }
+
+    #[test]
+    fn test_handle_cancel_delete_not_marked() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 创建角色但不标记删除
+        let char_id = server
+            .db
+            .create_character(1, 0, "NoMark", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
+
+        let data = CHCancelDelete { char_id }.to_packet();
+        let result = server.handle_cancel_delete(&data[4..], &mut session);
+        assert!(result.is_some(), "未标记删除时取消应返回失败响应");
+        assert_eq!(result.unwrap(), vec![0x00], "应返回失败字节");
+    }
+
+    #[test]
+    fn test_delete_char_requires_account_id() {
+        let server = create_test_server();
+        let mut session = Session::new(); // 无 account_id
+
+        let data = CHDeleteChar {
+            char_id: 1,
+            email: String::new(),
+        }
+        .to_packet();
+
+        let result = server.handle_delete_char(&data[4..], &mut session);
+        assert!(result.is_none(), "无 account_id 时应返回 None");
+    }
+
+    #[test]
+    fn test_cancel_delete_requires_account_id() {
+        let server = create_test_server();
+        let mut session = Session::new();
+
+        let data = CHCancelDelete { char_id: 1 }.to_packet();
+        let result = server.handle_cancel_delete(&data[4..], &mut session);
+        assert!(result.is_none(), "无 account_id 时应返回 None");
     }
 }

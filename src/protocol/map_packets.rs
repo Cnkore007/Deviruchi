@@ -186,7 +186,8 @@ impl Packed for CHDeleteChar {
         if slice.len() < 4 {
             return None;
         }
-        let char_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        // 注意: PacketBuilder::put_u32 使用大端序（bytes crate 默认行为）
+        let char_id = u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]);
         let mut offset = 4;
         let email = parse_fixed_string(slice, &mut offset, 40)?;
         Some(Self { char_id, email })
@@ -224,7 +225,8 @@ impl Packed for CHCancelDelete {
         if slice.len() < 4 {
             return None;
         }
-        let char_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        // 注意: PacketBuilder::put_u32 使用大端序（bytes crate 默认行为）
+        let char_id = u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]);
         Some(Self { char_id })
     }
 }
@@ -585,8 +587,8 @@ mod tests {
     #[test]
     fn test_ch_delete_char_parse() {
         let mut data = vec![0u8; 4 + 40];
-        // char_id = 42
-        data[0] = 42;
+        // char_id = 42，大端序写入（与 put_u32 一致）
+        data[3] = 42;
         // email = "test@email.com" + null padding
         let email_bytes = b"test@email.com";
         data[4..4 + email_bytes.len()].copy_from_slice(email_bytes);
@@ -604,7 +606,8 @@ mod tests {
 
     #[test]
     fn test_ch_cancel_delete_parse() {
-        let data = vec![100, 0, 0, 0]; // char_id = 100
+        // char_id = 100，大端序写入
+        let data = vec![0, 0, 0, 100];
         let pkt = CHCancelDelete::from_slice(&data).unwrap();
         assert_eq!(pkt.char_id, 100);
     }
