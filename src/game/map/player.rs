@@ -589,7 +589,7 @@ impl Player {
     pub fn add_zeny(&self, zeny: u64) {
         let mut eco = self.economy.write();
         let amount = zeny.min(u32::MAX as u64) as u32;
-        let can_add = crate::game::zeny::MAX_ZENY - eco.zeny;
+        let can_add = crate::game::zeny::MAX_ZENY.saturating_sub(eco.zeny);
         eco.zeny += amount.min(can_add);
     }
 
