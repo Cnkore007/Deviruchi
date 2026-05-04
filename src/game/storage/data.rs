@@ -75,24 +75,63 @@ impl Storage {
         self.slots.iter().find(|s| s.item_id == item_id)
     }
 
-    pub fn add_item(&mut self, item_id: u16, amount: u16) -> bool {
-        for slot in &mut self.slots {
-            if slot.item_id == item_id && slot.amount + amount <= MAX_STACK_SIZE {
-                slot.amount += amount;
-                return true;
+    /// 添加物品到仓库（完整参数版本，支持精炼和卡片）
+    ///
+    /// # 参数
+    /// - `item_id`: 物品 ID
+    /// - `amount`: 数量
+    /// - `identified`: 是否已鉴定
+    /// - `refine`: 精炼等级
+    /// - `cards`: 卡片插槽 [0-3]
+    ///
+    /// # 返回
+    /// `true` 表示添加成功，`false` 表示仓库已满
+    pub fn add_item_full(
+        &mut self,
+        item_id: u16,
+        amount: u16,
+        identified: bool,
+        refine: u8,
+        cards: [u16; 4],
+    ) -> bool {
+        // 精炼等级 > 0 或有卡片的通常是装备，不参与堆叠
+        let is_equipment = refine > 0 || cards.iter().any(|&c| c != 0);
+
+        if !is_equipment {
+            // 非装备物品尝试堆叠
+            for slot in &mut self.slots {
+                if slot.item_id == item_id
+                    && slot.amount + amount <= MAX_STACK_SIZE
+                    && slot.refine == 0
+                    && slot.cards == [0; 4]
+                {
+                    slot.amount += amount;
+                    return true;
+                }
             }
         }
 
+        // 放入空格子
         for slot in &mut self.slots {
             if slot.is_empty() {
                 slot.item_id = item_id;
                 slot.amount = amount;
-                slot.identified = true;
+                slot.identified = identified;
+                slot.refine = refine;
+                slot.cards = cards;
                 return true;
             }
         }
 
         false
+    }
+
+    /// 添加物品到仓库（简化版本，兼容原有接口）
+    ///
+    /// 用于消耗品等不需要精炼/卡片的物品。
+    /// 默认 identified=true, refine=0, cards=[0;4]。
+    pub fn add_item(&mut self, item_id: u16, amount: u16) -> bool {
+        self.add_item_full(item_id, amount, true, 0, [0; 4])
     }
 
     pub fn remove_item(&mut self, index: u16, amount: u16) -> bool {
@@ -615,5 +654,56 @@ mod tests {
         let slot = StorageSlot::empty(0);
         // 不应该 panic
         storage.set_slot(10, slot);
+    }
+
+    // ========== add_item_full 测试 ==========
+
+    /// 装备入库带精炼和卡片
+    #[test]
+    fn add_item_with_refine_and_cards() {
+        let mut storage = Storage::new(10);
+        // 装备入库，带精炼和卡片
+        assert!(storage.add_item_full(1101, 1, true, 7, [4001, 4002, 0, 0]));
+        let slot = storage.get_slot(0).unwrap();
+        assert_eq!(slot.item_id, 1101);
+        assert_eq!(slot.amount, 1);
+        assert!(slot.identified);
+        assert_eq!(slot.refine, 7);
+        assert_eq!(slot.cards, [4001, 4002, 0, 0]);
+    }
+
+    /// 消耗品堆叠不受 refine/cards 影响
+    #[test]
+    fn add_item_full_stacks_same_item_ignoring_refine() {
+        let mut storage = Storage::new(10);
+        storage.add_item_full(501, 10, true, 0, [0; 4]);
+        // 消耗品堆叠（refine/cards 不影响堆叠判断）
+        assert!(storage.add_item_full(501, 5, true, 0, [0; 4]));
+        assert_eq!(storage.used_count(), 1);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 15);
+    }
+
+    /// 装备不参与堆叠（不同精炼放在不同格子）
+    #[test]
+    fn add_item_equipment_does_not_stack() {
+        let mut storage = Storage::new(10);
+        // 装备通常 amount=1，带不同精炼，应该放在不同格子
+        storage.add_item_full(1101, 1, true, 7, [4001, 0, 0, 0]);
+        storage.add_item_full(1101, 1, true, 10, [4002, 0, 0, 0]);
+        assert_eq!(storage.used_count(), 2);
+        assert_eq!(storage.get_slot(0).unwrap().refine, 7);
+        assert_eq!(storage.get_slot(1).unwrap().refine, 10);
+    }
+
+    /// 原有 add_item 接口保持兼容
+    #[test]
+    fn add_item_legacy_still_works() {
+        let mut storage = Storage::new(10);
+        assert!(storage.add_item(501, 10));
+        assert_eq!(storage.get_slot(0).unwrap().item_id, 501);
+        assert_eq!(storage.get_slot(0).unwrap().amount, 10);
+        // 默认值
+        assert_eq!(storage.get_slot(0).unwrap().refine, 0);
+        assert_eq!(storage.get_slot(0).unwrap().cards, [0; 4]);
     }
 }
