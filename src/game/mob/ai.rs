@@ -2,7 +2,7 @@ use crate::game::battle::{BattleHandler, ExpDistributor};
 use crate::game::map::data::MapDatabase;
 use crate::game::map::{ChannelBus, DropManager, GameEvent, MapState};
 use crate::game::mob::droptable::{DropResolver, MVPResolver, MobDropTable};
-use crate::game::mob::{Mob, MobAIState, MobSpawnManager};
+use crate::game::mob::{Mob, MobAIState, MobBehavior, MobSpawnManager};
 use crate::game::party::PartyManager;
 use crate::game::rand::GameRng;
 use std::sync::Arc;
@@ -74,20 +74,36 @@ impl MobAI {
 
     fn update_idle(&self, mob: &Arc<Mob>, map_state: &MapState) {
         let (x, y) = mob.get_position();
-        let players = map_state.get_players_on_map(&mob.spawn_map);
 
-        for player in players {
-            let (px, py) = player.get_position();
-            let distance = Self::calculate_distance(x, y, px, py);
+        match mob.behavior {
+            MobBehavior::Aggressive => {
+                // 主动攻击：进入视野范围后追击
+                let players = map_state.get_players_on_map(&mob.spawn_map);
 
-            if distance <= mob.sight_range {
-                *mob.ai_state.write() = MobAIState::Chase;
-                *mob.target_id.write() = Some(player.id);
-                return;
+                for player in players {
+                    let (px, py) = player.get_position();
+                    let distance = Self::calculate_distance(x, y, px, py);
+
+                    if distance <= mob.sight_range {
+                        *mob.ai_state.write() = MobAIState::Chase;
+                        *mob.target_id.write() = Some(player.id);
+                        return;
+                    }
+                }
+            }
+            MobBehavior::Passive | MobBehavior::Immobile => {
+                // 被动/固定：不主动追击，被攻击时由 take_damage 或 attack handler 设置目标
+            }
+            MobBehavior::FleeWhenLowHp => {
+                // 低血量逃跑：暂不实现逃跑逻辑，当前与被动行为一致
+            }
+            MobBehavior::Assist | MobBehavior::PassiveAssist => {
+                // 协助：暂不实现，当前与被动行为一致
             }
         }
 
-        if self.rand_simple() < 5 {
+        // 随机移动（Immobile 怪物不移动）
+        if !matches!(mob.behavior, MobBehavior::Immobile) && self.rand_simple() < 5 {
             let new_x = (x as i32 + self.rand_offset(-3, 3)).max(0) as u16;
             let new_y = (y as i32 + self.rand_offset(-3, 3)).max(0) as u16;
             mob.move_to(new_x, new_y);
@@ -529,7 +545,7 @@ mod tests {
             size: crate::game::battle::element::MobSize::Medium,
             ai_state: parking_lot::RwLock::new(MobAIState::Idle),
             target_id: parking_lot::RwLock::new(None),
-            behavior: crate::game::mob::MobBehavior::Passive,
+            behavior: crate::game::mob::MobBehavior::Aggressive,
             skills: Vec::new(),
             sight_range: 10,
             chase_range: 20,
@@ -635,6 +651,72 @@ mod tests {
         // Should transition to Chase
         assert_eq!(*mob.ai_state.read(), MobAIState::Chase);
         assert_eq!(*mob.target_id.read(), Some(player.id));
+    }
+
+    #[test]
+    fn passive_mob_stays_idle_when_player_in_sight() {
+        // Passive mob should NOT chase players even when in sight range
+        let position = (100u16, 100u16);
+        let mob = Arc::new(Mob {
+            id: Uuid::new_v4(),
+            mob_id: 1001,
+            name: "PassiveMob".to_string(),
+            pos_x: parking_lot::RwLock::new(position.0),
+            pos_y: parking_lot::RwLock::new(position.1),
+            map_name: "test_map".to_string(),
+            level: 5,
+            hp: parking_lot::RwLock::new(500),
+            max_hp: 500,
+            sp: parking_lot::RwLock::new(0),
+            max_sp: 0,
+            atk: 30,
+            matk: 0,
+            defense: 0,
+            magic_defense: 0,
+            hit: 10,
+            flee: 5,
+            crit: 0,
+            walk_speed: 150,
+            atk_range: 1,
+            element: crate::game::battle::element::Element::Neutral,
+            element_level: crate::game::battle::element::ElementLevel::Level1,
+            size: crate::game::battle::element::MobSize::Medium,
+            ai_state: parking_lot::RwLock::new(MobAIState::Idle),
+            target_id: parking_lot::RwLock::new(None),
+            behavior: crate::game::mob::MobBehavior::Passive,
+            skills: Vec::new(),
+            sight_range: 10,
+            chase_range: 20,
+            aggro_rate: 0,
+            spawn_delay: 0,
+            respawn_time: 60000,
+            spawn_x: position.0,
+            spawn_y: position.1,
+            spawn_map: "test_map".to_string(),
+            death_time: parking_lot::RwLock::new(None),
+            drops: vec![],
+            base_exp: 10,
+            job_exp: 5,
+            zeny: Some(100),
+            drops_processed: parking_lot::RwLock::new(false),
+            path_manager: parking_lot::RwLock::new(MobPathManager::new()),
+            damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+        });
+
+        let player = create_test_player((105, 105), 10); // Distance = 7.07 < sight_range
+
+        let map_state = create_test_map_state();
+        let player_for_map = (*player).clone();
+        map_state.add_player(player_for_map);
+
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![10], map_state);
+        ai.update(&mob, &map_state);
+
+        // Passive mob should stay Idle, not chase
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+        assert_eq!(*mob.target_id.read(), None);
     }
 
     #[test]
