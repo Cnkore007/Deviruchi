@@ -1,11 +1,11 @@
-use std::sync::Arc;
-use std::collections::HashMap;
-use uuid::Uuid;
-use parking_lot::RwLock;
-use crate::game::map::{Player, MapState};
+use super::PlayerCooldown;
 use super::data::SkillDatabase;
 use super::effect::{SkillEffect, SkillResult};
-use super::PlayerCooldown;
+use crate::game::map::{MapState, Player};
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct SkillHandler {
@@ -75,8 +75,7 @@ impl SkillHandler {
             return Err(error);
         }
 
-        let skill = self.db.get(skill_id)
-            .ok_or(SkillError::SkillNotFound)?;
+        let skill = self.db.get(skill_id).ok_or(SkillError::SkillNotFound)?;
 
         // 消耗SP/HP
         let sp_cost = skill.sp_cost as u32 * level as u32;
@@ -101,13 +100,13 @@ impl SkillHandler {
         };
 
         // 应用伤害/治疗
-        if let SkillResult::Damage { damage, .. } = &result {
-            if let Some(ref t) = target {
-                let died = t.take_damage(*damage as u32);
-                tracing::info!("Skill {} dealt {} damage to {}", skill.name, damage, t.name);
-                if died {
-                    tracing::info!("Player {} was killed", t.name);
-                }
+        if let SkillResult::Damage { damage, .. } = &result
+            && let Some(ref t) = target
+        {
+            let died = t.take_damage(*damage as u32);
+            tracing::info!("Skill {} dealt {} damage to {}", skill.name, damage, t.name);
+            if died {
+                tracing::info!("Player {} was killed", t.name);
             }
         }
 
@@ -132,7 +131,13 @@ impl SkillHandler {
     }
 
     /// 检查玩家是否在范围内
-    pub fn is_target_in_range(&self, caster: &Player, target_char_id: u32, range: u16, map_state: &MapState) -> bool {
+    pub fn is_target_in_range(
+        &self,
+        caster: &Player,
+        target_char_id: u32,
+        range: u16,
+        map_state: &MapState,
+    ) -> bool {
         let map_name = caster.map_name.clone();
         let players = map_state.get_players_on_map(&map_name);
 
@@ -167,10 +172,10 @@ impl SkillHandler {
     /// 检查技能冷却
     pub fn check_cooldown(&self, player_id: Uuid, skill_id: u16) -> Result<(), SkillError> {
         let cooldowns = self.cooldowns.read();
-        if let Some(cd) = cooldowns.get(&player_id) {
-            if !cd.is_ready(skill_id) {
-                return Err(SkillError::Cooldown);
-            }
+        if let Some(cd) = cooldowns.get(&player_id)
+            && !cd.is_ready(skill_id)
+        {
+            return Err(SkillError::Cooldown);
         }
         Ok(())
     }
@@ -178,14 +183,17 @@ impl SkillHandler {
     /// 设置技能冷却
     pub fn set_cooldown(&self, player_id: Uuid, skill_id: u16, duration_ms: u32) {
         let mut cooldowns = self.cooldowns.write();
-        let cd = cooldowns.entry(player_id).or_insert_with(|| PlayerCooldown::new(player_id));
+        let cd = cooldowns
+            .entry(player_id)
+            .or_insert_with(|| PlayerCooldown::new(player_id));
         cd.set_cooldown(skill_id, duration_ms);
     }
 
     /// 获取冷却剩余时间
     pub fn get_cooldown_remaining(&self, player_id: Uuid, skill_id: u16) -> u64 {
         let cooldowns = self.cooldowns.read();
-        cooldowns.get(&player_id)
+        cooldowns
+            .get(&player_id)
             .map(|cd| cd.remaining_ms(skill_id))
             .unwrap_or(0)
     }
@@ -196,6 +204,28 @@ impl SkillHandler {
         if let Some(cd) = cooldowns.get_mut(&player_id) {
             cd.clear_all();
         }
+    }
+
+    /// 学习技能
+    pub fn learn_skill(&self, player: &Player, skill_id: u16) -> Result<(), SkillError> {
+        // 检查技能是否存在
+        let skill = match self.db.get(skill_id) {
+            Some(s) => s,
+            None => {
+                tracing::warn!("Skill {} not found in database", skill_id);
+                return Err(SkillError::SkillNotFound);
+            }
+        };
+
+        // 技能学习系统尚未实现，不返回假成功
+        tracing::warn!(
+            "Skill learning not yet implemented: player={}, skill_id={}, skill={}",
+            player.name,
+            skill_id,
+            skill.name
+        );
+
+        Err(SkillError::NotImplemented)
     }
 }
 
@@ -216,6 +246,7 @@ pub enum SkillError {
     Cooldown,
     InvalidTarget,
     NoTarget,
+    NotImplemented,
 }
 
 #[cfg(test)]

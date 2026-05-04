@@ -296,39 +296,9 @@ impl CashShopManager {
             };
         }
 
-        // 扣除点数
-        points.credit -= total_cost;
-        let remaining = points.credit;
-
-        // 更新每日购买记录
-        drop(cash);
-        self.record_daily_purchase(player.char_id, item_id, amount);
-
-        // 记录购买日志
-        self.log_purchase(
-            player.char_id,
-            item_id,
-            item.name.clone(),
-            amount,
-            total_cost,
-            PurchaseType::Buy,
-            None,
-        );
-
-        info!(
-            "Player {} purchased {}x {} for {} points, remaining: {}",
-            player.name, amount, item.name, total_cost, remaining
-        );
-
-        // TODO: 调用 Inventory 系统添加物品到玩家背包
-        // 在实际实现中，如果背包已满应返回 InventoryFull
-        // self.inventory.add_item(player, item_id, amount);
-
-        PurchaseResult::Success {
-            remaining_points: remaining,
-            item_name: item.name,
-            amount,
-        }
+        // 购买系统尚未完全实现（物品不会添加到背包），不扣除点数
+        warn!("Cash shop purchase not yet implemented: item_id={}, player={}", item_id, player.name);
+        PurchaseResult::InternalError("Cash shop purchase system not yet implemented".to_string())
     }
 
     /// 赠送物品给其他玩家
@@ -377,40 +347,9 @@ impl CashShopManager {
             };
         }
 
-        // 扣除点数
-        points.credit -= total_cost;
-        let remaining = points.credit;
-
-        // 更新每日购买记录
-        drop(cash);
-        self.record_daily_purchase(player.char_id, item_id, 1);
-
-        // 记录购买日志（礼物类型）
-        self.log_purchase(
-            player.char_id,
-            item_id,
-            item.name.clone(),
-            1,
-            total_cost,
-            PurchaseType::Gift,
-            Some(target_name.to_string()),
-        );
-
-        info!(
-            "Player {} gifted 1x {} to {} for {} points",
-            player.name, item.name, target_name, total_cost
-        );
-
-        // TODO: 实际实现中，应该：
-        // 1. 查询目标玩家是否在线
-        // 2. 如果在线，发送物品到收件箱
-        // 3. 如果不在线，将物品存入邮件系统
-
-        GiftResult::Success {
-            remaining_points: remaining,
-            item_name: item.name,
-            target_name: target_name.to_string(),
-        }
+        // 赠送系统尚未完全实现，不扣除点数
+        warn!("Cash shop gift not yet implemented: item_id={}, to={}", item_id, target_name);
+        GiftResult::InternalError("Cash shop gift system not yet implemented".to_string())
     }
 
     /// 检查每日购买限制
@@ -447,7 +386,8 @@ impl CashShopManager {
         None
     }
 
-    /// 记录每日购买
+    /// 记录每日购买（购买/赠送系统实现后启用）
+    #[allow(dead_code)]
     fn record_daily_purchase(&self, char_id: u32, item_id: u16, amount: u16) {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
@@ -469,7 +409,8 @@ impl CashShopManager {
         *record.items.entry(item_id).or_insert(0) += amount;
     }
 
-    /// 记录购买日志
+    /// 记录购买日志（购买/赠送系统实现后启用）
+    #[allow(dead_code)]
     fn log_purchase(
         &self,
         char_id: u32,
@@ -739,29 +680,19 @@ mod tests {
     }
 
     #[test]
-    fn test_purchase_success() {
+    fn test_purchase_returns_not_implemented() {
         let manager = create_test_manager();
         manager.set_cash_points(1, 0, 1000);
 
         let player = create_test_player();
         let result = manager.purchase(&player, 1001, 1);
 
-        match result {
-            PurchaseResult::Success {
-                remaining_points,
-                item_name,
-                amount,
-            } => {
-                assert_eq!(remaining_points, 920); // 1000 - 80 (discount price)
-                assert_eq!(item_name, "Red Potion");
-                assert_eq!(amount, 1);
-            }
-            _ => panic!("Expected success"),
-        }
+        // 购买系统未实现时应返回 InternalError，且不扣除点数
+        assert!(matches!(result, PurchaseResult::InternalError(_)));
 
-        // 检查点数是否已扣除
+        // 点数不应被扣除
         let points = manager.get_cash_points(1);
-        assert_eq!(points.credit, 920);
+        assert_eq!(points.credit, 1000);
     }
 
     #[test]
@@ -813,25 +744,19 @@ mod tests {
     }
 
     #[test]
-    fn test_gift_success() {
+    fn test_gift_returns_not_implemented() {
         let manager = create_test_manager();
         manager.set_cash_points(1, 0, 1000);
 
         let player = create_test_player();
         let result = manager.gift(&player, "OtherPlayer", 1001);
 
-        match result {
-            GiftResult::Success {
-                remaining_points,
-                item_name,
-                target_name,
-            } => {
-                assert_eq!(remaining_points, 920); // 1000 - 80 (discount price)
-                assert_eq!(item_name, "Red Potion");
-                assert_eq!(target_name, "OtherPlayer");
-            }
-            _ => panic!("Expected success"),
-        }
+        // 赠送系统未实现时应返回 InternalError，且不扣除点数
+        assert!(matches!(result, GiftResult::InternalError(_)));
+
+        // 点数不应被扣除
+        let points = manager.get_cash_points(1);
+        assert_eq!(points.credit, 1000);
     }
 
     #[test]
