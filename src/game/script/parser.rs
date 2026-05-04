@@ -53,15 +53,15 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
     }
 
     // select("选项1","选项2",...)
-    if let Some(opts) = line.strip_prefix("select(") {
-        if let Some(opts) = opts.strip_suffix(")") {
-            let options: Vec<String> = opts
-                .split(',')
-                .filter_map(|s| extract_string(s.trim()))
-                .collect();
-            if !options.is_empty() {
-                return Some(ScriptCommand::Select(options));
-            }
+    if let Some(opts) = line.strip_prefix("select(")
+        && let Some(opts) = opts.strip_suffix(")")
+    {
+        let options: Vec<String> = opts
+            .split(',')
+            .filter_map(|s| extract_string(s.trim()))
+            .collect();
+        if !options.is_empty() {
+            return Some(ScriptCommand::Select(options));
         }
     }
 
@@ -82,10 +82,10 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
 fn extract_string(s: &str) -> Option<String> {
     let s = s.trim();
     if s.starts_with('"') && s.ends_with('"') {
-        Some(s[1..s.len()-1].to_string())
+        Some(s[1..s.len() - 1].to_string())
     } else if s.starts_with('[') && s.ends_with(']') {
         // [NPC Name] 格式
-        Some(s[1..s.len()-1].to_string())
+        Some(s[1..s.len() - 1].to_string())
     } else {
         None
     }
@@ -128,12 +128,14 @@ mod tests {
 
     #[test]
     fn test_parse_multi_line() {
-        let node = parse_script(r#"
+        let node = parse_script(
+            r#"
             mes "Hello!";
             next;
             mes "How are you?";
             close;
-        "#);
+        "#,
+        );
         assert_eq!(node.commands.len(), 4);
     }
 }

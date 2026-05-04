@@ -3,24 +3,24 @@ use serde::{Deserialize, Serialize};
 /// 物品类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ItemType {
-    Heal,           // 恢复道具
-    Etc,            // 杂项
-    Weapon,         // 武器
-    Armor,          // 防具
-    Card,           // 卡片
-    PetEgg,         // 宠物蛋
-    PetArmor,       // 宠物装备
+    Heal,     // 恢复道具
+    Etc,      // 杂项
+    Weapon,   // 武器
+    Armor,    // 防具
+    Card,     // 卡片
+    PetEgg,   // 宠物蛋
+    PetArmor, // 宠物装备
 }
 
 /// 物品标志
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ItemFlag {
     None,
-    Identified,     // 已鉴定
-    Unique,         // 唯一
-    NonTradable,    // 不可交易
-    NoDrop,         // 不可丢弃
-    NoTrade,        // 交易限制
+    Identified,  // 已鉴定
+    Unique,      // 唯一
+    NonTradable, // 不可交易
+    NoDrop,      // 不可丢弃
+    NoTrade,     // 交易限制
 }
 
 /// 物品数据
@@ -33,19 +33,19 @@ pub struct Item {
     pub sell_price: u32,
     pub weight: u16,
     pub flags: u32,
-    pub hp_restore: u16,      // HP恢复量
-    pub sp_restore: u16,      // SP恢复量
-    pub equip_mask: u32,     // 装备位置掩码
-    pub atk: u16,             // 物理攻击
-    pub matk: u16,            // 魔法攻击
-    pub defense: u16,         // 防御
-    pub magic_defense: u16,   // 魔法防御
-    pub str_bonus: i16,       // STR加成
-    pub agi_bonus: i16,       // AGI加成
-    pub vit_bonus: i16,       // VIT加成
-    pub int_bonus: i16,       // INT加成
-    pub dex_bonus: i16,       // DEX加成
-    pub luk_bonus: i16,       // LUK加成
+    pub hp_restore: u16,    // HP恢复量
+    pub sp_restore: u16,    // SP恢复量
+    pub equip_mask: u32,    // 装备位置掩码
+    pub atk: u16,           // 物理攻击
+    pub matk: u16,          // 魔法攻击
+    pub defense: u16,       // 防御
+    pub magic_defense: u16, // 魔法防御
+    pub str_bonus: i16,     // STR加成
+    pub agi_bonus: i16,     // AGI加成
+    pub vit_bonus: i16,     // VIT加成
+    pub int_bonus: i16,     // INT加成
+    pub dex_bonus: i16,     // DEX加成
+    pub luk_bonus: i16,     // LUK加成
 }
 
 impl Default for Item {
@@ -106,97 +106,115 @@ impl ItemDatabase {
 
     fn init_default_items(&mut self) {
         // 红色药水
-        self.items.insert(501, Item {
-            id: 501,
-            name: "Red Potion",
-            type_: ItemType::Heal,
-            buy_price: 50,
-            sell_price: 25,
-            weight: 7,
-            flags: 0,
-            hp_restore: 120,
-            sp_restore: 0,
-            equip_mask: 0,
-            ..Default::default()
-        });
+        self.items.insert(
+            501,
+            Item {
+                id: 501,
+                name: "Red Potion",
+                type_: ItemType::Heal,
+                buy_price: 50,
+                sell_price: 25,
+                weight: 7,
+                flags: 0,
+                hp_restore: 120,
+                sp_restore: 0,
+                equip_mask: 0,
+                ..Default::default()
+            },
+        );
 
         // 黄色药水
-        self.items.insert(502, Item {
-            id: 502,
-            name: "Yellow Potion",
-            type_: ItemType::Heal,
-            buy_price: 40,
-            sell_price: 20,
-            weight: 5,
-            flags: 0,
-            hp_restore: 60,
-            sp_restore: 0,
-            equip_mask: 0,
-            ..Default::default()
-        });
+        self.items.insert(
+            502,
+            Item {
+                id: 502,
+                name: "Yellow Potion",
+                type_: ItemType::Heal,
+                buy_price: 40,
+                sell_price: 20,
+                weight: 5,
+                flags: 0,
+                hp_restore: 60,
+                sp_restore: 0,
+                equip_mask: 0,
+                ..Default::default()
+            },
+        );
 
         // 蓝色药水
-        self.items.insert(503, Item {
-            id: 503,
-            name: "Blue Potion",
-            type_: ItemType::Heal,
-            buy_price: 50,
-            sell_price: 25,
-            weight: 7,
-            flags: 0,
-            hp_restore: 0,
-            sp_restore: 40,
-            equip_mask: 0,
-            ..Default::default()
-        });
+        self.items.insert(
+            503,
+            Item {
+                id: 503,
+                name: "Blue Potion",
+                type_: ItemType::Heal,
+                buy_price: 50,
+                sell_price: 25,
+                weight: 7,
+                flags: 0,
+                hp_restore: 0,
+                sp_restore: 40,
+                equip_mask: 0,
+                ..Default::default()
+            },
+        );
 
         // 短剑
-        self.items.insert(1201, Item {
-            id: 1201,
-            name: "Dagger",
-            type_: ItemType::Weapon,
-            buy_price: 1000,
-            sell_price: 500,
-            weight: 50,
-            flags: 0,
-            hp_restore: 0,
-            sp_restore: 0,
-            equip_mask: 0x0001,  // 右手
-            atk: 10,
-            ..Default::default()
-        });
+        self.items.insert(
+            1201,
+            Item {
+                id: 1201,
+                name: "Dagger",
+                type_: ItemType::Weapon,
+                buy_price: 1000,
+                sell_price: 500,
+                weight: 50,
+                flags: 0,
+                hp_restore: 0,
+                sp_restore: 0,
+                equip_mask: 0x0001, // 右手
+                atk: 10,
+                ..Default::default()
+            },
+        );
 
         // 盗贼短剑
-        self.items.insert(1202, Item {
-            id: 1202,
-            name: "Main Gauche",
-            type_: ItemType::Weapon,
-            buy_price: 2500,
-            sell_price: 1250,
-            weight: 60,
-            flags: 0,
-            hp_restore: 0,
-            sp_restore: 0,
-            equip_mask: 0x0001,
-            atk: 15,
-            ..Default::default()
-        });
+        self.items.insert(
+            1202,
+            Item {
+                id: 1202,
+                name: "Main Gauche",
+                type_: ItemType::Weapon,
+                buy_price: 2500,
+                sell_price: 1250,
+                weight: 60,
+                flags: 0,
+                hp_restore: 0,
+                sp_restore: 0,
+                equip_mask: 0x0001,
+                atk: 15,
+                ..Default::default()
+            },
+        );
 
         // 布甲
-        self.items.insert(1501, Item {
-            id: 1501,
-            name: "Clothes",
-            type_: ItemType::Armor,
-            buy_price: 500,
-            sell_price: 250,
-            weight: 40,
-            flags: 0,
-            hp_restore: 0,
-            sp_restore: 0,
-            equip_mask: 0x0008,  // 身体
-            defense: 2,
-            ..Default::default()
-        });
+        self.items.insert(
+            1501,
+            Item {
+                id: 1501,
+                name: "Clothes",
+                type_: ItemType::Armor,
+                buy_price: 500,
+                sell_price: 250,
+                weight: 40,
+                flags: 0,
+                hp_restore: 0,
+                sp_restore: 0,
+                equip_mask: 0x0008, // 身体
+                defense: 2,
+                ..Default::default()
+            },
+        );
     }
 
     pub fn get(&self, item_id: u16) -> Option<&Item> {

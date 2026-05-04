@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::game::script::commands::{ScriptCommand, ScriptNode};
+use uuid::Uuid;
 
 /// NPC 对话状态
 pub struct NpcDialogueState {
@@ -41,9 +41,7 @@ impl NpcDialogueState {
                 DialogueResponse::Pending
             }
 
-            ScriptCommand::Close | ScriptCommand::End => {
-                DialogueResponse::Closed
-            }
+            ScriptCommand::Close | ScriptCommand::End => DialogueResponse::Closed,
 
             ScriptCommand::Select(options) => {
                 self.current_index += 1;
@@ -76,7 +74,7 @@ impl NpcDialogueState {
     }
 
     /// 处理玩家输入（如选择菜单）
-    pub fn handle_input(&mut self, input: usize) -> DialogueResponse {
+    pub fn handle_input(&mut self, _input: usize) -> DialogueResponse {
         self.pending_next = false;
         self.process()
     }
@@ -112,18 +110,16 @@ mod tests {
 
     #[test]
     fn test_simple_dialogue() {
-        let script = parse_script(r#"
+        let script = parse_script(
+            r#"
             mes "Hello!";
             next;
             mes "How are you?";
             close;
-        "#);
-
-        let state = NpcDialogueState::new(
-            Uuid::new_v4(),
-            1,
-            script,
+        "#,
         );
+
+        let state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
 
         assert!(state.is_active());
     }
@@ -174,10 +170,12 @@ mod tests {
 
     #[test]
     fn test_dialogue_close() {
-        let script = parse_script(r#"
+        let script = parse_script(
+            r#"
             mes "Goodbye!";
             close;
-        "#);
+        "#,
+        );
 
         let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
 

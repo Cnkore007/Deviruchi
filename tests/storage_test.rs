@@ -130,8 +130,8 @@ fn test_storage_remove_all() {
     assert_eq!(slot.item_id, 0);
 }
 
-use std::sync::Arc;
 use deviruchi::game::storage::manager::StorageManager;
+use std::sync::Arc;
 
 #[test]
 fn test_storage_manager_get_or_create() {

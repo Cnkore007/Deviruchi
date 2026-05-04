@@ -1,13 +1,15 @@
 //! 角色选择业务逻辑
 
 use std::sync::Arc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
-use crate::protocol::map_packets::{SCCharList, CHEnter, CHMakeChar, CharInfo, HCNotifyZoneServer};
+use crate::game::token::TokenStore;
+use crate::network::session::{Session, SessionManager};
+use crate::protocol::map_packets::{CHEnter, CHMakeChar, CharInfo, HCNotifyZoneServer, SCCharList};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
-use crate::network::session::{SessionManager, Session};
-use crate::game::token::TokenStore;
+#[cfg(test)]
+use crate::storage::{init_schema, Character};
 
 /// 角色服务器
 pub struct CharServer {
@@ -17,6 +19,7 @@ pub struct CharServer {
     token_store: Arc<TokenStore>,
     map_ip: String,
     map_port: u16,
+    map_server_id: u32,
 }
 
 impl CharServer {
@@ -31,6 +34,7 @@ impl CharServer {
             token_store,
             map_ip: "127.0.0.1".to_string(),
             map_port: 6121,
+            map_server_id: 1,
         }
     }
 
@@ -40,8 +44,20 @@ impl CharServer {
         self
     }
 
+    /// 设置 Map Server ID
+    #[allow(dead_code)]
+    pub fn with_map_server_id(mut self, server_id: u32) -> Self {
+        self.map_server_id = server_id;
+        self
+    }
+
     /// 根据 packet_id 分发处理
-    pub fn handle_packet(&self, packet_id: u16, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub fn handle_packet(
+        &self,
+        packet_id: u16,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         match packet_id {
             0x0066 => self.handle_request_char_list(session),
             0x0067 => self.handle_make_char(data, session),
@@ -66,9 +82,18 @@ impl CharServer {
             .map(|c| self.db.character_to_char_info(c))
             .collect();
 
-        info!("Sending {} characters for account_id={}", char_infos.len(), account_id);
+        info!(
+            "Sending {} characters for account_id={}",
+            char_infos.len(),
+            account_id
+        );
 
-        Some(SCCharList { characters: char_infos }.to_packet())
+        Some(
+            SCCharList {
+                characters: char_infos,
+            }
+            .to_packet(),
+        )
     }
 
     /// 处理创建角色 (0x0067)
@@ -104,7 +129,10 @@ impl CharServer {
             make_char.hair_color,
         ) {
             Ok(char_id) => {
-                info!("Character created: char_id={}, name={}", char_id, make_char.name);
+                info!(
+                    "Character created: char_id={}, name={}",
+                    char_id, make_char.name
+                );
                 Some(vec![0]) // 成功响应
             }
             Err(e) => {
@@ -131,35 +159,41 @@ impl CharServer {
         let valid_char = characters.iter().any(|c| c.char_id == enter.char_id);
 
         if !valid_char {
-            warn!("Invalid char selection: char_id={} not owned by account_id={}", enter.char_id, account_id);
+            warn!(
+                "Invalid char selection: char_id={} not owned by account_id={}",
+                enter.char_id, account_id
+            );
             return Some(vec![0]); // 失败响应
         }
 
         // 设置 session.char_id
         session.char_id = Some(enter.char_id);
 
-        // Generate one-time token for Char→Map transition
-        let token = self.token_store.create(account_id, enter.char_id);
+        // Generate one-time token for Char→Map transition with target map server ID
+        let token = self
+            .token_store
+            .create(account_id, enter.char_id, self.map_server_id);
 
         info!(
-            "Character selected: char_id={}, token generated for map {}:{}",
-            enter.char_id, self.map_ip, self.map_port
+            "Character selected: char_id={}, token generated for map server {} ({}:{})",
+            enter.char_id, self.map_server_id, self.map_ip, self.map_port
         );
 
         // Return HCNotifyZoneServer with map server info
-        Some(HCNotifyZoneServer {
-            map_ip: self.map_ip.clone(),
-            map_port: self.map_port,
-            token,
-        }.to_packet())
+        Some(
+            HCNotifyZoneServer {
+                map_ip: self.map_ip.clone(),
+                map_port: self.map_port,
+                token,
+            }
+            .to_packet(),
+        )
     }
 
     /// 查找空槽位 (0-8)
     fn find_empty_slot(&self, characters: &[crate::storage::Character]) -> Option<u8> {
-        let used_slots: std::collections::HashSet<u8> = characters
-            .iter()
-            .map(|c| c.char_num)
-            .collect();
+        let used_slots: std::collections::HashSet<u8> =
+            characters.iter().map(|c| c.char_num).collect();
 
         for slot in 0..9 {
             if !used_slots.contains(&slot) {
@@ -168,5 +202,284 @@ impl CharServer {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::map_packets::{CHEnter, CHMakeChar};
+
+    fn create_test_server() -> CharServer {
+        let db = Arc::new(Database::open_memory().unwrap());
+        init_schema(&db).unwrap();
+
+        // 创建测试账户
+        db.create_account("test_user", "password_hash", 1).unwrap();
+
+        CharServer::new(
+            db,
+            Arc::new(SessionManager::new()),
+            Arc::new(TokenStore::new()),
+        )
+    }
+
+    fn create_session_with_account(account_id: u32) -> Session {
+        let mut session = Session::new();
+        session.account_id = Some(account_id);
+        session
+    }
+
+    #[test]
+    fn test_handle_request_char_list_returns_empty_for_new_account() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 新账户没有角色，应该返回空的角色列表
+        let result = server.handle_request_char_list(&mut session);
+        assert!(result.is_some());
+
+        let packet_data = result.unwrap();
+        // SCCharList 的 packet_id 是 0x0066
+        assert!(!packet_data.is_empty());
+    }
+
+    #[test]
+    fn test_handle_request_char_list_requires_account_id() {
+        let server = create_test_server();
+        let mut session = Session::new(); // 没有 account_id
+
+        let result = server.handle_request_char_list(&mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_select_char_returns_none_without_account_id() {
+        let server = create_test_server();
+        let mut session = Session::new();
+
+        let data = CHEnter { char_id: 1 }.to_packet();
+
+        let result = server.handle_select_char(&data, &mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_select_char_returns_error_for_invalid_char() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        let data = CHEnter {
+            char_id: 9999, // 不存在的角色ID
+        }
+        .to_packet();
+
+        // 账户1没有角色，应该返回失败响应
+        let result = server.handle_select_char(&data, &mut session);
+        assert!(result.is_some());
+        // 失败时返回 vec![0]
+        let packet_data = result.unwrap();
+        assert_eq!(packet_data, vec![0]);
+    }
+
+    #[test]
+    fn test_handle_select_char_success() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 先创建一个角色
+        let char_id = server
+            .db
+            .create_character(1, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .unwrap();
+
+        // 现在选择这个角色
+        let data = CHEnter { char_id }.to_packet();
+
+        let result = server.handle_select_char(&data, &mut session);
+        assert!(result.is_some());
+
+        // 应该返回 HCNotifyZoneServer 包 (map_ip, map_port, token)
+        let packet_data = result.unwrap();
+        assert!(!packet_data.is_empty());
+    }
+
+    #[test]
+    fn test_handle_make_char_requires_account_id() {
+        let server = create_test_server();
+        let mut session = Session::new();
+
+        let data = CHMakeChar {
+            name: "NewChar".to_string(),
+            str: 10,
+            agi: 10,
+            vit: 10,
+            int: 10,
+            dex: 10,
+            luk: 10,
+            hair_color: 0,
+            hair: 1,
+        }
+        .to_packet();
+
+        let result = server.handle_make_char(&data, &mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_handle_make_char_success() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        let data = CHMakeChar {
+            name: "NewChar".to_string(),
+            str: 10,
+            agi: 10,
+            vit: 10,
+            int: 10,
+            dex: 10,
+            luk: 10,
+            hair_color: 0,
+            hair: 1,
+        }
+        .to_packet();
+
+        let result = server.handle_make_char(&data, &mut session);
+        assert!(result.is_some());
+        // 成功时返回 vec![0]
+        let packet_data = result.unwrap();
+        assert_eq!(packet_data, vec![0]);
+    }
+
+    #[test]
+    fn test_find_empty_slot() {
+        let server = create_test_server();
+
+        // 没有角色时，应该返回槽位 0
+        let result = server.find_empty_slot(&[]);
+        assert_eq!(result, Some(0));
+
+        // 槽位0已使用时，应该返回槽位1
+        let chars = vec![Character {
+            char_id: 1,
+            char_num: 0,
+            name: "Char0".to_string(),
+            class: 0,
+            base_level: 1,
+            job_level: 1,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 40,
+            max_hp: 40,
+            sp: 11,
+            max_sp: 11,
+            hair: 1,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "new_1-1.gat".to_string(),
+            last_x: 53,
+            last_y: 111,
+            save_map: "new_1-1.gat".to_string(),
+            save_x: 53,
+            save_y: 111,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
+        }];
+        let result = server.find_empty_slot(&chars);
+        assert_eq!(result, Some(1));
+
+        // 所有槽位已满时，应该返回 None
+        let mut full_chars: Vec<Character> = (0..9)
+            .map(|i| Character {
+                char_id: i as u32 + 1,
+                char_num: i as u8,
+                name: format!("Char{}", i),
+                class: 0,
+                base_level: 1,
+                job_level: 1,
+                base_exp: 0,
+                job_exp: 0,
+                zeny: 0,
+                str: 1,
+                agi: 1,
+                vit: 1,
+                int: 1,
+                dex: 1,
+                luk: 1,
+                hp: 40,
+                max_hp: 40,
+                sp: 11,
+                max_sp: 11,
+                hair: 1,
+                hair_color: 0,
+                clothes_color: 0,
+                weapon: 0,
+                shield: 0,
+                head_top: 0,
+                head_mid: 0,
+                head_bottom: 0,
+                last_map: "new_1-1.gat".to_string(),
+                last_x: 53,
+                last_y: 111,
+                save_map: "new_1-1.gat".to_string(),
+                save_x: 53,
+                save_y: 111,
+                delete_timer: 0,
+                created_at: 0,
+                updated_at: 0,
+            })
+            .collect();
+        let result = server.find_empty_slot(&full_chars);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_handle_packet_dispatches_correctly() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        // 测试未知包ID
+        let result = server.handle_packet(0xFFFF, &[], &mut session);
+        assert!(result.is_none());
+
+        // 测试 0x0066 (请求角色列表)
+        let result = server.handle_packet(0x0066, &[], &mut session);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_char_server_with_map_server_config() {
+        let server = create_test_server()
+            .with_map_server("192.168.1.100", 6122)
+            .with_map_server_id(5);
+
+        // 验证配置已设置
+        let mut session = create_session_with_account(1);
+
+        // 创建一个角色
+        let char_id = server
+            .db
+            .create_character(1, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .unwrap();
+
+        // 选择角色，验证返回的map服务器信息
+        let data = CHEnter { char_id }.to_packet();
+        let result = server.handle_select_char(&data, &mut session);
+
+        assert!(result.is_some());
+        // HCNotifyZoneServer 包包含服务器信息
     }
 }

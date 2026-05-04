@@ -19,13 +19,11 @@ impl GuildStorage {
 
     /// 保存公会（插入或更新）
     pub fn save_guild(&self, guild: &Guild) -> Result<()> {
-        let existing_id: Option<i64> = self
-            .db
-            .query_row_optional(
-                "SELECT guild_id FROM guilds WHERE guild_uuid = ?1",
-                [&guild.id.to_string()],
-                |row| row.get(0),
-            )?;
+        let existing_id: Option<i64> = self.db.query_row_optional(
+            "SELECT guild_id FROM guilds WHERE guild_uuid = ?1",
+            [&guild.id.to_string()],
+            |row| row.get(0),
+        )?;
 
         let guild_db_id: i64 = if let Some(id) = existing_id {
             self.db.execute_with_params(
@@ -71,8 +69,10 @@ impl GuildStorage {
         };
 
         // 删除旧数据并重新插入职位和成员
-        self.db
-            .execute_with_params("DELETE FROM guild_positions WHERE guild_id=?1", [guild_db_id])?;
+        self.db.execute_with_params(
+            "DELETE FROM guild_positions WHERE guild_id=?1",
+            [guild_db_id],
+        )?;
         self.db
             .execute_with_params("DELETE FROM guild_members WHERE guild_id=?1", [guild_db_id])?;
 
@@ -119,31 +119,42 @@ impl GuildStorage {
 
     /// 加载单个公会
     pub fn load_guild(&self, guild_uuid: &Uuid) -> Result<Option<Guild>> {
-        let row = self
-            .db
-            .query_row_optional(
-                "SELECT guild_id, name, master_name, guild_lv, exp, max_exp, member_count,
+        let row = self.db.query_row_optional(
+            "SELECT guild_id, name, master_name, guild_lv, exp, max_exp, member_count,
                         max_members, average_level, notice, emblem_id
                  FROM guilds WHERE guild_uuid = ?1",
-                [guild_uuid.to_string()],
-                |row| {
-                    Ok((
-                        row.get::<_, i64>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, String>(2)?,
-                        row.get::<_, i64>(3)? as u8,
-                        row.get::<_, i64>(4)? as u64,
-                        row.get::<_, i64>(5)? as u64,
-                        row.get::<_, i64>(6)? as u32,
-                        row.get::<_, i64>(7)? as u32,
-                        row.get::<_, i64>(8)? as u16,
-                        row.get::<_, String>(9)?,
-                        row.get::<_, i64>(10)? as u32,
-                    ))
-                },
-            )?;
+            [guild_uuid.to_string()],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)? as u8,
+                    row.get::<_, i64>(4)? as u64,
+                    row.get::<_, i64>(5)? as u64,
+                    row.get::<_, i64>(6)? as u32,
+                    row.get::<_, i64>(7)? as u32,
+                    row.get::<_, i64>(8)? as u16,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, i64>(10)? as u32,
+                ))
+            },
+        )?;
 
-        let Some((guild_db_id, name, master_name, level, exp, max_exp, member_count, max_members, average_level, notice, emblem_id)) = row else {
+        let Some((
+            guild_db_id,
+            name,
+            master_name,
+            level,
+            exp,
+            max_exp,
+            member_count,
+            max_members,
+            average_level,
+            notice,
+            emblem_id,
+        )) = row
+        else {
             return Ok(None);
         };
 
@@ -208,18 +219,17 @@ impl GuildStorage {
 
     /// 加载所有公会
     pub fn load_all_guilds(&self) -> Result<Vec<Guild>> {
-        let guild_uuids: Vec<String> = self.db.query(
-            "SELECT guild_uuid FROM guilds",
-            [],
-            |row| row.get::<_, String>(0),
-        )?;
+        let guild_uuids: Vec<String> =
+            self.db.query("SELECT guild_uuid FROM guilds", [], |row| {
+                row.get::<_, String>(0)
+            })?;
 
         let mut guilds = Vec::new();
         for uuid_str in guild_uuids {
-            if let Ok(uuid) = Uuid::parse_str(&uuid_str) {
-                if let Some(guild) = self.load_guild(&uuid)? {
-                    guilds.push(guild);
-                }
+            if let Ok(uuid) = Uuid::parse_str(&uuid_str)
+                && let Some(guild) = self.load_guild(&uuid)?
+            {
+                guilds.push(guild);
             }
         }
         Ok(guilds)

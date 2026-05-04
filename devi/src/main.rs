@@ -1,11 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use bevy::prelude::*;
-use devi::game::map::GameMap;
-use devi::render::tile::{setup_map, setup_local_player};
-use devi::render::camera::follow_camera;
 use devi::game::input::handle_input;
+use devi::game::map::GameMap;
 use devi::network::{NetworkClient, NetworkResource};
+use devi::render::camera::follow_camera;
+use devi::render::tile::{setup_local_player, setup_map};
 use std::sync::Arc;
 
 async fn init_network(network: Arc<tokio::sync::Mutex<Option<NetworkClient>>>) {

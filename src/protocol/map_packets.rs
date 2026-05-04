@@ -1,4 +1,4 @@
-use super::packet_builder::{PacketBuilder, Packed, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
 
 const NAME_LENGTH: usize = 24;
 
@@ -106,9 +106,7 @@ pub struct CHEnter {
 
 impl Packed for CHEnter {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0065)
-            .put_u32(self.char_id)
-            .build()
+        PacketBuilder::new(0x0065).put_u32(self.char_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -215,7 +213,11 @@ impl Packed for CZRequestAction {
         let account_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
         let target_id = u32::from_le_bytes([slice[4], slice[5], slice[6], slice[7]]);
         let action_type = slice[8];
-        Some(Self { account_id, target_id, action_type })
+        Some(Self {
+            account_id,
+            target_id,
+            action_type,
+        })
     }
 }
 

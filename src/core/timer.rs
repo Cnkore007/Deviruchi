@@ -1,12 +1,14 @@
-use std::collections::BinaryHeap;
-use std::cmp::Ordering;
-use std::time::{Duration, Instant};
-use parking_lot::Mutex;
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+use std::time::{Duration, Instant};
 
-static TIMER_QUEUE: Lazy<Mutex<BinaryHeap<TimerEntry>>> = Lazy::new(|| Mutex::new(BinaryHeap::new()));
+static TIMER_QUEUE: Lazy<Mutex<BinaryHeap<TimerEntry>>> =
+    Lazy::new(|| Mutex::new(BinaryHeap::new()));
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TimerId(u64);
 
 impl TimerId {
@@ -70,7 +72,8 @@ impl Timer {
         let due = Instant::now() + interval;
 
         // 使用 Arc<dyn Fn()> 实现重复调用的回调
-        let callback: std::sync::Arc<dyn Fn() + Send + Sync + 'static> = std::sync::Arc::new(callback);
+        let callback: std::sync::Arc<dyn Fn() + Send + Sync + 'static> =
+            std::sync::Arc::new(callback);
         let callback_clone = callback.clone();
 
         let wrapper = std::sync::Arc::new(move || {
@@ -83,7 +86,11 @@ impl Timer {
             TIMER_QUEUE.lock().push(entry);
         });
 
-        let entry = TimerEntry { due, id, callback: wrapper };
+        let entry = TimerEntry {
+            due,
+            id,
+            callback: wrapper,
+        };
         TIMER_QUEUE.lock().push(entry);
         TimerId(id)
     }

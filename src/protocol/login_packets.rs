@@ -1,4 +1,4 @@
-use super::packet_builder::{PacketBuilder, Packed, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
 
 /// 客户端登录请求 (0x0064)
 #[derive(Debug, Clone)]
@@ -25,7 +25,11 @@ impl Packed for CALogin {
         let mut offset = 4;
         let username = parse_fixed_string(slice, &mut offset, 24)?;
         let password = parse_fixed_string(slice, &mut offset, 24)?;
-        Some(Self { version, username, password })
+        Some(Self {
+            version,
+            username,
+            password,
+        })
     }
 }
 
@@ -61,9 +65,7 @@ pub struct ACRefuseLogin {
 
 impl Packed for ACRefuseLogin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x006A)
-            .put_u8(self.error_code)
-            .build()
+        PacketBuilder::new(0x006A).put_u8(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -79,9 +81,7 @@ pub struct SCNotifyBan {
 
 impl Packed for SCNotifyBan {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0081)
-            .put_u32(self.error_code)
-            .build()
+        PacketBuilder::new(0x0081).put_u32(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -110,6 +110,9 @@ impl Packed for CAConnectInfo {
         }
         let version = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
         let client_type = slice[4];
-        Some(Self { version, client_type })
+        Some(Self {
+            version,
+            client_type,
+        })
     }
 }

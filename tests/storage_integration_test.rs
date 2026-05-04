@@ -1,5 +1,5 @@
+use deviruchi::game::storage::{Storage, StorageManager};
 use std::sync::Arc;
-use deviruchi::game::storage::{StorageManager, Storage};
 
 #[test]
 fn test_storage_full_workflow() {
@@ -92,8 +92,8 @@ fn test_storage_merge_on_move() {
 
 #[test]
 fn test_storage_concurrent_access() {
-    use std::thread;
     use parking_lot::RwLock;
+    use std::thread;
 
     let manager = Arc::new(RwLock::new(StorageManager::new()));
 
@@ -144,8 +144,9 @@ fn test_storage_db_persistence() {
             card2 INTEGER NOT NULL,
             card3 INTEGER NOT NULL,
             PRIMARY KEY (char_id, slot_index)
-        )"
-    ).expect("Failed to create storage table");
+        )",
+    )
+    .expect("Failed to create storage table");
 
     // Create and populate storage
     let mut storage = Storage::new(100);
@@ -178,8 +179,18 @@ fn test_storage_packet_serialization() {
 
     // Test ZCStorageItems serialization
     let items = vec![
-        StorageItem { index: 0, item_id: 501, amount: 10, identified: true },
-        StorageItem { index: 1, item_id: 502, amount: 5, identified: false },
+        StorageItem {
+            index: 0,
+            item_id: 501,
+            amount: 10,
+            identified: true,
+        },
+        StorageItem {
+            index: 1,
+            item_id: 502,
+            amount: 5,
+            identified: false,
+        },
     ];
     let packet = ZCStorageItems { count: 2, items };
     let data = packet.to_packet();

@@ -1,5 +1,5 @@
-use crate::game::map::Player;
 use super::data::{Skill, SkillType};
+use crate::game::map::Player;
 
 /// 技能效果应用
 pub struct SkillEffect;
@@ -18,7 +18,7 @@ impl SkillEffect {
 
     fn apply_attack(skill: &Skill, _caster: &Player, _target: &Player, level: u8) -> SkillResult {
         // 计算伤害 (简化版，实际需要引用战斗公式)
-        let base_damage = skill.damage as i32 * level as i32 / 10;
+        let base_damage = skill.damage * level as i32 / 10;
         SkillResult::Damage {
             damage: base_damage,
             element: skill.element,
@@ -27,7 +27,7 @@ impl SkillEffect {
     }
 
     fn apply_healing(skill: &Skill, caster: &Player, _target: &Player, level: u8) -> SkillResult {
-        let heal_amount = skill.damage as i32 * level as i32 / 10;
+        let heal_amount = skill.damage * level as i32 / 10;
         let matk = *caster.int.read() * 2 + *caster.dex.read();
         let total_heal = (heal_amount * matk as i32 / 100).max(1);
 
@@ -56,8 +56,20 @@ impl SkillEffect {
 #[derive(Debug, Clone)]
 pub enum SkillResult {
     None,
-    Damage { damage: i32, element: u8, hit_bonus: i16 },
-    Heal { amount: u32 },
-    Buff { buff_type: u16, duration: u32 },
-    Debuff { debuff_type: u16, duration: u32 },
+    Damage {
+        damage: i32,
+        element: u8,
+        hit_bonus: i16,
+    },
+    Heal {
+        amount: u32,
+    },
+    Buff {
+        buff_type: u16,
+        duration: u32,
+    },
+    Debuff {
+        debuff_type: u16,
+        duration: u32,
+    },
 }

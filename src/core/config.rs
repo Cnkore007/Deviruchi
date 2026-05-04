@@ -6,14 +6,13 @@
 //! - 默认值自动创建
 //! - 分层配置 (默认 < 文件 < 命令行)
 
+use anyhow::{Context, Result};
+use notify::{Config as NotifyConfig, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use parking_lot::RwLock;
-use anyhow::{Context, Result};
-use notify::{Watcher, RecommendedWatcher, RecursiveMode, Event, Config as NotifyConfig};
-use std::sync::mpsc::{channel, Receiver};
-use std::time::Duration;
+use std::sync::mpsc::{Receiver, channel};
 
 /// 服务器配置
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -44,17 +43,13 @@ pub struct ServerConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ServerMode {
+    #[default]
     All,
     Login,
     Char,
     Map,
-}
-
-impl Default for ServerMode {
-    fn default() -> Self {
-        ServerMode::All
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -164,6 +159,9 @@ pub struct BattleConfig {
     pub natural_heal_interval_ms: u64,
     pub natural_heal_threshold_hp: u32,
     pub natural_heal_threshold_sp: u32,
+    pub battle_heal_penalty: bool,     // 战斗惩罚开关
+    pub overweight_heal_penalty: bool, // 超重惩罚开关
+    pub status_heal_modifier: bool,    // 状态效果修饰开关
 }
 
 impl Default for BattleConfig {
@@ -187,6 +185,9 @@ impl Default for BattleConfig {
             natural_heal_interval_ms: 6000,
             natural_heal_threshold_hp: 50,
             natural_heal_threshold_sp: 50,
+            battle_heal_penalty: true,
+            overweight_heal_penalty: true,
+            status_heal_modifier: true,
         }
     }
 }
@@ -460,8 +461,8 @@ impl Config {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("读取配置文件失败: {:?}", path))?;
 
-        let config: Config = toml::from_str(&content)
-            .with_context(|| format!("解析配置文件失败: {:?}", path))?;
+        let config: Config =
+            toml::from_str(&content).with_context(|| format!("解析配置文件失败: {:?}", path))?;
 
         Ok(config)
     }
@@ -527,10 +528,10 @@ impl HotReloadConfig {
     pub fn check_reload(&self) -> bool {
         if let Some(rx) = &self.receiver {
             while let Ok(result) = rx.try_recv() {
-                if let Ok(event) = result {
-                    if event.kind.is_modify() {
-                        return true;
-                    }
+                if let Ok(event) = result
+                    && event.kind.is_modify()
+                {
+                    return true;
                 }
             }
         }

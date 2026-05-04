@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use super::data::{ExpShareMode, ItemShareMode, Party, PartyMember};
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
-use super::data::{Party, PartyMember, ExpShareMode, ItemShareMode};
 
 pub struct PartyManager {
     parties: RwLock<HashMap<Uuid, Party>>,
@@ -68,10 +68,10 @@ impl PartyManager {
             party.members.retain(|m| m.player_id != *player_id);
 
             // Transfer leader if needed
-            if party.leader_id == *player_id {
-                if let Some(new_leader) = party.members.first() {
-                    party.leader_id = new_leader.player_id;
-                }
+            if party.leader_id == *player_id
+                && let Some(new_leader) = party.members.first()
+            {
+                party.leader_id = new_leader.player_id;
             }
 
             // Remove empty party
@@ -94,7 +94,11 @@ impl PartyManager {
 
     /// Check if a player is the leader of a party
     pub fn is_leader(&self, party_id: &Uuid, player_id: &Uuid) -> bool {
-        self.parties.read().get(party_id).map(|p| p.leader_id == *player_id).unwrap_or(false)
+        self.parties
+            .read()
+            .get(party_id)
+            .map(|p| p.leader_id == *player_id)
+            .unwrap_or(false)
     }
 
     /// Kick a member from party (only leader can do this)
@@ -121,12 +125,12 @@ impl PartyManager {
         };
 
         let mut parties = self.parties.write();
-        if let Some(party) = parties.get_mut(&party_id) {
-            if let Some(member) = party.members.iter_mut().find(|m| m.player_id == *player_id) {
-                member.map_name = map_name.to_string();
-                member.hp = hp;
-                member.max_hp = max_hp;
-            }
+        if let Some(party) = parties.get_mut(&party_id)
+            && let Some(member) = party.members.iter_mut().find(|m| m.player_id == *player_id)
+        {
+            member.map_name = map_name.to_string();
+            member.hp = hp;
+            member.max_hp = max_hp;
         }
     }
 }
@@ -168,11 +172,18 @@ mod tests {
         let party = manager.create_party("Test Party", leader_id, "Leader".to_string());
         let party_id = party.id;
 
-        manager.join_party(&party_id, member_id, "Member".to_string()).unwrap();
+        manager
+            .join_party(&party_id, member_id, "Member".to_string())
+            .unwrap();
 
         let updated_party = manager.get_party(&party_id).unwrap();
         assert_eq!(updated_party.members.len(), 2);
-        assert!(updated_party.members.iter().any(|m| m.player_id == member_id));
+        assert!(
+            updated_party
+                .members
+                .iter()
+                .any(|m| m.player_id == member_id)
+        );
     }
 
     #[test]
@@ -184,7 +195,9 @@ mod tests {
         let party = manager.create_party("Test Party", leader_id, "Leader".to_string());
         let party_id = party.id;
 
-        manager.join_party(&party_id, member_id, "Member".to_string()).unwrap();
+        manager
+            .join_party(&party_id, member_id, "Member".to_string())
+            .unwrap();
 
         // Leader leaves
         manager.leave_party(&leader_id);
@@ -192,7 +205,12 @@ mod tests {
         let updated_party = manager.get_party(&party_id).unwrap();
         assert_eq!(updated_party.members.len(), 1);
         assert_eq!(updated_party.leader_id, member_id);
-        assert!(!updated_party.members.iter().any(|m| m.player_id == leader_id));
+        assert!(
+            !updated_party
+                .members
+                .iter()
+                .any(|m| m.player_id == leader_id)
+        );
     }
 
     #[test]
@@ -228,7 +246,9 @@ mod tests {
         let party = manager.create_party("Test Party", leader_id, "Leader".to_string());
         let party_id = party.id;
 
-        manager.join_party(&party_id, member_id, "Member".to_string()).unwrap();
+        manager
+            .join_party(&party_id, member_id, "Member".to_string())
+            .unwrap();
 
         assert!(manager.is_leader(&party_id, &leader_id));
         assert!(!manager.is_leader(&party_id, &member_id));
@@ -243,14 +263,21 @@ mod tests {
         let party = manager.create_party("Test Party", leader_id, "Leader".to_string());
         let party_id = party.id;
 
-        manager.join_party(&party_id, member_id, "Member".to_string()).unwrap();
+        manager
+            .join_party(&party_id, member_id, "Member".to_string())
+            .unwrap();
 
         let result = manager.kick_member(&party_id, &leader_id, &member_id);
         assert!(result);
 
         let updated_party = manager.get_party(&party_id).unwrap();
         assert_eq!(updated_party.members.len(), 1);
-        assert!(!updated_party.members.iter().any(|m| m.player_id == member_id));
+        assert!(
+            !updated_party
+                .members
+                .iter()
+                .any(|m| m.player_id == member_id)
+        );
     }
 
     #[test]
@@ -263,8 +290,12 @@ mod tests {
         let party = manager.create_party("Test Party", leader_id, "Leader".to_string());
         let party_id = party.id;
 
-        manager.join_party(&party_id, member1_id, "Member1".to_string()).unwrap();
-        manager.join_party(&party_id, member2_id, "Member2".to_string()).unwrap();
+        manager
+            .join_party(&party_id, member1_id, "Member1".to_string())
+            .unwrap();
+        manager
+            .join_party(&party_id, member2_id, "Member2".to_string())
+            .unwrap();
 
         // Try to kick member2 by member1 (not leader)
         let result = manager.kick_member(&party_id, &member1_id, &member2_id);
@@ -285,7 +316,11 @@ mod tests {
         manager.update_member(&leader_id, "Map1", 100, 200);
 
         let party = manager.get_player_party(&leader_id).unwrap();
-        let member = party.members.iter().find(|m| m.player_id == leader_id).unwrap();
+        let member = party
+            .members
+            .iter()
+            .find(|m| m.player_id == leader_id)
+            .unwrap();
         assert_eq!(member.map_name, "Map1");
         assert_eq!(member.hp, 100);
         assert_eq!(member.max_hp, 200);

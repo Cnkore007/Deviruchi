@@ -2,7 +2,7 @@
 //!
 //! 包含玩家回城、GM传送、地图切换等相关协议
 
-use super::packet_builder::{PacketBuilder, Packed, parse_fixed_string, parse_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
 
 const NAME_LENGTH: usize = 24;
 const MAP_NAME_LENGTH: usize = 16;
@@ -31,16 +31,16 @@ pub struct ZCWarpAck {
 
 impl Packed for ZCWarpAck {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0088)
-            .put_u8(self.warp_type)
-            .build()
+        PacketBuilder::new(0x0088).put_u8(self.warp_type).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
-        if slice.len() < 1 {
+        if slice.is_empty() {
             return None;
         }
-        Some(Self { warp_type: slice[0] })
+        Some(Self {
+            warp_type: slice[0],
+        })
     }
 }
 
@@ -182,9 +182,7 @@ impl ZCWarpError {
 
 impl Packed for ZCWarpError {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0084)
-            .put_u8(self.error_code)
-            .build()
+        PacketBuilder::new(0x0084).put_u8(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -238,9 +236,7 @@ pub struct ZCWarpStart {
 
 impl Packed for ZCWarpStart {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0840)
-            .put_u8(self.warp_type)
-            .build()
+        PacketBuilder::new(0x0840).put_u8(self.warp_type).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {

@@ -1,8 +1,8 @@
+use super::data::{Item, ItemType};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs;
 use std::error::Error;
-use super::data::{Item, ItemType};
+use std::fs;
 
 #[derive(Deserialize, Debug)]
 struct ItemYaml {

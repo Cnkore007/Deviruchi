@@ -2,13 +2,13 @@
 //!
 //! 使用 WebSocket + JSON 格式的协议，与 Devi 客户端通信
 
-use std::sync::Arc;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, RwLock};
-use tokio_tungstenite::{accept_async, tungstenite::Message};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, error};
+use std::sync::Arc;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::broadcast;
+use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::network::SessionManager;
@@ -29,6 +29,12 @@ pub struct ModernSession {
     pub x: f32,
     pub y: f32,
     pub name: String,
+}
+
+impl Default for ModernSession {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ModernSession {
@@ -72,7 +78,9 @@ impl ModernServer {
                     let tx = self.tx.clone();
                     let session_manager = self.session_manager.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(stream, addr, tx, session_manager).await {
+                        if let Err(e) =
+                            Self::handle_connection(stream, addr, tx, session_manager).await
+                        {
                             error!("WebSocket connection error: {}", e);
                         }
                     });
@@ -96,7 +104,7 @@ impl ModernServer {
         let (mut write, mut read) = ws_stream.split();
 
         let mut session = ModernSession::new();
-        let player_id = session.id.to_string();
+        let _player_id = session.id.to_string();
 
         // Subscribe to broadcasts
         let mut rx = tx.subscribe();
@@ -215,7 +223,9 @@ impl ModernServer {
             }
             "CHAT" => {
                 // Handle CHAT packet
-                let message = packet.payload.get("message")
+                let message = packet
+                    .payload
+                    .get("message")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 

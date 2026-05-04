@@ -3,21 +3,21 @@ use parking_lot::RwLock;
 /// NPC类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcType {
-    Shop,          // 商店
-    SkillTrainer,  // 技能训练师
-    Quest,         // 任务NPC
-    Warp,          // 传送门
-    CashShop,      // 现金商店
+    Shop,         // 商店
+    SkillTrainer, // 技能训练师
+    Quest,        // 任务NPC
+    Warp,         // 传送门
+    CashShop,     // 现金商店
 }
 
 /// NPC标志
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcFlag {
     None,
-    NoWarp,        // 不能传送
-    NoMob,         // 不刷怪
-    NoSave,        // 不保存位置
-    Private_,      // 私有NPC
+    NoWarp,   // 不能传送
+    NoMob,    // 不刷怪
+    NoSave,   // 不保存位置
+    Private_, // 私有NPC
 }
 
 /// NPC数据
@@ -71,18 +71,35 @@ impl Npc {
         npc
     }
 
-    pub fn warp(id: u32, name: &str, x: u16, y: u16, map: &str, _dest_map: &str, _dest_x: u16, _dest_y: u16) -> Self {
+    pub fn warp(
+        id: u32,
+        name: &str,
+        x: u16,
+        y: u16,
+        map: &str,
+        _dest_map: &str,
+        _dest_x: u16,
+        _dest_y: u16,
+    ) -> Self {
         let mut npc = Self::new(id, name, x, y, map);
         npc.type_ = NpcType::Warp;
         npc
     }
 
     pub fn add_shop_item(&self, item_id: u16, buy_price: u32, sell_price: u32) {
-        self.shop_items.write().push(ShopItem { item_id, buy_price, sell_price });
+        self.shop_items.write().push(ShopItem {
+            item_id,
+            buy_price,
+            sell_price,
+        });
     }
 
     pub fn add_skill(&self, skill_id: u16, sp_cost: u16, price: u32) {
-        self.skills.write().push(NpcSkill { skill_id, sp_cost, price });
+        self.skills.write().push(NpcSkill {
+            skill_id,
+            sp_cost,
+            price,
+        });
     }
 }
 
@@ -90,8 +107,8 @@ impl Npc {
 #[derive(Debug, Clone, Copy)]
 pub struct ShopItem {
     pub item_id: u16,
-    pub buy_price: u32,   // NPC卖给玩家的价格
-    pub sell_price: u32,  // NPC收购价格
+    pub buy_price: u32,  // NPC卖给玩家的价格
+    pub sell_price: u32, // NPC收购价格
 }
 
 /// NPC技能
@@ -119,9 +136,9 @@ impl NpcDatabase {
         let mut npc = Npc::shop(1, "Poring Merchant", 50, 100, "new_1-1.gat");
         npc.display_name = "波利商人".to_string();
         npc.sprite_id = 124;
-        npc.add_shop_item(501, 50, 25);   // Red Potion
-        npc.add_shop_item(502, 40, 20);   // Yellow Potion
-        npc.add_shop_item(503, 50, 25);   // Blue Potion
+        npc.add_shop_item(501, 50, 25); // Red Potion
+        npc.add_shop_item(502, 40, 20); // Yellow Potion
+        npc.add_shop_item(503, 50, 25); // Blue Potion
         npc
     }
 
@@ -130,13 +147,22 @@ impl NpcDatabase {
         npc.display_name = "蜥蜴武士".to_string();
         npc.sprite_id = 404;
         npc.level = 10;
-        npc.add_skill(1, 8, 1000);    // Bash
-        npc.add_skill(25, 9, 2000);   // Fire Ball
+        npc.add_skill(1, 8, 1000); // Bash
+        npc.add_skill(25, 9, 2000); // Fire Ball
         npc
     }
 
     fn create_prontera_warp() -> Npc {
-        let mut npc = Npc::warp(3, "To Prontera", 150, 150, "new_1-1.gat", "prontera.gat", 150, 100);
+        let mut npc = Npc::warp(
+            3,
+            "To Prontera",
+            150,
+            150,
+            "new_1-1.gat",
+            "prontera.gat",
+            150,
+            100,
+        );
         npc.display_name = "前往普隆德拉".to_string();
         npc.sprite_id = 405;
         npc

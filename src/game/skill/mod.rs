@@ -1,16 +1,16 @@
 //! 技能系统
 
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
 use uuid::Uuid;
 
 pub mod data;
 pub mod effect;
 pub mod handler;
 
-pub use data::{Skill, SkillType, SkillTarget, SkillDatabase};
+pub use data::{Skill, SkillDatabase, SkillTarget, SkillType};
 pub use handler::SkillHandler;
 
 /// 每个玩家的技能冷却状态

@@ -1,7 +1,7 @@
 //! 装备系统
 
-use std::collections::HashMap;
 use super::inventory::InventorySlot;
+use std::collections::HashMap;
 
 /// 装备槽位
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

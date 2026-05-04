@@ -1,9 +1,45 @@
-use rusqlite::params;
-use crate::storage::Database;
 use crate::error::Result;
-use crate::storage::chrono_now;
-use crate::protocol::map_packets::CharInfo;
+use crate::game::status::effect::StatusEffect;
+use crate::game::status::effect::StatusSource;
+use crate::game::status::types::StatusChange;
 use crate::game::storage::data::Storage;
+use crate::protocol::map_packets::CharInfo;
+use crate::storage::Database;
+use crate::storage::chrono_now;
+use rusqlite::params;
+
+/// 角色状态效果数据（用于数据库存储）
+#[derive(Debug, Clone)]
+pub struct CharacterStatusData {
+    pub status_type: u32,
+    pub val1: i32,
+    pub val2: i32,
+    pub val3: i32,
+    pub stack: u8,
+    pub duration_ms: u64,
+    pub started_at_ms: u64,
+    pub source_type: u8,
+    pub source_id: u16,
+}
+
+/// 角色物品栏数据（用于数据库存储）
+#[derive(Debug, Clone)]
+pub struct CharacterInventoryData {
+    pub index: u8,
+    pub item_id: u16,
+    pub amount: u16,
+    pub identified: bool,
+    pub refine: u8,
+    pub cards: [u16; 4],
+}
+
+/// 角色快捷键数据（用于数据库存储）
+#[derive(Debug, Clone)]
+pub struct CharacterHotkeyData {
+    pub hotkey_id: u8,
+    pub type_: u8,
+    pub item_or_skill_id: u32,
+}
 
 impl Database {
     pub fn create_character(
@@ -32,8 +68,7 @@ impl Database {
                      'new_1-1.gat', 53, 111, 'new_1-1.gat', 53, 111,
                      ?12, ?12)",
             params![
-                account_id, slot, name, str, agi, vit, int, dex, luk,
-                hair, hair_color, now
+                account_id, slot, name, str, agi, vit, int, dex, luk, hair, hair_color, now
             ],
         )?;
         Ok(self.last_insert_rowid()? as u32)
@@ -46,7 +81,7 @@ impl Database {
                     hp, max_hp, sp, max_sp,
                     hair, hair_color, clothes_color,
                     weapon, shield, head_top, head_mid, head_bottom,
-                    last_map, last_x, last_y,
+                    last_map, last_x, last_y, save_map, save_x, save_y,
                     delete_timer, created_at, updated_at
              FROM characters WHERE account_id = ?1
              ORDER BY char_num",
@@ -83,9 +118,12 @@ impl Database {
                     last_map: row.get(27)?,
                     last_x: row.get(28)?,
                     last_y: row.get(29)?,
-                    delete_timer: row.get(30)?,
-                    created_at: row.get(31)?,
-                    updated_at: row.get(32)?,
+                    save_map: row.get(30)?,
+                    save_x: row.get(31)?,
+                    save_y: row.get(32)?,
+                    delete_timer: row.get(33)?,
+                    created_at: row.get(34)?,
+                    updated_at: row.get(35)?,
                 })
             },
         )
@@ -98,7 +136,7 @@ impl Database {
                     hp, max_hp, sp, max_sp,
                     hair, hair_color, clothes_color,
                     weapon, shield, head_top, head_mid, head_bottom,
-                    last_map, last_x, last_y,
+                    last_map, last_x, last_y, save_map, save_x, save_y,
                     delete_timer, created_at, updated_at
              FROM characters WHERE char_id = ?1",
             params![char_id],
@@ -134,9 +172,12 @@ impl Database {
                     last_map: row.get(27)?,
                     last_x: row.get(28)?,
                     last_y: row.get(29)?,
-                    delete_timer: row.get(30)?,
-                    created_at: row.get(31)?,
-                    updated_at: row.get(32)?,
+                    save_map: row.get(30)?,
+                    save_x: row.get(31)?,
+                    save_y: row.get(32)?,
+                    delete_timer: row.get(33)?,
+                    created_at: row.get(34)?,
+                    updated_at: row.get(35)?,
                 })
             },
         )
@@ -213,10 +254,7 @@ impl Database {
         let char_id = storage.char_id();
 
         // 先删除该角色的所有仓库物品
-        self.execute_with_params(
-            "DELETE FROM storage WHERE char_id = ?1",
-            params![char_id],
-        )?;
+        self.execute_with_params("DELETE FROM storage WHERE char_id = ?1", params![char_id])?;
 
         // 插入当前物品
         for slot in storage.slots().iter().filter(|s| !s.is_empty()) {
@@ -240,6 +278,294 @@ impl Database {
         }
 
         Ok(())
+    }
+
+    /// ==================== 玩家数据持久化 ====================
+
+    /// 保存角色完整数据到数据库
+    pub fn save_character(
+        &self,
+        char_id: u32,
+        last_map: &str,
+        last_x: i32,
+        last_y: i32,
+        hp: u32,
+        max_hp: u32,
+        sp: u32,
+        max_sp: u32,
+        base_exp: u64,
+        job_exp: u64,
+        base_level: u16,
+        job_level: u16,
+        zeny: u32,
+        str: u16,
+        agi: u16,
+        vit: u16,
+        int: u16,
+        dex: u16,
+        luk: u16,
+        status_effects: &[StatusEffect],
+        inventory: &[CharacterInventoryData],
+        hotkeys: &[CharacterHotkeyData],
+    ) -> Result<()> {
+        let now = chrono_now();
+
+        // 1. 更新 characters 表基础数据
+        self.execute_with_params(
+            "UPDATE characters SET
+                last_map = ?1, last_x = ?2, last_y = ?3,
+                hp = ?4, max_hp = ?5, sp = ?6, max_sp = ?7,
+                base_exp = ?8, job_exp = ?9,
+                base_level = ?10, job_level = ?11,
+                zeny = ?12,
+                str = ?13, agi = ?14, vit = ?15, int = ?16, dex = ?17, luk = ?18,
+                updated_at = ?19
+             WHERE char_id = ?20",
+            params![
+                last_map,
+                last_x,
+                last_y,
+                hp,
+                max_hp,
+                sp,
+                max_sp,
+                base_exp as i64,
+                job_exp as i64,
+                base_level,
+                job_level,
+                zeny,
+                str,
+                agi,
+                vit,
+                int,
+                dex,
+                luk,
+                now,
+                char_id
+            ],
+        )?;
+
+        // 2. 保存状态效果
+        self.save_character_status(char_id, status_effects)?;
+
+        // 3. 保存物品栏
+        self.save_character_inventory(char_id, inventory)?;
+
+        // 4. 保存快捷键
+        self.save_character_hotkeys(char_id, hotkeys)?;
+
+        tracing::debug!("Saved character {} data successfully", char_id);
+        Ok(())
+    }
+
+    /// 保存角色状态效果
+    pub fn save_character_status(&self, char_id: u32, statuses: &[StatusEffect]) -> Result<()> {
+        // 先删除该角色的所有状态效果
+        self.execute_with_params(
+            "DELETE FROM character_status WHERE char_id = ?1",
+            params![char_id],
+        )?;
+
+        // 插入当前状态效果
+        for effect in statuses {
+            let source_type = match effect.source {
+                StatusSource::Skill(_) => 0u8,
+                StatusSource::Item(_) => 1,
+                StatusSource::Passive => 2,
+                StatusSource::Quest => 3,
+                StatusSource::Environment => 4,
+            };
+
+            let source_id = match effect.source {
+                StatusSource::Skill(id) => id,
+                StatusSource::Item(id) => id,
+                _ => 0,
+            };
+
+            self.execute_with_params(
+                "INSERT INTO character_status
+                    (char_id, status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    char_id,
+                    effect.id as u32,
+                    effect.val1,
+                    effect.val2,
+                    effect.val3,
+                    effect.stack,
+                    effect.duration_ms as i64,
+                    effect.started_at.elapsed().as_millis() as i64,
+                    source_type,
+                    source_id
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// 加载角色状态效果
+    pub fn load_character_status(&self, char_id: u32) -> Result<Vec<StatusEffect>> {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_millis() as u64;
+
+        self.query(
+            "SELECT status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id
+             FROM character_status WHERE char_id = ?1",
+            params![char_id],
+            |row| {
+                let status_type: u32 = row.get(0)?;
+                let val1: i32 = row.get(1)?;
+                let val2: i32 = row.get(2)?;
+                let val3: i32 = row.get(3)?;
+                let stack: u8 = row.get(4)?;
+                let duration_ms: u64 = row.get::<_, i64>(5)? as u64;
+                let started_at_ms: u64 = row.get::<_, i64>(6)? as u64;
+                let source_type: u8 = row.get(7)?;
+                let source_id: u16 = row.get(8)?;
+
+                let source = match source_type {
+                    0 => StatusSource::Skill(source_id),
+                    1 => StatusSource::Item(source_id),
+                    2 => StatusSource::Passive,
+                    3 => StatusSource::Quest,
+                    4 => StatusSource::Environment,
+                    _ => StatusSource::Environment,
+                };
+
+                // 计算剩余时间：started_at_ms + duration_ms - now_ms
+                let end_time_ms = started_at_ms.saturating_add(duration_ms);
+                let remaining_ms = end_time_ms.saturating_sub(now_ms);
+
+                // 如果状态已过期则跳过
+                if remaining_ms == 0 {
+                    return Ok(StatusEffect {
+                        id: StatusChange::from_u32(status_type),
+                        duration_ms: 0,
+                        started_at: std::time::Instant::now(),
+                        source,
+                        val1,
+                        val2,
+                        val3,
+                        stack,
+                    });
+                }
+
+                // 使用剩余时间作为新的 duration，started_at 为当前时间
+                Ok(StatusEffect {
+                    id: StatusChange::from_u32(status_type),
+                    duration_ms: remaining_ms,
+                    started_at: std::time::Instant::now(),
+                    source,
+                    val1,
+                    val2,
+                    val3,
+                    stack,
+                })
+            },
+        )
+    }
+
+    /// 保存角色物品栏
+    pub fn save_character_inventory(
+        &self,
+        char_id: u32,
+        items: &[CharacterInventoryData],
+    ) -> Result<()> {
+        // 先删除该角色的所有物品栏数据
+        self.execute_with_params(
+            "DELETE FROM character_inventory WHERE char_id = ?1",
+            params![char_id],
+        )?;
+
+        // 插入当前物品
+        for item in items {
+            self.execute_with_params(
+                "INSERT INTO character_inventory
+                    (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    char_id,
+                    item.index,
+                    item.item_id,
+                    item.amount,
+                    item.identified as i32,
+                    item.refine,
+                    item.cards[0],
+                    item.cards[1],
+                    item.cards[2],
+                    item.cards[3]
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// 加载角色物品栏
+    pub fn load_character_inventory(&self, char_id: u32) -> Result<Vec<CharacterInventoryData>> {
+        self.query(
+            "SELECT slot_index, item_id, amount, identified, refine, card0, card1, card2, card3
+             FROM character_inventory WHERE char_id = ?1 ORDER BY slot_index",
+            params![char_id],
+            |row| {
+                Ok(CharacterInventoryData {
+                    index: row.get(0)?,
+                    item_id: row.get(1)?,
+                    amount: row.get(2)?,
+                    identified: row.get::<_, i32>(3)? != 0,
+                    refine: row.get(4)?,
+                    cards: [row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?],
+                })
+            },
+        )
+    }
+
+    /// 保存角色快捷键
+    pub fn save_character_hotkeys(
+        &self,
+        char_id: u32,
+        hotkeys: &[CharacterHotkeyData],
+    ) -> Result<()> {
+        // 先删除该角色的所有快捷键
+        self.execute_with_params(
+            "DELETE FROM character_hotkeys WHERE char_id = ?1",
+            params![char_id],
+        )?;
+
+        // 插入当前快捷键
+        for hotkey in hotkeys {
+            self.execute_with_params(
+                "INSERT INTO character_hotkeys (char_id, hotkey_id, type, item_or_skill_id)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    char_id,
+                    hotkey.hotkey_id,
+                    hotkey.type_,
+                    hotkey.item_or_skill_id
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// 加载角色快捷键
+    pub fn load_character_hotkeys(&self, char_id: u32) -> Result<Vec<CharacterHotkeyData>> {
+        self.query(
+            "SELECT hotkey_id, type, item_or_skill_id
+             FROM character_hotkeys WHERE char_id = ?1 ORDER BY hotkey_id",
+            params![char_id],
+            |row| {
+                Ok(CharacterHotkeyData {
+                    hotkey_id: row.get(0)?,
+                    type_: row.get(1)?,
+                    item_or_skill_id: row.get(2)?,
+                })
+            },
+        )
     }
 }
 
@@ -275,7 +601,248 @@ pub struct Character {
     pub last_map: String,
     pub last_x: i32,
     pub last_y: i32,
+    pub save_map: String,
+    pub save_x: i32,
+    pub save_y: i32,
     pub delete_timer: u32,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup_test_account(db: &crate::storage::Database) -> u32 {
+        // 创建测试账户
+        db.execute_with_params(
+            "INSERT INTO accounts (account_id, user_id, password_hash, sex, created_at)
+             VALUES (1, 'test_user', 'hash', 0, 1000)",
+            [],
+        )
+        .expect("Failed to create test account");
+        1
+    }
+
+    #[test]
+    fn test_save_and_load_character_status() {
+        let db =
+            crate::storage::Database::open_memory().expect("Failed to create in-memory database");
+
+        // 初始化 schema
+        crate::storage::schema::init_schema(&db).expect("Failed to init schema");
+
+        // 创建测试账户
+        let account_id = setup_test_account(&db);
+
+        // 创建测试角色
+        let char_id = db
+            .create_character(account_id, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+
+        // 创建测试状态效果
+        let status_effects = vec![
+            StatusEffect::with_values(
+                StatusChange::Blessing,
+                60000,
+                StatusSource::Skill(9),
+                10,
+                0,
+                0,
+            ),
+            StatusEffect::with_values(
+                StatusChange::Haste,
+                30000,
+                StatusSource::Skill(29),
+                30,
+                0,
+                0,
+            ),
+        ];
+
+        // 保存状态效果
+        db.save_character_status(char_id, &status_effects)
+            .expect("Failed to save status");
+
+        // 加载状态效果
+        let loaded = db
+            .load_character_status(char_id)
+            .expect("Failed to load status");
+
+        assert_eq!(loaded.len(), 2);
+        assert!(loaded.iter().any(|s| s.id == StatusChange::Blessing));
+        assert!(loaded.iter().any(|s| s.id == StatusChange::Haste));
+    }
+
+    #[test]
+    fn test_save_and_load_character_inventory() {
+        let db =
+            crate::storage::Database::open_memory().expect("Failed to create in-memory database");
+
+        // 初始化 schema
+        crate::storage::schema::init_schema(&db).expect("Failed to init schema");
+
+        // 创建测试账户
+        let account_id = setup_test_account(&db);
+
+        // 创建测试角色
+        let char_id = db
+            .create_character(account_id, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+
+        // 创建测试物品
+        let inventory = vec![
+            CharacterInventoryData {
+                index: 0,
+                item_id: 501, // Red Potion
+                amount: 10,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
+            CharacterInventoryData {
+                index: 1,
+                item_id: 502, // Blue Potion
+                amount: 5,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
+        ];
+
+        // 保存物品栏
+        db.save_character_inventory(char_id, &inventory)
+            .expect("Failed to save inventory");
+
+        // 加载物品栏
+        let loaded = db
+            .load_character_inventory(char_id)
+            .expect("Failed to load inventory");
+
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].item_id, 501);
+        assert_eq!(loaded[0].amount, 10);
+        assert_eq!(loaded[1].item_id, 502);
+    }
+
+    #[test]
+    fn test_save_and_load_character_hotkeys() {
+        let db =
+            crate::storage::Database::open_memory().expect("Failed to create in-memory database");
+
+        // 初始化 schema
+        crate::storage::schema::init_schema(&db).expect("Failed to init schema");
+
+        // 创建测试账户
+        let account_id = setup_test_account(&db);
+
+        // 创建测试角色
+        let char_id = db
+            .create_character(account_id, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+
+        // 创建测试快捷键
+        let hotkeys = vec![
+            CharacterHotkeyData {
+                hotkey_id: 0,
+                type_: 0,              // Item
+                item_or_skill_id: 501, // Red Potion
+            },
+            CharacterHotkeyData {
+                hotkey_id: 1,
+                type_: 1,             // Skill
+                item_or_skill_id: 28, // Heal
+            },
+        ];
+
+        // 保存快捷键
+        db.save_character_hotkeys(char_id, &hotkeys)
+            .expect("Failed to save hotkeys");
+
+        // 加载快捷键
+        let loaded = db
+            .load_character_hotkeys(char_id)
+            .expect("Failed to load hotkeys");
+
+        assert_eq!(loaded.len(), 2);
+        assert_eq!(loaded[0].type_, 0);
+        assert_eq!(loaded[1].type_, 1);
+    }
+
+    #[test]
+    fn test_save_character_updates_all_fields() {
+        let db =
+            crate::storage::Database::open_memory().expect("Failed to create in-memory database");
+
+        // 初始化 schema
+        crate::storage::schema::init_schema(&db).expect("Failed to init schema");
+
+        // 创建测试账户
+        let account_id = setup_test_account(&db);
+
+        // 创建测试角色
+        let char_id = db
+            .create_character(account_id, 0, "TestChar", 10, 10, 10, 10, 10, 10, 1, 0)
+            .expect("Failed to create character");
+
+        // 准备测试数据
+        let status_effects = vec![StatusEffect::new(
+            StatusChange::Blessing,
+            60000,
+            StatusSource::Skill(9),
+        )];
+        let inventory = vec![CharacterInventoryData {
+            index: 0,
+            item_id: 501,
+            amount: 10,
+            identified: true,
+            refine: 0,
+            cards: [0; 4],
+        }];
+        let hotkeys = vec![CharacterHotkeyData {
+            hotkey_id: 0,
+            type_: 0,
+            item_or_skill_id: 501,
+        }];
+
+        // 保存完整角色数据
+        db.save_character(
+            char_id,
+            "prontera.gat",
+            100,
+            200,
+            500,
+            1000,
+            100,
+            200,
+            10000,
+            5000,
+            50,
+            30,
+            100000,
+            50,
+            50,
+            50,
+            50,
+            50,
+            50,
+            &status_effects,
+            &inventory,
+            &hotkeys,
+        )
+        .expect("Failed to save character");
+
+        // 验证角色数据已更新
+        let char = db
+            .get_character_by_id(char_id)
+            .expect("Failed to get character")
+            .expect("Character not found");
+
+        assert_eq!(char.last_map, "prontera.gat");
+        assert_eq!(char.last_x, 100);
+        assert_eq!(char.last_y, 200);
+        assert_eq!(char.hp, 500);
+        assert_eq!(char.max_hp, 1000);
+        assert_eq!(char.zeny, 100000);
+    }
 }

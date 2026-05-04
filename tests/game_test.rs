@@ -1,8 +1,8 @@
 use deviruchi::game::{
-    skill::{SkillDatabase, SkillType},
-    item::{ItemDatabase, ItemType, Inventory},
+    item::{Inventory, ItemDatabase, ItemType},
+    map::{CellType, MapData},
     mob::Mob,
-    map::{MapData, CellType},
+    skill::{SkillDatabase, SkillType},
 };
 
 #[test]
@@ -77,6 +77,6 @@ fn test_map_data() {
 fn test_map_out_of_bounds() {
     let map = MapData::new("test.gat", 100, 100);
 
-    assert!(!map.is_walkable(150, 50));  // x 越界
-    assert!(!map.is_walkable(50, 150));  // y 越界
+    assert!(!map.is_walkable(150, 50)); // x 越界
+    assert!(!map.is_walkable(50, 150)); // y 越界
 }

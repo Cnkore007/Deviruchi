@@ -1,16 +1,16 @@
-use std::sync::Arc;
-use parking_lot::RwLock;
-use tracing::warn;
-use crate::storage::Database;
-use crate::network::{Session, SessionManager, PacketId};
-use crate::network::session::SessionStage;
-use crate::game::token::TokenStore;
-use crate::game::map::{MapState, ChannelBus, DropManager, MapServer};
+use crate::game::guild::GuildManager;
+use crate::game::map::teleport::{SavePointManager, TeleportManager, WarpService};
+use crate::game::map::{ChannelBus, DropManager, MapServer, MapState};
 use crate::game::party::PartyManager;
 use crate::game::storage::StorageManager;
+use crate::game::token::TokenStore;
 use crate::game::trade::TradeManager;
-use crate::game::guild::GuildManager;
-use crate::game::map::teleport::{TeleportManager, WarpService, SavePointManager};
+use crate::network::session::SessionStage;
+use crate::network::{PacketId, Session, SessionManager};
+use crate::storage::Database;
+use parking_lot::RwLock;
+use std::sync::Arc;
+use tracing::warn;
 
 pub struct PacketHandler {
     login_server: Arc<crate::game::login::LoginServer>,
@@ -70,7 +70,12 @@ impl PacketHandler {
         }
     }
 
-    pub fn handle(&self, session: &mut Session, packet_id: PacketId, data: &[u8]) -> Option<Vec<u8>> {
+    pub fn handle(
+        &self,
+        session: &mut Session,
+        packet_id: PacketId,
+        data: &[u8],
+    ) -> Option<Vec<u8>> {
         match session.stage {
             SessionStage::Login => {
                 if packet_id == 0x0064 {
@@ -86,7 +91,7 @@ impl PacketHandler {
                 }
             }
             SessionStage::Char => {
-                if matches!(packet_id, 0x0065 | 0x0066 | 0x0067 | 0x0068) {
+                if matches!(packet_id, 0x0065..=0x0068) {
                     let result = self.char_server.handle_packet(packet_id, data, session);
                     // Advance to Map stage on successful char selection
                     if packet_id == 0x0065 && result.is_some() && session.char_id.is_some() {
@@ -98,9 +103,7 @@ impl PacketHandler {
                     None
                 }
             }
-            SessionStage::Map => {
-                self.map_server.handle_packet(packet_id, data, session)
-            }
+            SessionStage::Map => self.map_server.handle_packet(packet_id, data, session),
         }
     }
 }

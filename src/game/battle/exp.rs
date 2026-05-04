@@ -1,6 +1,6 @@
-use uuid::Uuid;
 use crate::game::map::MapState;
-use crate::game::party::{PartyManager, ExpShareMode};
+use crate::game::party::{ExpShareMode, PartyManager};
+use uuid::Uuid;
 
 /// MVP 经验加成倍数
 const MVP_BONUS_MULTIPLIER: f64 = 1.1;
@@ -26,7 +26,12 @@ impl ExpDistributor {
         let party = party_manager.get_player_party(&killer_id);
 
         match party {
-            Some(party) if matches!(party.exp_share, ExpShareMode::Equal | ExpShareMode::LevelBased) => {
+            Some(party)
+                if matches!(
+                    party.exp_share,
+                    ExpShareMode::Equal | ExpShareMode::LevelBased
+                ) =>
+            {
                 // 队伍经验分享
                 Self::distribute_party_exp(
                     map_state,
@@ -40,16 +45,30 @@ impl ExpDistributor {
             }
             _ => {
                 // 单人经验
-                Self::give_exp_to_player(map_state, killer_id, mvp_id, mob_level, mob_base_exp, mob_job_exp);
+                Self::give_exp_to_player(
+                    map_state,
+                    killer_id,
+                    mvp_id,
+                    mob_level,
+                    mob_base_exp,
+                    mob_job_exp,
+                );
 
                 // 处理 MVP 加成（如果 MVP 不是击杀者）
-                if let Some(mvp) = mvp_id {
-                    if mvp != killer_id {
-                        // MVP 获得额外的 1.1x 加成
-                        let mvp_bonus_base = (mob_base_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
-                        let mvp_bonus_job = (mob_job_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
-                        Self::give_exp_to_player(map_state, mvp, None, mob_level, mvp_bonus_base, mvp_bonus_job);
-                    }
+                if let Some(mvp) = mvp_id
+                    && mvp != killer_id
+                {
+                    // MVP 获得额外的 1.1x 加成
+                    let mvp_bonus_base = (mob_base_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
+                    let mvp_bonus_job = (mob_job_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
+                    Self::give_exp_to_player(
+                        map_state,
+                        mvp,
+                        None,
+                        mob_level,
+                        mvp_bonus_base,
+                        mvp_bonus_job,
+                    );
                 }
             }
         }
@@ -87,16 +106,31 @@ impl ExpDistributor {
             ExpShareMode::Equal => {
                 // 等额分配
                 for (member_id, _) in &nearby {
-                    Self::give_exp_to_player(map_state, *member_id, None, mob_level, base_per_member, job_per_member);
+                    Self::give_exp_to_player(
+                        map_state,
+                        *member_id,
+                        None,
+                        mob_level,
+                        base_per_member,
+                        job_per_member,
+                    );
                 }
-                Self::give_exp_to_player(map_state, killer_id, None, mob_level, base_per_member, job_per_member);
+                Self::give_exp_to_player(
+                    map_state,
+                    killer_id,
+                    None,
+                    mob_level,
+                    base_per_member,
+                    job_per_member,
+                );
             }
             ExpShareMode::LevelBased => {
                 // 按等级加权分配
                 let killer = map_state.get_player(&killer_id);
                 let killer_level = killer.map(|p| *p.base_level.read()).unwrap_or(1) as u64;
 
-                let total_level: u64 = killer_level + nearby.iter().map(|(_, lvl)| *lvl as u64).sum::<u64>();
+                let total_level: u64 =
+                    killer_level + nearby.iter().map(|(_, lvl)| *lvl as u64).sum::<u64>();
                 if total_level == 0 {
                     return;
                 }
@@ -104,24 +138,39 @@ impl ExpDistributor {
                 for (member_id, level) in &nearby {
                     let share = mob_base_exp * (*level as u64) / total_level;
                     let job_share = mob_job_exp * (*level as u64) / total_level;
-                    Self::give_exp_to_player(map_state, *member_id, None, mob_level, share, job_share);
+                    Self::give_exp_to_player(
+                        map_state, *member_id, None, mob_level, share, job_share,
+                    );
                 }
 
                 let killer_share = mob_base_exp * killer_level / total_level;
                 let killer_job_share = mob_job_exp * killer_level / total_level;
-                Self::give_exp_to_player(map_state, killer_id, None, mob_level, killer_share, killer_job_share);
+                Self::give_exp_to_player(
+                    map_state,
+                    killer_id,
+                    None,
+                    mob_level,
+                    killer_share,
+                    killer_job_share,
+                );
             }
-            _ => unreachable!(),
         }
 
         // 处理 MVP 加成（如果 MVP 不是击杀者）
-        if let Some(mvp) = mvp_id {
-            if mvp != killer_id {
-                // MVP 获得额外的 1.1x 加成
-                let mvp_bonus_base = (mob_base_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
-                let mvp_bonus_job = (mob_job_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
-                Self::give_exp_to_player(map_state, mvp, None, mob_level, mvp_bonus_base, mvp_bonus_job);
-            }
+        if let Some(mvp) = mvp_id
+            && mvp != killer_id
+        {
+            // MVP 获得额外的 1.1x 加成
+            let mvp_bonus_base = (mob_base_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
+            let mvp_bonus_job = (mob_job_exp as f64 * MVP_BONUS_MULTIPLIER) as u64;
+            Self::give_exp_to_player(
+                map_state,
+                mvp,
+                None,
+                mob_level,
+                mvp_bonus_base,
+                mvp_bonus_job,
+            );
         }
     }
 
@@ -163,11 +212,11 @@ impl ExpDistributor {
         let mut adjusted_job = job_exp as f64 * penalty;
 
         // 如果是 MVP（且不是击杀者），额外获得 MVP 加成
-        if let Some(mvp_id) = is_mvp {
-            if mvp_id == player_id {
-                adjusted_base *= MVP_BONUS_MULTIPLIER;
-                adjusted_job *= MVP_BONUS_MULTIPLIER;
-            }
+        if let Some(mvp_id) = is_mvp
+            && mvp_id == player_id
+        {
+            adjusted_base *= MVP_BONUS_MULTIPLIER;
+            adjusted_job *= MVP_BONUS_MULTIPLIER;
         }
 
         // 通过 MapState 原子更新玩家经验
@@ -183,13 +232,18 @@ impl ExpDistributor {
         map_state: &MapState,
         party_manager: &PartyManager,
         killer_id: Uuid,
-        mob_level: u16,
+        _mob_level: u16,
         zeny_amount: u64,
     ) {
         let party = party_manager.get_player_party(&killer_id);
 
         match party {
-            Some(party) if matches!(party.exp_share, ExpShareMode::Equal | ExpShareMode::LevelBased) => {
+            Some(party)
+                if matches!(
+                    party.exp_share,
+                    ExpShareMode::Equal | ExpShareMode::LevelBased
+                ) =>
+            {
                 // 收集同地图的在线队员（含击杀者）
                 let mut nearby: Vec<Uuid> = vec![killer_id];
                 for member in &party.members {
@@ -239,20 +293,38 @@ mod tests {
             base_exp: 0,
             job_exp: 0,
             zeny: 0,
-            str: 1, agi: 1, vit: 1, int: 1, dex: 1, luk: 1,
-            hp: 100, max_hp: 100, sp: 50, max_sp: 50,
-            hair: 0, hair_color: 0, clothes_color: 0,
-            weapon: 0, shield: 0, head_top: 0, head_mid: 0, head_bottom: 0,
-            last_map: "test".to_string(), last_x: 0, last_y: 0,
-            delete_timer: 0, created_at: 0, updated_at: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 0,
+            last_y: 0,
+            save_map: "test".to_string(),
+            save_x: 0,
+            save_y: 0,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         });
         let player_id = player.id;
         map_state.add_player(player);
 
-        ExpDistributor::distribute_mob_exp(
-            &map_state, &party_manager, player_id, None,
-            5, 100, 50,
-        );
+        ExpDistributor::distribute_mob_exp(&map_state, &party_manager, player_id, None, 5, 100, 50);
 
         let p = map_state.get_player(&player_id).unwrap();
         // level 10 vs mob 5: diff = 5, within 10 -> no penalty
@@ -273,19 +345,45 @@ mod tests {
             base_exp: 0,
             job_exp: 0,
             zeny: 0,
-            str: 1, agi: 1, vit: 1, int: 1, dex: 1, luk: 1,
-            hp: 100, max_hp: 100, sp: 50, max_sp: 50,
-            hair: 0, hair_color: 0, clothes_color: 0,
-            weapon: 0, shield: 0, head_top: 0, head_mid: 0, head_bottom: 0,
-            last_map: "test".to_string(), last_x: 0, last_y: 0,
-            delete_timer: 0, created_at: 0, updated_at: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 0,
+            last_y: 0,
+            save_map: "test".to_string(),
+            save_x: 0,
+            save_y: 0,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         });
         let player_id = player.id;
         map_state.add_player(player);
 
         ExpDistributor::distribute_mob_exp(
-            &map_state, &party_manager, player_id, None,
-            5, 100, 100,
+            &map_state,
+            &party_manager,
+            player_id,
+            None,
+            5,
+            100,
+            100,
         );
 
         let p = map_state.get_player(&player_id).unwrap();
@@ -300,26 +398,82 @@ mod tests {
 
         // 创建两个玩家
         let player1 = crate::game::map::Player::from_character(crate::storage::Character {
-            char_id: 1, char_num: 0, name: "Player1".to_string(), class: 0,
-            base_level: 10, job_level: 5, base_exp: 0, job_exp: 0, zeny: 0,
-            str: 1, agi: 1, vit: 1, int: 1, dex: 1, luk: 1,
-            hp: 100, max_hp: 100, sp: 50, max_sp: 50,
-            hair: 0, hair_color: 0, clothes_color: 0,
-            weapon: 0, shield: 0, head_top: 0, head_mid: 0, head_bottom: 0,
-            last_map: "test".to_string(), last_x: 0, last_y: 0,
-            delete_timer: 0, created_at: 0, updated_at: 0,
+            char_id: 1,
+            char_num: 0,
+            name: "Player1".to_string(),
+            class: 0,
+            base_level: 10,
+            job_level: 5,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 0,
+            last_y: 0,
+            save_map: "test".to_string(),
+            save_x: 0,
+            save_y: 0,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         });
         let player1_id = player1.id;
 
         let player2 = crate::game::map::Player::from_character(crate::storage::Character {
-            char_id: 2, char_num: 0, name: "Player2".to_string(), class: 0,
-            base_level: 10, job_level: 5, base_exp: 0, job_exp: 0, zeny: 0,
-            str: 1, agi: 1, vit: 1, int: 1, dex: 1, luk: 1,
-            hp: 100, max_hp: 100, sp: 50, max_sp: 50,
-            hair: 0, hair_color: 0, clothes_color: 0,
-            weapon: 0, shield: 0, head_top: 0, head_mid: 0, head_bottom: 0,
-            last_map: "test".to_string(), last_x: 0, last_y: 0,
-            delete_timer: 0, created_at: 0, updated_at: 0,
+            char_id: 2,
+            char_num: 0,
+            name: "Player2".to_string(),
+            class: 0,
+            base_level: 10,
+            job_level: 5,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 0,
+            last_y: 0,
+            save_map: "test".to_string(),
+            save_x: 0,
+            save_y: 0,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         });
         let player2_id = player2.id;
 
@@ -328,8 +482,13 @@ mod tests {
 
         // 分发经验，player1 是击杀者，player2 是 MVP
         ExpDistributor::distribute_mob_exp(
-            &map_state, &party_manager, player1_id, Some(player2_id),
-            5, 100, 100,
+            &map_state,
+            &party_manager,
+            player1_id,
+            Some(player2_id),
+            5,
+            100,
+            100,
         );
 
         let p1 = map_state.get_player(&player1_id).unwrap();
@@ -346,21 +505,52 @@ mod tests {
         let (map_state, party_manager) = make_test_state();
 
         let player = crate::game::map::Player::from_character(crate::storage::Character {
-            char_id: 1, char_num: 0, name: "Test".to_string(), class: 0,
-            base_level: 10, job_level: 5, base_exp: 0, job_exp: 0, zeny: 0,
-            str: 1, agi: 1, vit: 1, int: 1, dex: 1, luk: 1,
-            hp: 100, max_hp: 100, sp: 50, max_sp: 50,
-            hair: 0, hair_color: 0, clothes_color: 0,
-            weapon: 0, shield: 0, head_top: 0, head_mid: 0, head_bottom: 0,
-            last_map: "test".to_string(), last_x: 0, last_y: 0,
-            delete_timer: 0, created_at: 0, updated_at: 0,
+            char_id: 1,
+            char_num: 0,
+            name: "Test".to_string(),
+            class: 0,
+            base_level: 10,
+            job_level: 5,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 0,
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int: 1,
+            dex: 1,
+            luk: 1,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "test".to_string(),
+            last_x: 0,
+            last_y: 0,
+            save_map: "test".to_string(),
+            save_x: 0,
+            save_y: 0,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
         });
         let player_id = player.id;
         map_state.add_player(player);
 
         ExpDistributor::distribute_zeny(
-            &map_state, &party_manager, player_id,
-            5, 100, // 100 zeny
+            &map_state,
+            &party_manager,
+            player_id,
+            5,
+            100, // 100 zeny
         );
 
         let p = map_state.get_player(&player_id).unwrap();

@@ -1,7 +1,7 @@
-use bevy::prelude::*;
-use crate::game::player::{Position, LocalPlayer};
 use crate::game::map::GameMap;
+use crate::game::player::{LocalPlayer, Position};
 use crate::network::Packet;
+use bevy::prelude::*;
 
 const MOVE_SPEED: f32 = 5.0;
 

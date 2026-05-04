@@ -23,6 +23,12 @@ pub struct DropManager {
     drops: RwLock<HashMap<Uuid, DropItem>>,
 }
 
+impl Default for DropManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DropManager {
     pub fn new() -> Self {
         Self {
@@ -136,7 +142,7 @@ impl DropManager {
         };
 
         let expired: Vec<Uuid> = {
-            let mut drops = self.drops.write();
+            let drops = self.drops.write();
             drops
                 .iter()
                 .filter(|(_, d)| d.dropped_at.elapsed().as_secs() > DROP_TTL_SECS)

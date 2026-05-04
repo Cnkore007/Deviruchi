@@ -3,5 +3,5 @@
 pub mod data;
 pub mod manager;
 
-pub use data::{Guild, GuildMember, GuildPosition, GuildPermission};
+pub use data::{Guild, GuildMember, GuildPermission, GuildPosition};
 pub use manager::GuildManager;

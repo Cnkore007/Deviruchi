@@ -1,5 +1,5 @@
-use deviruchi::protocol::login_packets::{CALogin, ACAceptLogin};
 use deviruchi::protocol::Packed;
+use deviruchi::protocol::login_packets::{ACAceptLogin, CALogin};
 
 #[test]
 fn test_ca_login_pack() {

@@ -3,16 +3,23 @@ use uuid::Uuid;
 /// 交易物品
 #[derive(Debug, Clone)]
 pub struct TradeItem {
-    pub index: u16,      // 背包索引
-    pub item_id: u16,    // 物品ID
-    pub amount: u16,     // 数量
+    pub index: u16,       // 背包索引
+    pub item_id: u16,     // 物品ID
+    pub amount: u16,      // 数量
     pub identified: bool, // 是否已鉴定
-    pub refine: u8,      // 精炼等级
-    pub cards: [u16; 4], // 卡片槽
+    pub refine: u8,       // 精炼等级
+    pub cards: [u16; 4],  // 卡片槽
 }
 
 impl TradeItem {
-    pub fn new(index: u16, item_id: u16, amount: u16, identified: bool, refine: u8, cards: [u16; 4]) -> Self {
+    pub fn new(
+        index: u16,
+        item_id: u16,
+        amount: u16,
+        identified: bool,
+        refine: u8,
+        cards: [u16; 4],
+    ) -> Self {
         Self {
             index,
             item_id,
@@ -27,11 +34,11 @@ impl TradeItem {
 /// 交易状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TradeState {
-    Requesting,  // 请求中
-    Trading,     // 交易中
-    Locked,      // 已锁定
-    Completed,   // 已完成
-    Cancelled,   // 已取消
+    Requesting, // 请求中
+    Trading,    // 交易中
+    Locked,     // 已锁定
+    Completed,  // 已完成
+    Cancelled,  // 已取消
 }
 
 /// 交易会话

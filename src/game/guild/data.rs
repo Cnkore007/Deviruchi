@@ -153,11 +153,11 @@ impl Guild {
 
     /// 更新成员职位
     pub fn change_position(&mut self, player_id: &Uuid, position_id: u8) -> bool {
-        if let Some(member) = self.members.get_mut(player_id) {
-            if (position_id as usize) < self.positions.len() {
-                member.position_id = position_id;
-                return true;
-            }
+        if let Some(member) = self.members.get_mut(player_id)
+            && (position_id as usize) < self.positions.len()
+        {
+            member.position_id = position_id;
+            return true;
         }
         false
     }

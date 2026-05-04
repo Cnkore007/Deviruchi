@@ -1,9 +1,9 @@
+use crate::game::mob::Mob;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
 use uuid::Uuid;
-use crate::game::mob::Mob;
 
 /// 怪物刷新点
 #[derive(Debug, Clone)]
@@ -42,7 +42,11 @@ impl MobSpawnManager {
 
     /// 获取地图的刷新点
     pub fn get_spawns(&self, map_name: &str) -> Vec<SpawnPoint> {
-        self.spawns.read().get(map_name).cloned().unwrap_or_default()
+        self.spawns
+            .read()
+            .get(map_name)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// 注册活跃怪物
@@ -63,17 +67,26 @@ impl MobSpawnManager {
 
     /// 获取地图上所有活跃怪物
     pub fn get_active_mobs(&self, map_name: &str) -> Vec<Arc<Mob>> {
-        self.active_mobs.read().get(map_name).cloned().unwrap_or_default()
+        self.active_mobs
+            .read()
+            .get(map_name)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// 获取所有地图上的所有活跃怪物
     pub fn get_all_active_mobs(&self) -> Vec<Arc<Mob>> {
-        self.active_mobs.read().values().flatten().cloned().collect()
+        self.active_mobs
+            .read()
+            .values()
+            .flatten()
+            .cloned()
+            .collect()
     }
 
     /// Check and process mob respawns. Called by GameLoop tick.
     /// Returns list of mob IDs that just respawned.
-    pub fn check_respawn(&self, channel_bus: &crate::game::map::ChannelBus) -> Vec<Uuid> {
+    pub fn check_respawn(&self, _channel_bus: &crate::game::map::ChannelBus) -> Vec<Uuid> {
         let mut respawned_ids = Vec::new();
         let mut death_times = self.death_times.write();
 
@@ -98,34 +111,46 @@ impl MobSpawnManager {
 
     /// 初始化默认刷新点
     pub fn init_default_spawns(&self) {
-        self.add_spawn("prontera.gat", SpawnPoint {
-            mob_id: 1001,
-            x: 100,
-            y: 100,
-            count: 10,
-            interval: 10000,
-        });
-        self.add_spawn("prontera.gat", SpawnPoint {
-            mob_id: 1002,
-            x: 150,
-            y: 120,
-            count: 5,
-            interval: 15000,
-        });
-        self.add_spawn("new_1-1.gat", SpawnPoint {
-            mob_id: 1001,
-            x: 50,
-            y: 50,
-            count: 15,
-            interval: 5000,
-        });
-        self.add_spawn("new_1-1.gat", SpawnPoint {
-            mob_id: 1312,
-            x: 100,
-            y: 100,
-            count: 10,
-            interval: 10000,
-        });
+        self.add_spawn(
+            "prontera.gat",
+            SpawnPoint {
+                mob_id: 1001,
+                x: 100,
+                y: 100,
+                count: 10,
+                interval: 10000,
+            },
+        );
+        self.add_spawn(
+            "prontera.gat",
+            SpawnPoint {
+                mob_id: 1002,
+                x: 150,
+                y: 120,
+                count: 5,
+                interval: 15000,
+            },
+        );
+        self.add_spawn(
+            "new_1-1.gat",
+            SpawnPoint {
+                mob_id: 1001,
+                x: 50,
+                y: 50,
+                count: 15,
+                interval: 5000,
+            },
+        );
+        self.add_spawn(
+            "new_1-1.gat",
+            SpawnPoint {
+                mob_id: 1312,
+                x: 100,
+                y: 100,
+                count: 10,
+                interval: 10000,
+            },
+        );
     }
 }
 

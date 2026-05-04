@@ -1,6 +1,6 @@
 //! 公会系统数据包协议
 
-use super::packet_builder::{PacketBuilder, Packed, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
 
 const GUILD_NAME_LENGTH: usize = 24;
 const MEMBER_NAME_LENGTH: usize = 24;
@@ -107,7 +107,10 @@ impl Packed for CZGuildExpel {
         let mut offset = 0;
         let target_name = parse_fixed_string(slice, &mut offset, MEMBER_NAME_LENGTH)?;
         let reason = parse_fixed_string(slice, &mut offset, MES_LENGTH)?;
-        Some(Self { target_name, reason })
+        Some(Self {
+            target_name,
+            reason,
+        })
     }
 }
 
@@ -139,9 +142,7 @@ pub struct CZGuildRequestInfo {
 
 impl Packed for CZGuildRequestInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B7)
-            .put_u32(self.guild_id)
-            .build()
+        PacketBuilder::new(0x01B7).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -161,9 +162,7 @@ pub struct CZGuildRequestMemberInfo {
 
 impl Packed for CZGuildRequestMemberInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B8)
-            .put_u32(self.guild_id)
-            .build()
+        PacketBuilder::new(0x01B8).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -183,9 +182,7 @@ pub struct CZGuildRequestPosInfo {
 
 impl Packed for CZGuildRequestPosInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B9)
-            .put_u32(self.guild_id)
-            .build()
+        PacketBuilder::new(0x01B9).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -205,9 +202,7 @@ pub struct CZGuildChat {
 
 impl Packed for CZGuildChat {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01EC)
-            .put_str(&self.message)
-            .build()
+        PacketBuilder::new(0x01EC).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -338,9 +333,7 @@ pub struct ZCGuildLeaveResult {
 
 impl Packed for ZCGuildLeaveResult {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0154)
-            .put_u8(self.result)
-            .build()
+        PacketBuilder::new(0x0154).put_u8(self.result).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {

@@ -1,4 +1,4 @@
-use super::packet_builder::{PacketBuilder, Packed, parse_fixed_string, parse_string};
+use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string, parse_string};
 
 /// 客户端创建队伍 (0x0100)
 #[derive(Debug, Clone)]
@@ -89,9 +89,7 @@ pub struct CZPartyChat {
 
 impl Packed for CZPartyChat {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0109)
-            .put_str(&self.message)
-            .build()
+        PacketBuilder::new(0x0109).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -109,9 +107,7 @@ pub struct CZChatMessage {
 
 impl Packed for CZChatMessage {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x010C)
-            .put_str(&self.message)
-            .build()
+        PacketBuilder::new(0x010C).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {

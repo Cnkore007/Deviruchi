@@ -8,19 +8,20 @@ pub mod version;
 
 use crate::game::heal;
 
-pub use config::{Config, HotReloadConfig};
-pub use version::VERSION;
-pub use logging::{LogManager, LogConfig, LogCategory, LogLevel};
 pub use crate::game::AtCommandHandler;
+pub use config::{Config, HotReloadConfig};
+pub use logging::{LogCategory, LogConfig, LogLevel, LogManager};
+pub use version::VERSION;
 
-use std::sync::Arc;
 use crate::cli::Cli;
-use crate::storage::{Database, init_schema};
-use crate::network::{SessionManager, GameServer, PacketHandler, ModernServer};
-use crate::game::token::TokenStore;
-use crate::game::map::{MapState, ChannelBus, DropManager};
+use crate::game::map::{ChannelBus, DropManager, MapState};
 use crate::game::party::PartyManager;
+use crate::game::token::TokenStore;
+use crate::network::{GameServer, ModernServer, PacketHandler, SessionManager};
+use crate::storage::{Database, init_schema};
+use std::sync::Arc;
 
+#[allow(dead_code)]
 pub struct Core {
     cli: Cli,
     config: Config,
@@ -76,7 +77,11 @@ impl Core {
         // 设置 panic hook
         crate::core::panic::PanicHandler::init();
 
-        tracing::info!("{} v{} 启动中...", crate::core::version::NAME, crate::core::VERSION);
+        tracing::info!(
+            "{} v{} 启动中...",
+            crate::core::version::NAME,
+            crate::core::VERSION
+        );
 
         // 启动 HP/SP 回复服务
         self.heal_service.start(self.map_state.clone());

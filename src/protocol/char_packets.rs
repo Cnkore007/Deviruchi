@@ -1,4 +1,4 @@
-use super::packet_builder::{PacketBuilder, Packed};
+use super::packet_builder::{Packed, PacketBuilder};
 
 /// 客户端进入地图请求 (0x007C)
 #[derive(Debug, Clone)]
@@ -8,9 +8,7 @@ pub struct CZEnter {
 
 impl Packed for CZEnter {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x007C)
-            .put_u32(self.gc_id)
-            .build()
+        PacketBuilder::new(0x007C).put_u32(self.gc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {

@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::fs;
 use uuid::Uuid;
 
-use crate::game::rand::GameRng;
 use crate::game::map::drop_item::DropItem;
+use crate::game::rand::GameRng;
 
 /// 掉落表条目
 #[derive(Debug, Clone)]
@@ -137,8 +137,8 @@ impl DropResolver {
                     id: Uuid::new_v4(),
                     item_id: entry.item_id,
                     amount,
-                    x: 0, // 由调用者设置
-                    y: 0, // 由调用者设置
+                    x: 0,                    // 由调用者设置
+                    y: 0,                    // 由调用者设置
                     map_name: String::new(), // 由调用者设置
                     dropped_at: std::time::Instant::now(),
                 });
@@ -195,7 +195,11 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(min);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(min);
             val.min(max).max(min)
         }
 
@@ -206,14 +210,22 @@ mod tests {
                 *p = current.wrapping_add(1);
                 current
             };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val % 2 == 0
         }
 
         fn rand_bp(&self, _chance: u32) -> u32 {
             // basis points: return 0 for always drop, 10001 for never drop
             let idx = unsafe { *self.index.get() };
-            let val = self.values.get(idx % self.values.len()).copied().unwrap_or(0);
+            let val = self
+                .values
+                .get(idx % self.values.len())
+                .copied()
+                .unwrap_or(0);
             val
         }
     }
@@ -279,7 +291,10 @@ mod tests {
         assert!(!drops.is_empty());
 
         for drop in drops {
-            assert!(drop.amount >= 1 && drop.amount <= 5, "Amount should be in range 1-5");
+            assert!(
+                drop.amount >= 1 && drop.amount <= 5,
+                "Amount should be in range 1-5"
+            );
         }
     }
 
@@ -289,7 +304,7 @@ mod tests {
         let resolver = DropResolver;
         let table = MobDropTable::new(vec![
             create_entry(501, 1, 1, 10000, false, false), // Always drops
-            create_entry(502, 1, 1, 0, false, false),      // Never drops
+            create_entry(502, 1, 1, 0, false, false),     // Never drops
         ]);
 
         // Both entries should be rolled independently
@@ -313,12 +328,18 @@ mod tests {
 
         // Without MVP ID - should not drop MVP bonus
         let drops_no_mvp = resolver.resolve(&table, &test_rng, 1, None);
-        assert!(drops_no_mvp.is_empty(), "MVP bonus should not drop without mvp_id");
+        assert!(
+            drops_no_mvp.is_empty(),
+            "MVP bonus should not drop without mvp_id"
+        );
 
         // With MVP ID - should drop
         let mvp_id = Uuid::new_v4();
         let drops_with_mvp = resolver.resolve(&table, &test_rng, 1, Some(mvp_id));
-        assert!(!drops_with_mvp.is_empty(), "MVP bonus should drop with mvp_id");
+        assert!(
+            !drops_with_mvp.is_empty(),
+            "MVP bonus should drop with mvp_id"
+        );
     }
 
     // Test 6: pick_mvp -> returns highest damage player

@@ -15,7 +15,11 @@ pub struct GameMap {
 
 impl GameMap {
     pub fn new(width: u32, height: u32, tile_size: f32) -> Self {
-        Self { width, height, tile_size }
+        Self {
+            width,
+            height,
+            tile_size,
+        }
     }
 }
 

@@ -1,9 +1,8 @@
-use std::sync::Arc;
-use crate::game::map::Player;
 use super::data::{ItemDatabase, ItemType};
+use super::equipment::EquipSlot;
 use super::inventory::{Inventory, InventorySlot};
-use super::equipment::{Equipment, EquipSlot};
-use super::effect::{ItemEffect, EffectResult};
+use crate::game::map::Player;
+use std::sync::Arc;
 
 /// 物品处理器
 pub struct ItemHandler {
@@ -16,13 +15,16 @@ impl ItemHandler {
     }
 
     /// 使用物品（治疗类）
-    pub fn use_item(&self,
+    pub fn use_item(
+        &self,
         player: &Player,
         inventory: &mut Inventory,
-        slot_index: u8
+        slot_index: u8,
     ) -> Option<super::data::Item> {
         let slot = inventory.slots().get(slot_index as usize)?;
-        if slot.is_empty() { return None; }
+        if slot.is_empty() {
+            return None;
+        }
 
         let item = self.db.get(slot.item_id)?;
 
@@ -57,15 +59,13 @@ impl ItemHandler {
         player: &Player,
         inventory: &mut Inventory,
         slot_index: u8,
-        equip_slot: EquipSlot
+        equip_slot: EquipSlot,
     ) -> EquipResult {
         let item = match inventory.slots().get(slot_index as usize) {
-            Some(s) if !s.is_empty() => {
-                match self.db.get(s.item_id) {
-                    Some(i) => i.clone(),
-                    None => return EquipResult::Failed(EquipError::InvalidItem),
-                }
-            }
+            Some(s) if !s.is_empty() => match self.db.get(s.item_id) {
+                Some(i) => i.clone(),
+                None => return EquipResult::Failed(EquipError::InvalidItem),
+            },
             _ => return EquipResult::Failed(EquipError::InvalidSlot),
         };
 
@@ -96,7 +96,7 @@ impl ItemHandler {
                 identified: true,
                 refine: 0,
                 cards: [0; 4],
-            }
+            },
         );
 
         // 如果有旧装备，返还到背包
@@ -115,7 +115,7 @@ impl ItemHandler {
         &self,
         player: &Player,
         inventory: &mut Inventory,
-        equip_slot: EquipSlot
+        equip_slot: EquipSlot,
     ) -> UnequipResult {
         let mut equipment = player.equipment.write();
         let item = match equipment.unequip(equip_slot) {

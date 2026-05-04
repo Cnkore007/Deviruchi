@@ -3,18 +3,18 @@ use serde::{Deserialize, Serialize};
 /// 地图格子类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CellType {
-    Walkable,      // 可行走
-    Wall,          // 墙壁
-    Water,         // 水域
-    Cliff,         // 悬崖
-    Npc,           // NPC位置
-    Warp,          // 传送点
-    Snipable,      // 可射击(可穿过但不可行走)
-    Icetrap,       // 冰陷阱
-    Basilica,      // 圣域
-    Landmine,      // 地雷
-    NoChat,        // 禁止聊天
-    Novice,        // 新手区
+    Walkable, // 可行走
+    Wall,     // 墙壁
+    Water,    // 水域
+    Cliff,    // 悬崖
+    Npc,      // NPC位置
+    Warp,     // 传送点
+    Snipable, // 可射击(可穿过但不可行走)
+    Icetrap,  // 冰陷阱
+    Basilica, // 圣域
+    Landmine, // 地雷
+    NoChat,   // 禁止聊天
+    Novice,   // 新手区
 }
 
 /// 地图格子
@@ -37,7 +37,10 @@ impl Cell {
     }
 
     pub fn is_walkable(&self) -> bool {
-        matches!(self.cell_type, CellType::Walkable | CellType::Npc | CellType::Warp | CellType::Novice)
+        matches!(
+            self.cell_type,
+            CellType::Walkable | CellType::Npc | CellType::Warp | CellType::Novice
+        )
     }
 
     pub fn is_sight_blocking(&self) -> bool {

@@ -1,6 +1,6 @@
-use bytes::{BytesMut, BufMut};
-use tokio_util::codec::{Decoder, Encoder};
 use super::packet::Packet;
+use bytes::{BufMut, BytesMut};
+use tokio_util::codec::{Decoder, Encoder};
 
 pub struct PacketCodec;
 
@@ -29,7 +29,7 @@ impl Decoder for PacketCodec {
             None => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    "Invalid packet format"
+                    "Invalid packet format",
                 ));
             }
         };

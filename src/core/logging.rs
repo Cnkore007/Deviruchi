@@ -7,10 +7,10 @@
 //! - 系统日志 (login, char, map, sql)
 //! - GM 命令日志
 
-use std::sync::OnceLock;
 use parking_lot::RwLock;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use std::sync::OnceLock;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// 日志分类
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -154,13 +154,15 @@ impl Default for LogConfig {
 }
 
 /// 全局日志管理器
+#[allow(dead_code)]
 pub struct LogManager {
     /// 日志配置
     config: RwLock<LogConfig>,
     /// 日志目录
     log_dir: String,
     /// 各分类的 appender
-    appenders: RwLock<std::collections::HashMap<LogCategory, tracing_appender::non_blocking::WorkerGuard>>,
+    appenders:
+        RwLock<std::collections::HashMap<LogCategory, tracing_appender::non_blocking::WorkerGuard>>,
 }
 
 impl LogManager {
@@ -180,9 +182,7 @@ impl LogManager {
         if !config.enabled {
             // 如果禁用日志，只输出到 /dev/null
             let filter = EnvFilter::new("off");
-            tracing_subscriber::registry()
-                .with(filter)
-                .init();
+            tracing_subscriber::registry().with(filter).init();
             return Ok(());
         }
 
@@ -225,8 +225,8 @@ impl LogManager {
             LogLevel::Error => "error",
         };
 
-        let filter = EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::new(env_filter));
+        let filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
 
         // 构建日志层
         let subscriber = tracing_subscriber::registry().with(filter);
@@ -283,7 +283,12 @@ impl LogManager {
             String::new()
         };
 
-        let file_path = format!("{}/{}/{}", self.log_dir, category.dir_name(), category.file_name());
+        let file_path = format!(
+            "{}/{}/{}",
+            self.log_dir,
+            category.dir_name(),
+            category.file_name()
+        );
 
         let line = if timestamp.is_empty() {
             format!("{}\n", message)
@@ -302,7 +307,11 @@ impl LogManager {
 
         // 截断过长消息以避免日志过长
         let truncated_message = if message.len() > 200 {
-            format!("{}...[truncated {} chars]", &message[..100], message.len() - 100)
+            format!(
+                "{}...[truncated {} chars]",
+                &message[..100],
+                message.len() - 100
+            )
         } else {
             message.to_string()
         };
@@ -335,104 +344,184 @@ impl LogManager {
     }
 
     /// 记录物品拾取日志
-    pub fn log_pick(&self, player_id: u32, player_name: &str, item_id: u32, item_name: &str, amount: i32, reason: &str) {
-        self.write_category(LogCategory::Pick, &format!(
-            "{} ({}) {} x{} - {}",
-            player_name, player_id, item_name, amount, reason
-        ));
+    pub fn log_pick(
+        &self,
+        player_id: u32,
+        player_name: &str,
+        _item_id: u32,
+        item_name: &str,
+        amount: i32,
+        reason: &str,
+    ) {
+        self.write_category(
+            LogCategory::Pick,
+            &format!(
+                "{} ({}) {} x{} - {}",
+                player_name, player_id, item_name, amount, reason
+            ),
+        );
     }
 
     /// 记录 Zeny 交易日志
-    pub fn log_zeny(&self, player_id: u32, player_name: &str, amount: i32, reason: &str, target: Option<(&str, u32)>) {
-        let target_str = target.map(|(t, id)| format!(" -> {} ({})", t, id)).unwrap_or_default();
-        self.write_category(LogCategory::Zeny, &format!(
-            "{} ({}) {} zeny - {}{}",
-            player_name, player_id, amount, reason, target_str
-        ));
+    pub fn log_zeny(
+        &self,
+        player_id: u32,
+        player_name: &str,
+        amount: i32,
+        reason: &str,
+        target: Option<(&str, u32)>,
+    ) {
+        let target_str = target
+            .map(|(t, id)| format!(" -> {} ({})", t, id))
+            .unwrap_or_default();
+        self.write_category(
+            LogCategory::Zeny,
+            &format!(
+                "{} ({}) {} zeny - {}{}",
+                player_name, player_id, amount, reason, target_str
+            ),
+        );
     }
 
     /// 记录聊天日志
-    pub fn log_chat(&self, chat_type: &str, sender_id: u32, sender_name: &str, message: &str, channel: Option<&str>) {
+    pub fn log_chat(
+        &self,
+        chat_type: &str,
+        sender_id: u32,
+        sender_name: &str,
+        message: &str,
+        channel: Option<&str>,
+    ) {
         let channel_str = channel.map(|c| format!(" [{}]", c)).unwrap_or_default();
-        self.write_category(LogCategory::Chat, &format!(
-            "[{}] {} ({}): {}{}",
-            chat_type, sender_name, sender_id, message, channel_str
-        ));
+        self.write_category(
+            LogCategory::Chat,
+            &format!(
+                "[{}] {} ({}): {}{}",
+                chat_type, sender_name, sender_id, message, channel_str
+            ),
+        );
     }
 
     /// 记录 GM 命令
-    pub fn log_gm_command(&self, gm_id: u32, gm_name: &str, command: &str, target: Option<(&str, u32)>) {
-        let target_str = target.map(|(t, id)| format!(" on {} ({})", t, id)).unwrap_or_default();
-        self.write_category(LogCategory::GmCommand, &format!(
-            "{} ({}) used: {}{}",
-            gm_name, gm_id, command, target_str
-        ));
+    pub fn log_gm_command(
+        &self,
+        gm_id: u32,
+        gm_name: &str,
+        command: &str,
+        target: Option<(&str, u32)>,
+    ) {
+        let target_str = target
+            .map(|(t, id)| format!(" on {} ({})", t, id))
+            .unwrap_or_default();
+        self.write_category(
+            LogCategory::GmCommand,
+            &format!("{} ({}) used: {}{}", gm_name, gm_id, command, target_str),
+        );
     }
 
     /// 记录战斗日志
-    pub fn log_battle(&self, attacker_name: &str, attacker_id: u32, target_name: &str, target_id: u32, damage: i32, skill_name: Option<&str>) {
+    pub fn log_battle(
+        &self,
+        attacker_name: &str,
+        attacker_id: u32,
+        target_name: &str,
+        target_id: u32,
+        damage: i32,
+        skill_name: Option<&str>,
+    ) {
         let skill_str = skill_name.map(|s| format!(" [{}]", s)).unwrap_or_default();
-        self.write_category(LogCategory::Battle, &format!(
-            "{} ({}) -> {} ({}) damage: {}{}",
-            attacker_name, attacker_id, target_name, target_id, damage, skill_str
-        ));
+        self.write_category(
+            LogCategory::Battle,
+            &format!(
+                "{} ({}) -> {} ({}) damage: {}{}",
+                attacker_name, attacker_id, target_name, target_id, damage, skill_str
+            ),
+        );
     }
 
     /// 记录怪物死亡
     pub fn log_mob_death(&self, mob_id: u32, mob_name: &str, killer_name: &str, killer_id: u32) {
-        self.write_category(LogCategory::Battle, &format!(
-            "Monster {} ({}) killed by {} ({})",
-            mob_name, mob_id, killer_name, killer_id
-        ));
+        self.write_category(
+            LogCategory::Battle,
+            &format!(
+                "Monster {} ({}) killed by {} ({})",
+                mob_name, mob_id, killer_name, killer_id
+            ),
+        );
     }
 
     /// 记录 MVP 掉落
-    pub fn log_mvp_drop(&self, mob_id: u32, mob_name: &str, item_id: u32, item_name: &str, winner_name: &str, winner_id: u32) {
-        self.write_category(LogCategory::MvpDrop, &format!(
-            "MVP {} ({}) dropped {} ({}) to {} ({})",
-            mob_name, mob_id, item_name, item_id, winner_name, winner_id
-        ));
+    pub fn log_mvp_drop(
+        &self,
+        mob_id: u32,
+        mob_name: &str,
+        item_id: u32,
+        item_name: &str,
+        winner_name: &str,
+        winner_id: u32,
+    ) {
+        self.write_category(
+            LogCategory::MvpDrop,
+            &format!(
+                "MVP {} ({}) dropped {} ({}) to {} ({})",
+                mob_name, mob_id, item_name, item_id, winner_name, winner_id
+            ),
+        );
     }
 
     /// 记录登录
     pub fn log_login(&self, account_id: u32, username: &str, ip: &str, success: bool) {
         let status = if success { "SUCCESS" } else { "FAILED" };
-        self.write_category(LogCategory::Login, &format!(
-            "{} {} from {} - {}",
-            username, account_id, ip, status
-        ));
+        self.write_category(
+            LogCategory::Login,
+            &format!("{} {} from {} - {}", username, account_id, ip, status),
+        );
     }
 
     /// 记录角色选择
     pub fn log_char_select(&self, account_id: u32, char_name: &str, char_id: u32, ip: &str) {
-        self.write_category(LogCategory::Char, &format!(
-            "Account {} selected {} ({}) from {}",
-            account_id, char_name, char_id, ip
-        ));
+        self.write_category(
+            LogCategory::Char,
+            &format!(
+                "Account {} selected {} ({}) from {}",
+                account_id, char_name, char_id, ip
+            ),
+        );
     }
 
     /// 记录地图登录
     pub fn log_map_login(&self, char_name: &str, char_id: u32, map: &str) {
-        self.write_category(LogCategory::Map, &format!(
-            "{} ({}) entered map {}",
-            char_name, char_id, map
-        ));
+        self.write_category(
+            LogCategory::Map,
+            &format!("{} ({}) entered map {}", char_name, char_id, map),
+        );
     }
 
     /// 记录 NPC 对话
     pub fn log_npc(&self, npc_name: &str, player_name: &str, player_id: u32, action: &str) {
-        self.write_category(LogCategory::Npc, &format!(
-            "{}: {} ({}) - {}",
-            npc_name, player_name, player_id, action
-        ));
+        self.write_category(
+            LogCategory::Npc,
+            &format!("{}: {} ({}) - {}", npc_name, player_name, player_id, action),
+        );
     }
 
     /// 记录交易
-    pub fn log_trade(&self, player1_name: &str, player1_id: u32, player2_name: &str, player2_id: u32, item_count: u32, zeny: u32) {
-        self.write_category(LogCategory::Trade, &format!(
-            "{} ({}) <-> {} ({}): items={}, zeny={}",
-            player1_name, player1_id, player2_name, player2_id, item_count, zeny
-        ));
+    pub fn log_trade(
+        &self,
+        player1_name: &str,
+        player1_id: u32,
+        player2_name: &str,
+        player2_id: u32,
+        item_count: u32,
+        zeny: u32,
+    ) {
+        self.write_category(
+            LogCategory::Trade,
+            &format!(
+                "{} ({}) <-> {} ({}): items={}, zeny={}",
+                player1_name, player1_id, player2_name, player2_id, item_count, zeny
+            ),
+        );
     }
 
     /// 更新配置
@@ -462,10 +551,7 @@ fn chrono_lite_timestamp() -> String {
     let minutes = (secs % 3600) / 60;
     let seconds = secs % 60;
 
-    format!(
-        "{:02}:{:02}:{:02}.{:03}",
-        hours, minutes, seconds, millis
-    )
+    format!("{:02}:{:02}:{:02}.{:03}", hours, minutes, seconds, millis)
 }
 
 /// 全局日志管理器实例
@@ -485,21 +571,40 @@ pub fn get_log_manager() -> Option<&'static LogManager> {
 }
 
 /// 全局便捷方法 - 记录物品拾取
-pub fn log_pick(player_id: u32, player_name: &str, item_id: u32, item_name: &str, amount: i32, reason: &str) {
+pub fn log_pick(
+    player_id: u32,
+    player_name: &str,
+    item_id: u32,
+    item_name: &str,
+    amount: i32,
+    reason: &str,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
         manager.log_pick(player_id, player_name, item_id, item_name, amount, reason);
     }
 }
 
 /// 全局便捷方法 - 记录 Zeny
-pub fn log_zeny(player_id: u32, player_name: &str, amount: i32, reason: &str, target: Option<(&str, u32)>) {
+pub fn log_zeny(
+    player_id: u32,
+    player_name: &str,
+    amount: i32,
+    reason: &str,
+    target: Option<(&str, u32)>,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
         manager.log_zeny(player_id, player_name, amount, reason, target);
     }
 }
 
 /// 全局便捷方法 - 记录聊天
-pub fn log_chat(chat_type: &str, sender_id: u32, sender_name: &str, message: &str, channel: Option<&str>) {
+pub fn log_chat(
+    chat_type: &str,
+    sender_id: u32,
+    sender_name: &str,
+    message: &str,
+    channel: Option<&str>,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
         manager.log_chat(chat_type, sender_id, sender_name, message, channel);
     }
@@ -513,9 +618,23 @@ pub fn log_gm_command(gm_id: u32, gm_name: &str, command: &str, target: Option<(
 }
 
 /// 全局便捷方法 - 记录战斗
-pub fn log_battle(attacker_name: &str, attacker_id: u32, target_name: &str, target_id: u32, damage: i32, skill_name: Option<&str>) {
+pub fn log_battle(
+    attacker_name: &str,
+    attacker_id: u32,
+    target_name: &str,
+    target_id: u32,
+    damage: i32,
+    skill_name: Option<&str>,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
-        manager.log_battle(attacker_name, attacker_id, target_name, target_id, damage, skill_name);
+        manager.log_battle(
+            attacker_name,
+            attacker_id,
+            target_name,
+            target_id,
+            damage,
+            skill_name,
+        );
     }
 }
 
@@ -527,7 +646,14 @@ pub fn log_mob_death(mob_id: u32, mob_name: &str, killer_name: &str, killer_id: 
 }
 
 /// 全局便捷方法 - 记录 MVP 掉落
-pub fn log_mvp_drop(mob_id: u32, mob_name: &str, item_id: u32, item_name: &str, winner_name: &str, winner_id: u32) {
+pub fn log_mvp_drop(
+    mob_id: u32,
+    mob_name: &str,
+    item_id: u32,
+    item_name: &str,
+    winner_name: &str,
+    winner_id: u32,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
         manager.log_mvp_drop(mob_id, mob_name, item_id, item_name, winner_name, winner_id);
     }
@@ -562,9 +688,23 @@ pub fn log_npc(npc_name: &str, player_name: &str, player_id: u32, action: &str) 
 }
 
 /// 全局便捷方法 - 记录交易
-pub fn log_trade(player1_name: &str, player1_id: u32, player2_name: &str, player2_id: u32, item_count: u32, zeny: u32) {
+pub fn log_trade(
+    player1_name: &str,
+    player1_id: u32,
+    player2_name: &str,
+    player2_id: u32,
+    item_count: u32,
+    zeny: u32,
+) {
     if let Some(manager) = LOG_MANAGER.get() {
-        manager.log_trade(player1_name, player1_id, player2_name, player2_id, item_count, zeny);
+        manager.log_trade(
+            player1_name,
+            player1_id,
+            player2_name,
+            player2_id,
+            item_count,
+            zeny,
+        );
     }
 }
 

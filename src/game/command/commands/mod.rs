@@ -1,2 +1,2 @@
-pub mod teleport;
 pub mod player;
+pub mod teleport;

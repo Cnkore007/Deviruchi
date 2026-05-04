@@ -152,7 +152,12 @@ impl GuildManager {
     }
 
     /// 直接设置成员职位（无需权限检查，用于初始化会长等）
-    pub fn set_member_position_direct(&self, guild_id: &Uuid, player_id: &Uuid, position_id: u8) -> bool {
+    pub fn set_member_position_direct(
+        &self,
+        guild_id: &Uuid,
+        player_id: &Uuid,
+        position_id: u8,
+    ) -> bool {
         let mut guilds = self.guilds.write();
         let Some(guild) = guilds.get_mut(guild_id) else {
             return false;
@@ -187,10 +192,10 @@ impl GuildManager {
     /// 更新成员在线状态
     pub fn set_member_online(&self, guild_id: &Uuid, player_id: &Uuid, online: bool) {
         let mut guilds = self.guilds.write();
-        if let Some(guild) = guilds.get_mut(guild_id) {
-            if let Some(member) = guild.get_member_mut(player_id) {
-                member.online = online;
-            }
+        if let Some(guild) = guilds.get_mut(guild_id)
+            && let Some(member) = guild.get_member_mut(player_id)
+        {
+            member.online = online;
         }
     }
 }
@@ -219,14 +224,24 @@ mod tests {
     #[test]
     fn test_create_duplicate_guild_name() {
         let manager = GuildManager::new();
-        assert!(manager.create_guild("SameName".to_string(), "M1".to_string()).is_some());
-        assert!(manager.create_guild("SameName".to_string(), "M2".to_string()).is_none());
+        assert!(
+            manager
+                .create_guild("SameName".to_string(), "M1".to_string())
+                .is_some()
+        );
+        assert!(
+            manager
+                .create_guild("SameName".to_string(), "M2".to_string())
+                .is_none()
+        );
     }
 
     #[test]
     fn test_disband_guild() {
         let manager = GuildManager::new();
-        let guild_id = manager.create_guild("TestGuild".to_string(), "Master".to_string()).unwrap();
+        let guild_id = manager
+            .create_guild("TestGuild".to_string(), "Master".to_string())
+            .unwrap();
         assert!(manager.disband_guild(&guild_id));
         assert!(manager.get_guild(&guild_id).is_none());
     }
@@ -234,7 +249,9 @@ mod tests {
     #[test]
     fn test_join_and_leave_guild() {
         let manager = GuildManager::new();
-        let guild_id = manager.create_guild("TestGuild".to_string(), "Master".to_string()).unwrap();
+        let guild_id = manager
+            .create_guild("TestGuild".to_string(), "Master".to_string())
+            .unwrap();
         let player_id = Uuid::new_v4();
 
         assert!(manager.join_guild(guild_id, player_id, "Member".to_string()));
@@ -247,7 +264,9 @@ mod tests {
     #[test]
     fn test_expel_member() {
         let manager = GuildManager::new();
-        let guild_id = manager.create_guild("TestGuild".to_string(), "Master".to_string()).unwrap();
+        let guild_id = manager
+            .create_guild("TestGuild".to_string(), "Master".to_string())
+            .unwrap();
         let master_id = Uuid::new_v4();
         let member_id = Uuid::new_v4();
 
@@ -287,7 +306,9 @@ mod tests {
     #[test]
     fn test_get_player_guild_id() {
         let manager = GuildManager::new();
-        let guild_id = manager.create_guild("TestGuild".to_string(), "Master".to_string()).unwrap();
+        let guild_id = manager
+            .create_guild("TestGuild".to_string(), "Master".to_string())
+            .unwrap();
         let player_id = Uuid::new_v4();
 
         manager.join_guild(guild_id, player_id, "Member".to_string());
@@ -297,7 +318,9 @@ mod tests {
     #[test]
     fn test_set_member_online() {
         let manager = GuildManager::new();
-        let guild_id = manager.create_guild("TestGuild".to_string(), "Master".to_string()).unwrap();
+        let guild_id = manager
+            .create_guild("TestGuild".to_string(), "Master".to_string())
+            .unwrap();
         let player_id = Uuid::new_v4();
 
         manager.join_guild(guild_id, player_id, "Member".to_string());

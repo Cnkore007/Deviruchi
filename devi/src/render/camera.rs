@@ -1,5 +1,5 @@
+use crate::game::player::{LocalPlayer, Position};
 use bevy::prelude::*;
-use crate::game::player::{Position, LocalPlayer};
 
 pub fn follow_camera(
     player_query: Query<&Position, With<LocalPlayer>>,

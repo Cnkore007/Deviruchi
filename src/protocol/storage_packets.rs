@@ -20,9 +20,9 @@ impl CZReqStorageClose {
 
 /// 客户端请求移动物品（存/取）(0x0215)
 pub struct CZReqStorageMoveItem {
-    pub from_index: u16,  // 源位置（背包或仓库索引）
-    pub to_index: u16,    // 目标位置（仓库或背包索引）
-    pub amount: u16,      // 数量
+    pub from_index: u16,     // 源位置（背包或仓库索引）
+    pub to_index: u16,       // 目标位置（仓库或背包索引）
+    pub amount: u16,         // 数量
     pub is_to_storage: bool, // true = 存入仓库, false = 取出到背包
 }
 
@@ -42,14 +42,12 @@ impl CZReqStorageMoveItem {
 
 /// 服务器通知仓库打开 (0x01F3)
 pub struct ZCStorageOpen {
-    pub result: u8,  // 0 = 成功, 1 = 失败
+    pub result: u8, // 0 = 成功, 1 = 失败
 }
 
 impl ZCStorageOpen {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F3)
-            .put_u8(self.result)
-            .build()
+        PacketBuilder::new(0x01F3).put_u8(self.result).build()
     }
 }
 

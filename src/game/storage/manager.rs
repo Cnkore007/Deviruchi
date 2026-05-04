@@ -26,9 +26,7 @@ impl StorageManager {
         }
 
         // 创建新仓库
-        let storage = Arc::new(RwLock::new(
-            Storage::new(max_size).with_char_id(char_id)
-        ));
+        let storage = Arc::new(RwLock::new(Storage::new(max_size).with_char_id(char_id)));
         storages.insert(char_id, storage.clone());
         storage
     }

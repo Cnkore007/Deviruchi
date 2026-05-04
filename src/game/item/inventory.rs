@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use super::data::{Item, ItemDatabase};
+use std::sync::Arc;
 
 /// 背包格子
 #[derive(Debug, Clone)]
@@ -39,9 +39,7 @@ pub struct Inventory {
 
 impl Inventory {
     pub fn new(max_size: u8, item_db: Arc<ItemDatabase>) -> Self {
-        let slots: Vec<_> = (0..max_size)
-            .map(InventorySlot::empty)
-            .collect();
+        let slots: Vec<_> = (0..max_size).map(InventorySlot::empty).collect();
 
         Self {
             max_size,
@@ -77,7 +75,7 @@ impl Inventory {
             }
         }
 
-        false  // 背包已满
+        false // 背包已满
     }
 
     /// 移除物品
@@ -137,12 +135,13 @@ impl Inventory {
 
     /// 计算总重量
     pub fn calc_weight(&self) -> u32 {
-        self.slots.iter()
+        self.slots
+            .iter()
             .filter(|s| !s.is_empty())
             .filter_map(|s| {
-                self.item_db.get(s.item_id).map(|item| {
-                    (item.weight as u32) * (s.amount as u32)
-                })
+                self.item_db
+                    .get(s.item_id)
+                    .map(|item| (item.weight as u32) * (s.amount as u32))
             })
             .sum()
     }
@@ -169,9 +168,7 @@ impl Inventory {
 
     /// 获取物品重量
     pub fn get_item_weight(&self, item_id: u16) -> u16 {
-        self.item_db.get(item_id)
-            .map(|i| i.weight)
-            .unwrap_or(0)
+        self.item_db.get(item_id).map(|i| i.weight).unwrap_or(0)
     }
 
     /// 获取物品数据库引用
@@ -198,6 +195,46 @@ impl Inventory {
             }
         }
         false
+    }
+
+    /// 从 CharacterInventoryData 创建 Inventory
+    pub fn from_character_inventory(
+        data: &[crate::storage::character::CharacterInventoryData],
+        item_db: Arc<ItemDatabase>,
+    ) -> Self {
+        let max_size = 100u8;
+        let mut inv = Self::new(max_size, item_db);
+
+        for char_slot in data {
+            if char_slot.index < max_size
+                && let Some(slot) = inv.slots.get_mut(char_slot.index as usize)
+            {
+                slot.item_id = char_slot.item_id;
+                slot.amount = char_slot.amount;
+                slot.identified = char_slot.identified;
+                slot.refine = char_slot.refine;
+                slot.cards = char_slot.cards;
+            }
+        }
+
+        inv.update_weight();
+        inv
+    }
+
+    /// 转换为 CharacterInventoryData
+    pub fn to_character_inventory(&self) -> Vec<crate::storage::character::CharacterInventoryData> {
+        self.slots
+            .iter()
+            .filter(|slot| !slot.is_empty())
+            .map(|slot| crate::storage::character::CharacterInventoryData {
+                index: slot.index,
+                item_id: slot.item_id,
+                amount: slot.amount,
+                identified: slot.identified,
+                refine: slot.refine,
+                cards: slot.cards,
+            })
+            .collect()
     }
 }
 
@@ -226,7 +263,7 @@ mod tests {
     fn test_remove_item_updates_weight() {
         let db = Arc::new(ItemDatabase::new());
         let mut inv = Inventory::new(10, db);
-        inv.add_item(501, 5);  // weight = 35
+        inv.add_item(501, 5); // weight = 35
         inv.remove_item(0, 2); // remove 2
         assert_eq!(inv.total_weight(), 21); // 7 * 3
     }

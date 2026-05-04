@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use crate::game::map::Player;
-use crate::game::item::Inventory;
-use crate::game::zeny::ZenyManager;
 use super::data::Npc;
+use crate::game::item::Inventory;
+use crate::game::map::Player;
+use crate::game::zeny::ZenyManager;
+use std::sync::Arc;
 
 /// NPC交互处理器
 pub struct NpcHandler {
@@ -37,7 +37,8 @@ impl NpcHandler {
 
     /// 获取地图上的NPC
     pub fn get_npcs_on_map(&self, map_name: &str) -> Vec<Arc<Npc>> {
-        self.npcs.values()
+        self.npcs
+            .values()
             .filter(|n| n.map_name == map_name)
             .cloned()
             .collect()
@@ -75,14 +76,16 @@ impl NpcHandler {
         inventory: &mut Inventory,
         npc_id: u32,
         item_id: u16,
-        amount: u8
+        amount: u8,
     ) -> BuyResult {
         let npc = match self.get_npc(npc_id) {
             Some(n) => n,
             None => return BuyResult::NpcNotFound,
         };
 
-        let shop_item = npc.shop_items.read()
+        let shop_item = npc
+            .shop_items
+            .read()
             .iter()
             .find(|i| i.item_id == item_id)
             .copied();
@@ -129,7 +132,7 @@ impl NpcHandler {
         player: &Player,
         inventory: &mut Inventory,
         inventory_index: u8,
-        amount: u8
+        amount: u8,
     ) -> SellResult {
         // 获取物品
         let slot = match inventory.slots().get(inventory_index as usize) {
@@ -177,7 +180,9 @@ impl NpcHandler {
             None => return LearnResult::NpcNotFound,
         };
 
-        let npc_skill = npc.skills.read()
+        let npc_skill = npc
+            .skills
+            .read()
             .iter()
             .find(|s| s.skill_id == skill_id)
             .copied();
@@ -200,15 +205,29 @@ impl Default for NpcHandler {
 pub enum NpcResponse {
     NotFound,
     Message(String),
-    OpenShop { npc_id: u32, items: Vec<super::data::ShopItem> },
-    SkillList { npc_id: u32, skills: Vec<super::data::NpcSkill> },
-    Warp { map: String, x: u16, y: u16 },
+    OpenShop {
+        npc_id: u32,
+        items: Vec<super::data::ShopItem>,
+    },
+    SkillList {
+        npc_id: u32,
+        skills: Vec<super::data::NpcSkill>,
+    },
+    Warp {
+        map: String,
+        x: u16,
+        y: u16,
+    },
 }
 
 /// 购买结果
 #[derive(Debug, Clone)]
 pub enum BuyResult {
-    Success { item_id: u16, amount: u8, remaining_zeny: u32 },
+    Success {
+        item_id: u16,
+        amount: u8,
+        remaining_zeny: u32,
+    },
     NpcNotFound,
     ItemNotFound,
     NotEnoughZeny,
@@ -219,7 +238,11 @@ pub enum BuyResult {
 /// 出售结果
 #[derive(Debug, Clone)]
 pub enum SellResult {
-    Success { item_id: u16, amount: u8, gained_zeny: u32 },
+    Success {
+        item_id: u16,
+        amount: u8,
+        gained_zeny: u32,
+    },
     Failed(SellError),
 }
 

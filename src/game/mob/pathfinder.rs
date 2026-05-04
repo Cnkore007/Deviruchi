@@ -8,14 +8,14 @@ type Pos = (u16, u16);
 
 /// 方向偏移量（八方向）
 const DIRECTIONS: [(i32, i32); 8] = [
-    (0, -1),   // 北 (N)
-    (0, 1),    // 南 (S)
-    (-1, 0),   // 西 (W)
-    (1, 0),    // 东 (E)
-    (-1, -1),  // 西北 (NW)
-    (1, -1),   // 东北 (NE)
-    (-1, 1),   // 西南 (SW)
-    (1, 1),    // 东南 (SE)
+    (0, -1),  // 北 (N)
+    (0, 1),   // 南 (S)
+    (-1, 0),  // 西 (W)
+    (1, 0),   // 东 (E)
+    (-1, -1), // 西北 (NW)
+    (1, -1),  // 东北 (NE)
+    (-1, 1),  // 西南 (SW)
+    (1, 1),   // 东南 (SE)
 ];
 
 /// 判断是否为斜角方向
@@ -27,7 +27,7 @@ fn is_diagonal(dx: i32, dy: i32) -> bool {
 fn heuristic(a: &Pos, b: &Pos) -> usize {
     let dx = (a.0 as f64 - b.0 as f64).abs();
     let dy = (a.1 as f64 - b.1 as f64).abs();
-    ((dx * dx + dy * dy) as f64).sqrt() as usize
+    (dx * dx + dy * dy).sqrt() as usize
 }
 
 /// 寻路器
@@ -57,8 +57,8 @@ impl Pathfinder {
         // 检查终点是否在搜索范围内
         let (sx, sy) = start;
         let (ex, ey) = end;
-        let dx = (sx as i32 - ex as i32).abs() as u16;
-        let dy = (sy as i32 - ey as i32).abs() as u16;
+        let dx = (sx as i32 - ex as i32).unsigned_abs() as u16;
+        let dy = (sy as i32 - ey as i32).unsigned_abs() as u16;
         if dx > search_radius || dy > search_radius {
             return None;
         }
@@ -69,7 +69,8 @@ impl Pathfinder {
             |pos| Self::successors(pos, &is_walkable),
             |pos| heuristic(pos, &end),
             |pos| *pos == end,
-        ).map(|(path, _)| path.into_iter().skip(1).collect())
+        )
+        .map(|(path, _)| path.into_iter().skip(1).collect())
     }
 
     /// 生成后继节点（八方向）
@@ -101,11 +102,7 @@ impl Pathfinder {
     }
 
     /// 严格斜角可通行检查
-    fn strict_diagonal_walkable<F>(
-        nx: u16, ny: u16,
-        cx: u16, cy: u16,
-        is_walkable: &F,
-    ) -> bool
+    fn strict_diagonal_walkable<F>(nx: u16, ny: u16, cx: u16, cy: u16, is_walkable: &F) -> bool
     where
         F: Fn(u16, u16) -> bool,
     {

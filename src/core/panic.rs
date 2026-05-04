@@ -1,6 +1,6 @@
-use std::panic;
-use std::io::Write;
 use std::backtrace::Backtrace;
+use std::io::Write;
+use std::panic;
 
 pub struct PanicHandler;
 

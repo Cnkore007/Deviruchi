@@ -1,5 +1,5 @@
-use anyhow::Result;
 use crate::storage::Database;
+use anyhow::Result;
 
 pub fn init_schema(db: &Database) -> Result<()> {
     // 账户表
@@ -171,6 +171,98 @@ pub fn init_schema(db: &Database) -> Result<()> {
             can_use_skill INTEGER DEFAULT 0,
             UNIQUE(guild_id, position_id),
             FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 现金点数表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS cash_points (
+            char_id INTEGER PRIMARY KEY,
+            kafra_points INTEGER DEFAULT 0,
+            credit_points INTEGER DEFAULT 0,
+            total_purchases INTEGER DEFAULT 0,
+            total_gifts INTEGER DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 商城购买日志表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS cashshop_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            char_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 1,
+            unit_price INTEGER NOT NULL,
+            total_price INTEGER NOT NULL,
+            purchase_type TEXT NOT NULL CHECK(purchase_type IN ('buy', 'gift')),
+            target_name TEXT,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (char_id) REFERENCES characters(char_id)
+        )",
+    )?;
+
+    // 每日购买限制表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS cashshop_daily_purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            char_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            purchase_date TEXT NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(char_id, item_id, purchase_date),
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 角色状态效果表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS character_status (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            char_id INTEGER NOT NULL,
+            status_type INTEGER NOT NULL,
+            val1 INTEGER DEFAULT 0,
+            val2 INTEGER DEFAULT 0,
+            val3 INTEGER DEFAULT 0,
+            stack INTEGER DEFAULT 1,
+            duration_ms INTEGER NOT NULL,
+            started_at INTEGER NOT NULL,
+            source_type INTEGER NOT NULL,
+            source_id INTEGER DEFAULT 0,
+            expires_at INTEGER,
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 角色物品栏表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS character_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            char_id INTEGER NOT NULL,
+            slot_index INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            identified INTEGER DEFAULT 1,
+            refine INTEGER DEFAULT 0,
+            card0 INTEGER DEFAULT 0,
+            card1 INTEGER DEFAULT 0,
+            card2 INTEGER DEFAULT 0,
+            card3 INTEGER DEFAULT 0,
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 角色快捷键表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS character_hotkeys (
+            char_id INTEGER NOT NULL,
+            hotkey_id INTEGER NOT NULL,
+            type INTEGER NOT NULL,
+            item_or_skill_id INTEGER NOT NULL,
+            PRIMARY KEY (char_id, hotkey_id),
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
         )",
     )?;
 

@@ -1,350 +1,242 @@
-# Deviruchi vs rAthena 功能完成清单
-
-## 概览
-
-| 分类 | rAthena | Deviruchi 状态 |
-|------|---------|---------------|
-| 总系统数 | ~45 | 约 30+ |
-
----
-
-## 一、核心基础设施 ✅
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 登录服务器 | login.cpp | ✅ `src/game/login.rs` | CA_LOGIN, 账号验证 |
-| 角色服务器 | char.cpp | ✅ `src/game/char.rs` | 角色列表、创建、选择 |
-| 地图服务器 | map.cpp | ✅ `src/game/map/map_server.rs` | 核心地图逻辑 |
-| 网络层 | clif.cpp | ✅ `src/network/` | TCP 监听, packet codec |
-| 数据库 | SQL | ✅ `src/storage/` | SQLite, schema 初始化 |
-| 日志系统 | log.cpp | ✅ `src/core/logging.rs` | tracing 日志，20+ 分类完整实现 |
-| 配置管理 | conf/ | ✅ `src/core/config.rs` | TOML 配置，完整配置项，热重载 |
-
----
-
-## 二、战斗系统 ✅
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 伤害公式 | battle.cpp | ✅ `src/game/battle/formula.rs` | 物理/魔法伤害, 命中率, 爆击率 |
-| 战斗处理 | battle.cpp | ✅ `src/game/battle/handler.rs` | AttackResult, MobAttackResult |
-| 怪物攻击 | battle.cpp | ⚠️ 部分 | `mob_attack()` 存在，逻辑待完善 |
-| 防御计算 | battle.cpp | ✅ 公式已实现 | damage_reduction() |
-| ASPD 攻击速度 | status.cpp | ❌ 未实现 | 角色攻击间隔 |
-| 伤害flag系统 | battle.cpp | ❌ 未实现 | 无属性伤害标记 |
-
----
-
-## 三、状态效果系统 (Buff/Debuff) ⚠️
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 状态效果枚举 | status.hpp | ❌ 未实现 | StatusChange 枚举缺失 |
-| ASPD 修改 | status.cpp | ❌ 未实现 | 攻击速度 buff |
-| 属性加成 | status.cpp | ❌ 未实现 | Str/Agi/Vit 等加成 |
-| 再生效果 | status.cpp | ❌ 未实现 | HP/SP 自然回复 |
-| 状态图标 | status.cpp | ❌ 未实现 | 客户端显示 |
-| **HP/SP 自然回复** | status.cpp | ❌ **待开发** | 核心功能缺失 |
-
----
-
-## 四、技能系统 ⚠️
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 技能数据库 | skill.hpp | ⚠️ `src/game/skill/data.rs` | 基础定义, 4个技能 |
-| 技能处理 | skill.cpp | ❌ `src/game/skill/handler.rs` | 空实现 |
-| 技能施放 | skill.cpp | ❌ 未实现 | cast_time, cooldown |
-| 地面技能 | skill.cpp | ❌ 未实现 | SkillUnit 单元效果 |
-| 技能树 | skill.cpp | ❌ 未实现 | 职业技能解锁 |
-| 职业技能 | skills/* | ❌ 未实现 | 18个子目录未移植 |
-| **技能效果应用** | skill.cpp | ❌ **待开发** | 核心功能缺失 |
-
----
-
-## 五、物品系统 ⚠️
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 物品数据库 | itemdb.cpp | ✅ `src/game/item/data.rs` | YAML 加载, 默认物品 |
-| 物品类型 | itemdb.cpp | ✅ ItemType enum | Heal/Weapon/Armor 等 |
-| 背包管理 | pc.cpp | ✅ `src/game/item/inventory.rs` | add/remove/use |
-| 装备管理 | pc.cpp | ✅ `src/game/item/equipment.rs` | 10个装备栏位 |
-| 物品使用 | pc.cpp | ⚠️ `src/game/item/effect.rs` | 基础效果解析 |
-| 卡片系统 | itemdb.cpp | ❌ 未实现 | 卡片属性附加 |
-| 装备精炼 | pc.cpp | ❌ 未实现 | refine 系统 |
-| 负重检查 | pc.cpp | ✅ 已实现 | is_overweight() |
-| 物品延迟 | itemdb.cpp | ❌ 未实现 | ItemDelay 冷却 |
-| 物品脚本 | itemdb.cpp | ⚠️ 基础解析 | 需完善脚本引擎 |
-
----
-
-## 六、怪物系统 ✅
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 怪物数据库 | mob.cpp | ✅ `src/game/mob/data.rs` | MobTemplate, 4个怪物 |
-| 怪物AI | mob.cpp | ✅ `src/game/mob/ai.rs` | 状态机 (Idle/Chase/Attack) |
-| 怪物刷新 | mob.cpp | ✅ `src/game/mob/spawn.rs` | 刷新点, 延迟复活 |
-| AI 路径寻路 | path.cpp | ✅ `src/game/mob/pathfinder.rs` | A* 寻路 |
-| **掉落表系统** | mob.cpp | ✅ `src/game/mob/droptable.rs` | YAML配置, MVP奖励 |
-| 怪物技能 | mob.cpp | ❌ 未实现 | MonsterSkill |
-| 怪物仇恨 | mob.cpp | ⚠️ damage_log | 基础仇恨追踪 |
-
----
-
-## 七、组队系统 ⚠️
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 创建队伍 | party.cpp | ✅ `src/game/party/manager.rs` | create_party() |
-| 加入/离开 | party.cpp | ✅ 已实现 | join/leave/kick |
-| 队伍聊天 | party.cpp | ⚠️ ChannelBus | 复用 Map channel |
-| **经验分配** | party.cpp | ✅ `src/game/battle/exp.rs` | Equal/LevelBased 模式 |
-| 物品分配 | party.cpp | ❌ 未实现 | LeaderPick/FreeForAll |
-| 队伍预约 | party.cpp | ❌ 未实现 | KRO 匹配系统 |
+审查报告：Deviruchi 服务端代码全面审查
+审查日期：2026-05-04
 
----
+代码规模：168 个 .rs 文件，约 44,240 行
 
-## 八、工会系统 ✅
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 创建工会 | guild.cpp | ✅ `src/game/guild/` | 完整实现 |
-| 成员管理 | guild.cpp | ✅ 已实现 | join/leave/expel |
-| 工会仓库 | guild.cpp | ✅ `src/game/storage/` | Storage 系统 |
-| 工会权限 | guild.cpp | ✅ GuildPermission | Invite/Expel 等 |
-| 工会公告 | guild.cpp | ✅ 已实现 | notice |
-| 工会技能 | guild.cpp | ❌ 未实现 | GuildSkill |
-| 城战(WoE) | guild.cpp | ❌ 未实现 | Castles 城堡系统 |
+审查维度：未完成代码标记、逻辑缺陷与安全性、并发安全、架构与代码质量、rAthena 功能缺失
 
----
-
-## 九、交易系统 ⚠️
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 交易请求 | trade.cpp | ✅ `src/game/trade/` | request/accept/reject |
-| 物品交易 | trade.cpp | ✅ 已实现 | add_item, confirm |
-| Zeny 交易 | trade.cpp | ✅ 已实现 | set_zeny |
-| 交易完成 | trade.cpp | ✅ 已实现 | commit/cancel |
-| **交易验证** | trade.cpp | ⚠️ 待完善 | 重量/背包验证需加强 |
+一、🔴 严重问题 (Critical)
+C1. 战斗伤害 i32→u32 无符号守卫（远程崩溃/漏洞利用）
+文件：src/game/battle/handler.rs，第 32-37、70、89、110 行
 
----
-
-## 十、仓库系统 ✅
+问题：所有攻击处理函数将 damage: i32 通过 damage as u32 转换为 u32。在 Rust release 模式下，负数 i32 会静默回绕为巨大的 u32 值（如 -1i32 as u32 == 4294967295）。公式中的 .max(1) 守卫在暴击倍率缩放之前被调用，如果 base_damage * crit_multiplier / 100 溢出 i32，结果会变负，导致怪物受到数十亿伤害或被瞬杀。
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 个人仓库 | storage.cpp | ✅ `src/game/storage/` | StorageSlot, 300格 |
-| 仓库管理 | storage.cpp | ✅ StorageManager | 按 char_id 管理 |
-| 仓库同步 | intif.cpp | ❌ 未实现 | Char-Map 服务器同步 |
 
----
+// handler.rs:32 — 在暴击缩放之前有守卫
+let damage = if is_crit {
+    (base_damage * BattleFormula::crit_multiplier()) / 100  // 可能溢出 i32
+} else {
+    base_damage
+};
+let killed = defender.take_damage(damage as u32);  // 负数回绕为大 u32
+C2. 网络包长度下溢 → 索引 Panic（远程 DoS）
+文件：src/network/packet.rs，第 46-50 行
 
-## 十一、HP/SP 回复系统 ❌ 缺失
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| **自然回复** | status.cpp | ❌ **未实现** | 核心功能缺失 |
-| 坐下回复 | pc.cpp | ❌ **未实现** | 坐下发呆加速回复 |
-| VIT 加成 | status.cpp | ❌ **未实现** | VIT 影响 HP 回复 |
-| INT 加成 | status.cpp | ❌ **未实现** | INT 影响 SP 回复 |
-| 装备加成 | status.cpp | ❌ **未实现** | 装备影响回复量 |
+问题：如果客户端发送包头长度字段为 1、2 或 3，切片 bytes[4..length as usize] 变成逆序范围（如 bytes[4..1]），在 Rust 中立即 panic 导致服务端崩溃。第 46 行只检查了 bytes.len() < length，没有验证 length >= 4。
 
----
 
-## 十二、坐骑/宠物系统 ❌ 缺失
+// packet.rs:46-50
+if bytes.len() < length as usize {  // length=3 时检查通过
+    return None;
+}
+let data = bytes[4..length as usize].to_vec();  // PANIC: 4..3 是逆序范围
+C3. 明文密码对比（凭据泄露）
+文件：src/game/login.rs，第 67 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 宠物捕捉 | pet.cpp | ❌ 未实现 | Peco/Ghost |
-| 宠物养成 | pet.cpp | ❌ 未实现 | 亲密/饥饿度 |
-| 宠物技能 | pet.cpp | ❌ 未实现 | PetSkill |
-| 坐骑系统 | pet.cpp | ❌ 未实现 | Peco 骑乘 |
 
----
+if login.password != account.password_hash {
+尽管字段名是 password_hash，但对比是明文字符串比较。整个代码库中没有任何密码哈希（bcrypt/argon2）实现。
 
-## 十三、佣兵/哈比系统 ❌ 缺失
+C4. Mutex 污染崩溃整个服务端
+文件：src/storage/sqlite.rs，第 27、32、41、53、63、69 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 佣兵系统 | mercenary.cpp | ❌ 未实现 | 佣兵契约 |
-| 哈比系统 | homunculus.cpp | ❌ 未实现 | 人工生命体 |
-| 元素精灵 | elemental.cpp | ❌ 未实现 | 巫师召唤 |
+问题：每个数据库操作都调用 .conn.lock().unwrap()。如果任何线程在持有 std::sync::Mutex 时 panic，该 mutex 变为 poisoned，所有后续 DB 操作都会 panic 崩溃整个服务端。共 6 个调用点。
 
----
+二、🟠 高优先级问题 (High)
+H1. 五个未实现的 TODO 函数返回假 Success
+文件：src/game/item/use_handler.rs，第 233、315、339、377、384 行
 
-## 十四、摆摊系统 ❌ 缺失
+函数	行号	影响
+execute_teleport	233	记录日志但从不移动玩家
+execute_use_skill	315	记录日志但从不施放技能
+execute_strip_equipment	339	记录日志但从不卸下装备
+execute_consume_ammo	377	记录日志但从不消耗弹药
+execute_disguise	384	记录日志但从不应用伪装
+这些函数全部返回 ItemUseResult::Success 但不执行任何实际操作。使用这些效果的道具会静默失效。
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 摆摊开店 | vending.cpp | ❌ 未实现 | PersonalShop |
-| 自动摆摊 | vending.cpp | ❌ 未实现 | AutoVending |
-| 收购商店 | buyingstore.cpp | ❌ 未实现 | BuyingStore |
-| 商店搜索 | searchstore.cpp | ❌ 未实现 | 搜索功能 |
+H2. from_slice 包解析 Panic（拒绝服务）
+文件：src/protocol/char_packets.rs 第 151-166 行、map_packets.rs、party_packets.rs、trade_packets.rs 等
 
----
+多个 from_slice 实现中的长度检查不足。例如 CHMakeChar::from_slice 检查 offset + 6 但实际读取 offset + 10 字节的两个 u16。畸形包可导致 panic。
 
-## 十五、NPC/脚本系统 ⚠️
+H3. GM 指令无权限检查
+文件：src/game/map/map_server.rs，第 715-847 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| NPC 定义 | npc.cpp | ⚠️ `src/game/npc/data.rs` | 基础定义, 3个NPC |
-| NPC 处理 | npc.cpp | ❌ 空实现 | handler 为空 |
-| **脚本引擎** | script.cpp | ❌ **未实现** | 核心功能缺失 (787KB) |
-| NPC 对话 | script.cpp | ❌ 未实现 | 脚本解析执行 |
-| 任务NPC | npc.cpp | ❌ 未实现 | Warp/Shop/Quest |
-| 玩家任务 | quest.cpp | ❌ 未实现 | QuestLog |
 
----
+// Check GM permissions (simplified - in real implementation check account level)
+// For now, allow all for testing
+@warp、@goto、@summon 等 GM 指令的权限检查被注释掉，任何玩家都可以使用。
 
-## 十六、地图/传送系统 ⚠️
+H4. 治愈服务变量名 Bug — HP 恢复使用了 SP 修正值
+文件：src/game/heal/service.rs，第 95-96 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 地图切换 | chrif.cpp | ✅ MapServer | char->map 切换 |
-| 传送管理 | - | ✅ `src/game/map/teleport.rs` | WarpService |
-| 地图边界 | map.cpp | ✅ 已实现 | MapEdge 检测 |
-| **保存点系统** | pc.cpp | ⚠️ 基础 | SavePoint 需持久化 |
-| 瞬移服务 | - | ✅ TeleportManager | warp cooldown |
-| 地图视野 | map.cpp | ⚠️ 14格 | ChannelBus vision |
 
----
+let (_, sp_base) = self.apply_all_modifiers(player, base_heal, 0, is_sitting);
+new_hp = (current_hp + sp_base).min(max_hp);  // BUG: 用 sp_base 来恢复 HP
+apply_all_modifiers 返回 (hp_value, sp_value)，但解构时将 HP 绑定到 _（丢弃）、SP 绑定到 sp_base，然后用 sp_base 来恢复 HP。这意味着 HP 恢复实际使用了 SP 修正链。
 
-## 十七、死亡/复活系统 ⚠️
+H5. 交易系统仅回显——无状态追踪
+文件：src/game/map/map_server.rs，第 586-663 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 死亡状态 | pc.cpp | ✅ PlayerState::Dead | 已实现 |
-| 经验惩罚 | pc.cpp | ✅ 1% 惩罚 | apply_death_penalty() |
-| **复活服务** | pc.cpp | ✅ `src/game/map/respawn.rs` | RespawnService |
-| Zeny 掉落 | pc.cpp | ✅ 50% 掉落 | drop_zeny_on_death() |
-| 复活延迟 | pc.cpp | ⚠️ 待配置 | 复活延迟时间 |
+四个交易处理器（handle_trade_request、handle_trade_ack、handle_trade_add_item、handle_trade_add_zeny、handle_trade_lock）全部只是回显响应，不追踪交易状态、不验证物品是否存在、不检查交易伙伴。item_id 在第 631 行被硬编码为 0。
 
----
+H6. 静默吞掉的失败
+位置	文件	影响
+Warp 失败	map_server.rs:225	玩家穿过传送门但传不到目的地
+Channel 发送失败	modern_server.rs:181	玩家复活/下线事件丢失
+碰撞分类错误	ai.rs	错误日志吞没判断错误
+H7. 定时器队列空 pop → Panic
+文件：src/core/timer.rs，第 105 行
 
-## 十八、GM 命令系统 ❌ 缺失
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| @命令框架 | atcommand.cpp | ❌ 未实现 | 368KB 未移植 |
-| 权限系统 | pc_groups.cpp | ❌ 未实现 | PlayerGroup |
-| 常用命令 | atcommand.cpp | ❌ 未实现 | @warp/@goto/@hide 等 |
+let entry = queue.pop().unwrap();
+如果队列在 peek 和 pop 之间被清空（竞争条件或逻辑错误），unwrap() 会崩溃服务端。
 
----
+H8. 玩家移动无验证（加速/穿墙）
+文件：src/game/map/map_server.rs，第 202-229 行
 
-## 十九、聊天系统 ⚠️
+handle_move 函数接受客户端的任何 (x, y) 坐标，不验证：
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 地图聊天 | chat.cpp | ✅ Map channel | ChannelBus |
-| 队伍聊天 | chat.cpp | ✅ Party channel | ChannelBus |
-| 工会聊天 | chat.cpp | ✅ Guild channel | ChannelBus |
-| 私聊 | whisper.cpp | ❌ 未实现 | /w 命令 |
-| 大厅聊天 | chat.cpp | ❌ 未实现 | NPC Chat |
+坐标在地图边界内
+移动距离合理（加速检测）
+玩家未死亡/眩晕/冻结
+移动路径可通行
+三、🟡 中优先级问题 (Medium)
+M1. 战斗公式未连线元素/体型修正
+文件：src/game/battle/formula.rs
 
----
+虽然 src/game/battle/element.rs 中已实现完整的元素表（4×10×10 矩阵）和体型修正表（23 种武器×3 种体型），但 BattleFormula::physical_damage() 从未调用 apply_element_and_size_modifier()。
 
-## 二十、成就/任务系统 ❌ 缺失
+M2. 状态计算可能整数溢出
+文件：src/game/battle/formula.rs，第 22、49、73、98 行
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 成就系统 | achievement.cpp | ❌ 未实现 | 34KB 未移植 |
-| 任务系统 | quest.cpp | ❌ 未实现 | QuestLog |
-| 每日签到 | pc.hpp | ❌ 未实现 | Attendance |
+所有攻击公式使用未检查的 i32 运算：
 
----
 
-## 二十一、现金商城 ❌ 缺失
+base_level * 2 + str + dex / 2 + agi / 3
+在 release 模式下，极高的属性值（GM 指令、装备、状态效果）可能溢出 i32 产生负伤害。
 
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 商城系统 | cashshop.cpp | ❌ 未实现 | 18KB 未移植 |
-| Kafra 传送 | storage.cpp | ❌ 未实现 | 仓库/现金商店 |
-| 点数系统 | cashshop.cpp | ❌ 未实现 | CashPoint |
+M3. Token 验证失败不关闭连接
+文件：src/game/map/map_server.rs，第 159-170 行
 
----
-
-## 二十二、战场/城战 ❌ 缺失
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 战场系统 | battleground.cpp | ❌ 未实现 | 45KB 未移植 |
-| 城战时间 | - | ❌ 未实现 | WoE Schedule |
-| 争夺城堡 | guild.cpp | ❌ 未实现 | Castles |
-
----
-
-## 二十三、副本/副本系统 ❌ 缺失
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 实例系统 | instance.cpp | ❌ 未实现 | 35KB 未移植 |
-| 副本地图 | instance.cpp | ❌ 未实现 | 动态创建 |
-| 时间限制 | instance.cpp | ❌ 未实现 | 副本倒计时 |
-
----
-
-## 二十四、邮件系统 ❌ 缺失
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 邮件系统 | mail.cpp | ❌ 未实现 | 14KB 未移植 |
-| 附件物品 | mail.cpp | ❌ 未实现 | MailAttachment |
-| 附件 Zeny | mail.cpp | ❌ 未实现 | MailZeny |
-
----
-
-## 二十五、其他系统
-
-| 功能 | rAthena 文件 | Deviruchi 状态 | 备注 |
-|------|-------------|---------------|------|
-| 决斗系统 | duel.cpp | ❌ 未实现 | 7KB |
-| 氏族系统 | clan.cpp | ❌ 未实现 | 5KB (轻量) |
-| 拍卖系统 | auction.cpp | ❌ 未实现 | AuctionHouse |
-| 每日抽奖 | itemdb.cpp | ❌ 未实现 | Roulette |
-| 宏检测 | pc.hpp | ❌ 未实现 | Anti-Macro |
-
----
-
-## 优先级排序
-
-### P0 - 核心功能 (必须实现)
-1. **HP/SP 自然回复系统** - 玩家基础体验
-2. **技能效果应用** - 战斗核心
-3. **GM 命令框架** - 服务器管理
-4. **脚本引擎基础** - NPC/任务基础
-
-### P1 - 重要功能 (应该实现)
-5. **状态效果系统** - Buff/Debuff
-6. **物品脚本完善** - 药水/消耗品
-7. **仓库服务器同步** - 多地图支持
-8. **私聊系统** - 社交基础
-
-### P2 - 扩展功能 (可以延后)
-9. 摆摊系统
-10. 宠物/坐骑
-11. 现金商城
-12. 成就/任务
-
-### P3 - 高级功能 (长期规划)
-13. 副本系统
-14. 战场/城战
-15. 佣兵/哈比
-
-### ✅ 已完成 (2026-05-04)
-- **日志系统**: 20+ 分类完整实现，分类文件输出，tracing 集成
-- **配置管理系统**: TOML 配置，完整配置项（Battle/Drop/Exp/Respawn/Skill/Party/Storage/Chat），热重载支持
-
----
-
-## 统计总结
-
-| 状态 | 数量 | 占比 |
-|------|------|------|
-| ✅ 已完成 | 20 | 44% |
-| ⚠️ 部分/待完善 | 8 | 18% |
-| ❌ 未实现 | 17 | 38% |
-
-**核心战斗系统已完成约 70%，HP/SP 回复、技能应用、GM 命令、脚本引擎等关键功能仍缺失。日志系统和配置管理已完整实现。**
+当 token 验证失败时返回 None，但不会设置 session.authenticated = false 或关闭连接。会话保持在 Map 阶段但没有有效玩家。
+
+M4. 角色删除定时器从未执行
+文件：src/game/char.rs
+
+标记为删除的角色有 delete_timer 字段，但没有定时任务执行实际删除。数据库中永远不会清理角色。
+
+M5. 未识别包 ID 静默丢弃
+文件：src/game/map/map_server.rs，第 138 行
+
+
+_ => None,
+dispatch match 对未识别的包 ID 返回 None 且无任何警告日志，使得协议调试和漏洞检测几乎不可能。
+
+M6. NPC 交互空操作
+文件：src/game/map/map_server.rs，第 378-384 行
+
+所有 NPC 交互包被解析但丢弃，NPC 完全不可用。
+
+M7. 队伍邀请空操作
+文件：src/game/map/map_server.rs，第 412-418 行
+
+队伍邀请被解析但从不转发给目标玩家。
+
+四、🔵 架构与并发问题
+A1. map_server.rs — 1244 行上帝对象
+文件：src/game/map/map_server.rs（1244 行）
+
+直接耦合到 13 个子系统，44 个函数处理所有包类型。应拆分为独立的 handler 模块。
+
+A2. Player 结构体 25+ 独立 RwLock — TOCTOU 漏洞
+文件：src/game/map/player.rs，第 15-62 行
+
+Player 结构体有 25 个独立的 RwLock 字段（每个属性一个）。Player::clone() 顺序获取 24 个读锁，在第一个锁和最后一个锁之间值可能被其他线程修改——产生不一致的快照。
+
+A3. 混合使用三种不同的锁类型
+锁类型	使用位置
+parking_lot::RwLock	40+ 文件，大部分 Player/Manager 字段
+std::sync::Mutex	Database.conn、ThreadRng、BattleHandler.rng、ItemDelay
+parking_lot::Mutex	仅 TIMER_QUEUE
+std::sync::Mutex 有 poison 机制（panic 后会污染），而 parking_lot 锁没有。混合使用可能导致微妙的优先级反转。
+
+A4. 数据库单 Mutex 瓶颈
+文件：src/storage/sqlite.rs，第 6-8 行
+
+尽管启用了 WAL 模式（允许并发读），但所有 DB 访问通过单个 Arc<Mutex<Connection>> 串行化。高并发下数据库成为瓶颈。
+
+A5. 存储/背包保存使用逐条 INSERT（无事务）
+文件：src/game/storage/repository.rs，第 84-108 行；src/storage/character.rs，第 257-261 行
+
+保存角色时执行多个独立 SQL 操作（UPDATE 角色、DELETE 背包、逐条 INSERT 物品、DELETE 状态、逐条 INSERT 状态）无显式事务。中途崩溃会导致数据不一致。
+
+A6. MockRng 四份完全相同
+测试辅助 MockRng 在四个文件中逐行复制：
+
+src/game/battle/handler.rs
+src/game/battle/formula.rs
+src/game/mob/ai.rs
+src/game/mob/droptable.rs
+A7. entry + get_mut 双重 lookups
+文件：src/game/map/map_state.rs，第 27-29 行
+
+
+by_map.entry(map_name.clone()).or_default();
+if let Some(players) = by_map.get_mut(&map_name) {  // 第二次查找
+应写为 by_map.entry(map_name.clone()).or_default().push(player_id);
+
+五、📦 rAthena 功能缺失对比
+严重缺失（核心功能）
+子系统	现状	缺失程度
+技能系统	仅有基础框架，20+ 技能效果存根	🔴 严重
+状态效果	结构体存在，excelotick 逻辑和叠加规则缺失	🔴 严重
+物品精炼	refiner.rs 和 ingredient.rs 为空	🔴 完全缺失
+NPC 系统	handler 存在但是空操作	🔴 不可用
+队伍系统	Manager 数据层面存在，邀请处理空操作	🟠 高
+公会系统	数据层面存在，未连线到网络处理	🟠 高
+PvP/Battleground	框架存在，无实例化逻辑	🟡 中
+副本实例	框架存在，无实际副本	🟡 中
+任务系统	框架存在，无实际任务	🟡 中
+邮件/拍卖	✅ 已实现	✅ 完成
+元素/体型表	✅ 已实现但未连线到伤害公式	⚠️ 半完成
+卡片系统	✅ 已实现基础	✅ 完成
+战斗系统详细差异
+物理伤害公式：当前 base_level*2 + str + dex/2 + agi/3，rAthena 用的公式是 statusATK + weaponATK + equipATK + masteries，差异较大
+魔法伤害公式：当前 int*2 + dex/3 + base_level/4，rAthena 有更复杂的 MATK 计算链
+元素修正：已计算但未应用于最终伤害
+完全缺失：Perfect Dodge、Perfect Hit、Crit Shield、Flee 率计算、Aspd 计算
+怪物系统详细差异
+MobDatabase：仅 4 种硬编码怪物（Poring/Lunatic/Blue Poring/Fabre），rAthena 有 2000+
+怪物技能使用：AI 框架有 MobSkill 结构体，但从不施放技能
+MVP 系统：MVP 奖励分发逻辑不完整
+怪物掉落：YAML 掉落表加载器存在但未集成到实际死亡处理
+六、📊 统计总览
+严重级别	数量	主题
+🔴 Critical	4	整数回绕崩溃、包 panic、明文密码、mutex 污染
+🟠 High	8	TODO 假成功、解析 panic、无 GM 认证、变量 bug、假交易、静默失败
+🟡 Medium	7	公式不连线、溢出风险、token 不关连接、空操作处理、缺失清理
+🔵 Architecture	7	上帝对象、TOCTOU、混合锁、DB 单瓶颈、无事务、代码重复
+📦 rAthena Gap	12+	技能/状态/精炼/NPC 核心缺失
+七、优先修复建议
+第一优先：修复 C2（包 length 下溢 panic）和 C1（伤害 as u32 回绕）——可被外部触发
+第二优先：实现 H1 中的 5 个 TODO 函数，连线元素/体型修正到伤害公式
+第三优先：添加 GM 权限检查，修复治愈服务变量 bug
+第四优先：为数据库操作添加事务包裹，使用 saturating_add 或 checked_add 替代裸算术
+第五优先：拆分 map_server.rs，消除上帝对象
+请告诉我您想优先处理哪些问题，或者是否要我按照推荐顺序开始实现修复。
+
+<DSMLCOUN xmlns="tool_calls="https://www.anthropic.com/xml/tool_calls">
+<DSMLCOUN type="text">我已完成对服务端全部 168 个 .rs 文件（~44,240 行）的全面审查，涵盖六大维度：
+
+未完成代码标记——5 个返回假 Success 的 TODO 函数、8 个完全空的模块
+逻辑缺陷与安全性——4 个 Critical 级问题（整数回绕崩溃、包解析 panic、明文密码、mutex 污染）
+并发安全——混合使用三种锁类型、25 个独立 RwLock 导致的 TOCTOU 漏洞
+架构质量——1244 行上帝对象 map_server.rs、多处代码重复、无事务的数据库操作
+rAthena 功能缺失——技能/状态/精炼/NPC 为最大缺失点，元素体型表已实现但未连线到伤害公式
+可优化点——双重 HashMap 查找、逐条 INSERT 无批处理、String clone 过多
+最关键的两个可被外部触发的安全问题：
+
+包头部 length < 4 时直接 panic 导致服务端崩溃
+伤害计算 i32 as u32 负数回绕可导致数十亿伤害或瞬杀
+您想优先处理哪些问题？或者我按推荐顺序（安全→功能缺失→架构优化）开始制定修复计划？

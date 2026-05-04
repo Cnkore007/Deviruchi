@@ -25,7 +25,7 @@ pub struct CZTradeAck {
 
 impl CZTradeAck {
     pub fn from_packet(data: &[u8]) -> Option<Self> {
-        if data.len() < 1 {
+        if data.is_empty() {
             return None;
         }
         Some(Self {
@@ -139,9 +139,7 @@ pub struct ZCTradeAddZeny {
 
 impl ZCTradeAddZeny {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00E9)
-            .put_u32(self.amount)
-            .build()
+        PacketBuilder::new(0x00E9).put_u32(self.amount).build()
     }
 }
 
@@ -170,8 +168,6 @@ pub struct ZCTradeCancel {
 
 impl ZCTradeCancel {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00F1)
-            .put_u8(self.reason)
-            .build()
+        PacketBuilder::new(0x00F1).put_u8(self.reason).build()
     }
 }

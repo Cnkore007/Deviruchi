@@ -1,6 +1,37 @@
-use std::collections::HashMap;
 use super::cell::{Cell, CellType};
 use crate::game::rand::GameRng;
+use std::collections::HashMap;
+
+/// CharacterData - 角色数据（用于创建 Player 实例）
+#[derive(Debug, Clone)]
+pub struct CharacterData {
+    pub char_id: u32,
+    pub account_id: u32,
+    pub name: String,
+    pub job: u16,
+    pub level: u16,
+    pub base_level: u16,
+    pub base_exp: u64,
+    pub job_level: u16,
+    pub job_exp: u64,
+    pub hp: u32,
+    pub max_hp: u32,
+    pub sp: u32,
+    pub max_sp: u32,
+    pub str: u16,
+    pub agi: u16,
+    pub vit: u16,
+    pub int: u16,
+    pub dex: u16,
+    pub luk: u16,
+    pub zeny: u32,
+    pub last_map: String,
+    pub last_x: i32,
+    pub last_y: i32,
+    pub save_map: String,
+    pub save_x: i32,
+    pub save_y: i32,
+}
 
 /// 地图数据
 #[derive(Debug, Clone)]
@@ -14,9 +45,11 @@ pub struct MapData {
 impl MapData {
     pub fn new(name: &str, width: u16, height: u16) -> Self {
         let cells = (0..height)
-            .map(|y| (0..width)
-                .map(|x| Cell::new(x, y, CellType::Walkable))
-                .collect())
+            .map(|y| {
+                (0..width)
+                    .map(|x| Cell::new(x, y, CellType::Walkable))
+                    .collect()
+            })
             .collect();
 
         Self {
@@ -36,7 +69,9 @@ impl MapData {
     }
 
     pub fn is_walkable(&self, x: u16, y: u16) -> bool {
-        self.get_cell(x, y).map(|c| c.is_walkable()).unwrap_or(false)
+        self.get_cell(x, y)
+            .map(|c| c.is_walkable())
+            .unwrap_or(false)
     }
 
     pub fn set_cell(&mut self, x: u16, y: u16, cell_type: CellType) {
@@ -48,7 +83,9 @@ impl MapData {
     /// 获取随机可行走位置
     pub fn random_walkable_pos(&self, rng: &dyn GameRng) -> Option<(u16, u16)> {
         for attempt in 0..100 {
-            let seed = rng.rand_range(0, u32::MAX).wrapping_add(attempt as u32 * 7919);
+            let seed = rng
+                .rand_range(0, u32::MAX)
+                .wrapping_add(attempt as u32 * 7919);
             let x = (seed % self.width as u32) as u16;
             let y = ((seed / self.width as u32) % self.height as u32) as u16;
 

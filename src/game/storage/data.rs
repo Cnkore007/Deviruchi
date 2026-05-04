@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 /// 最大堆叠数量
 const MAX_STACK_SIZE: u16 = 30000;
 
@@ -38,6 +36,7 @@ impl StorageSlot {
 }
 
 /// 角色仓库
+#[derive(Debug, Clone)]
 pub struct Storage {
     char_id: u32,
     max_size: u16,
@@ -46,9 +45,7 @@ pub struct Storage {
 
 impl Storage {
     pub fn new(max_size: u16) -> Self {
-        let slots: Vec<_> = (0..max_size)
-            .map(StorageSlot::empty)
-            .collect();
+        let slots: Vec<_> = (0..max_size).map(StorageSlot::empty).collect();
 
         Self {
             char_id: 0,
@@ -173,11 +170,24 @@ impl Storage {
         self.slots
             .iter()
             .filter(|s| !s.is_empty())
-            .map(|s| (s.index, s.item_id, s.amount, s.identified, s.refine, s.cards))
+            .map(|s| {
+                (
+                    s.index,
+                    s.item_id,
+                    s.amount,
+                    s.identified,
+                    s.refine,
+                    s.cards,
+                )
+            })
             .collect()
     }
 
-    pub fn from_db_format(char_id: u32, max_size: u16, items: Vec<(u16, u16, u16, bool, u8, [u16; 4])>) -> Self {
+    pub fn from_db_format(
+        char_id: u32,
+        max_size: u16,
+        items: Vec<(u16, u16, u16, bool, u8, [u16; 4])>,
+    ) -> Self {
         let mut storage = Self::new(max_size);
         storage.char_id = char_id;
 
@@ -195,5 +205,31 @@ impl Storage {
         }
 
         storage
+    }
+
+    /// 从仓库数据创建 (用于数据库加载)
+    pub fn from_slots(char_id: u32, max_size: u16, slots: Vec<StorageSlot>) -> Self {
+        let mut storage = Self::new(max_size);
+        storage.char_id = char_id;
+
+        for (i, slot) in slots.into_iter().enumerate() {
+            if i < max_size as usize {
+                storage.slots[i] = slot;
+            }
+        }
+
+        storage
+    }
+
+    /// 获取最大大小
+    pub fn max_size(&self) -> u16 {
+        self.max_size
+    }
+
+    /// 设置格子数据
+    pub fn set_slot(&mut self, index: usize, slot: StorageSlot) {
+        if index < self.slots.len() {
+            self.slots[index] = slot;
+        }
     }
 }

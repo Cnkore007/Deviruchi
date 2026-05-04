@@ -1,10 +1,10 @@
+use crate::network::{PacketCodec, PacketHandler, Session, SessionManager};
+use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_util::codec::Framed;
 use tokio::sync::mpsc;
-use tracing::{info, error, warn};
-use futures_util::{SinkExt, StreamExt};
-use crate::network::{PacketCodec, Session, SessionManager, PacketHandler};
+use tokio_util::codec::Framed;
+use tracing::{error, info, warn};
 
 pub struct GameServer {
     addr: String,
@@ -13,7 +13,11 @@ pub struct GameServer {
 }
 
 impl GameServer {
-    pub fn new(addr: String, session_manager: Arc<SessionManager>, packet_handler: Arc<PacketHandler>) -> Self {
+    pub fn new(
+        addr: String,
+        session_manager: Arc<SessionManager>,
+        packet_handler: Arc<PacketHandler>,
+    ) -> Self {
         Self {
             addr,
             session_manager,
@@ -31,7 +35,10 @@ impl GameServer {
                     let session_manager = self.session_manager.clone();
                     let packet_handler = self.packet_handler.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_connection(stream, addr, session_manager, packet_handler).await {
+                        if let Err(e) =
+                            Self::handle_connection(stream, addr, session_manager, packet_handler)
+                                .await
+                        {
                             error!("Connection error: {}", e);
                         }
                     });
@@ -71,7 +78,7 @@ impl GameServer {
                             info!("Received packet: id=0x{:04X}, len={}", packet.header.packet_id, packet.header.length);
 
                             if let Some(response) = packet_handler.handle(&mut session, packet.header.packet_id, &packet.data) {
-                                framed.send(response.into()).await?;
+                                framed.send(response).await?;
                             }
 
                             session_manager.update(&session_id, session.clone());
@@ -86,11 +93,10 @@ impl GameServer {
                 // Handle game events from ChannelBus
                 event_data = event_rx.recv() => {
                     if let Some(data) = event_data {
-                        if !data.is_empty() {
-                            if let Err(e) = framed.send(data.into()).await {
+                        if !data.is_empty()
+                            && let Err(e) = framed.send(data).await {
                                 warn!("Failed to send event to client: {}", e);
                             }
-                        }
                     } else {
                         // Channel closed - client disconnected from event bus
                         warn!("Event channel closed for session {}", session_id);
