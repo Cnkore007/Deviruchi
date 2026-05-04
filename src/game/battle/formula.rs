@@ -51,7 +51,7 @@ impl BattleFormula {
         let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk.saturating_sub(defense)).max(1)
+        let damage = ((total_atk.saturating_sub(defense))
             .saturating_mul(skill_damage_bonus))
             / 100;
 
@@ -67,6 +67,9 @@ impl BattleFormula {
         let weapon = weapon_type_from_i32(weapon_type);
         let size_mod = super::element::get_size_modifier(weapon, defender.size);
         let damage = (damage as i64 * size_mod as i64 / 100) as i32;
+
+        // 最低伤害保证放在所有修正之后
+        let damage = damage.max(1);
 
         // Note: variance needs RNG injection - using fixed value for now
         let variance = 100; // 100% (no variance)
@@ -98,7 +101,7 @@ impl BattleFormula {
         let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk.saturating_sub(defense)).max(1)
+        let damage = ((total_atk.saturating_sub(defense))
             .saturating_mul(skill_damage_bonus))
             / 100;
 
@@ -114,6 +117,9 @@ impl BattleFormula {
         let weapon = weapon_type_from_i32(weapon_type);
         let size_mod = super::element::get_size_modifier(weapon, defender.size);
         let damage = (damage as i64 * size_mod as i64 / 100) as i32;
+
+        // 最低伤害保证放在所有修正之后
+        let damage = damage.max(1);
 
         let variance = 90 + (rng.rand_range(0, 20) as i32);
         (damage * variance) / 100
@@ -366,11 +372,13 @@ mod tests {
         // Weapon ATK = weapon_type(1) * 2 = 2
         // Total ATK = 38 + 2 = 40
         // Damage = (40 - 0) * 100 / 100 = 40
+        // Size modifier (Fist vs Medium) = 75%
+        // Final = 40 * 75 / 100 = 30
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
         let damage = BattleFormula::physical_damage(&player, &mob, 100, 1);
-        assert_eq!(damage, 40);
+        assert_eq!(damage, 30);
     }
 
     #[test]
@@ -381,22 +389,26 @@ mod tests {
         // Total ATK = 40
         // Defense = 10
         // Damage = (40 - 10) * 100 / 100 = 30
+        // Size modifier (Fist vs Medium) = 75%
+        // Final = 30 * 75 / 100 = 22
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 10, 0, 0, 0);
 
         let damage = BattleFormula::physical_damage(&player, &mob, 100, 1);
-        assert_eq!(damage, 30);
+        assert_eq!(damage, 22);
     }
 
     #[test]
     fn test_physical_damage_with_skill_bonus() {
         // Same as above but with 150% skill damage bonus
         // Damage = (40 - 0) * 150 / 100 = 60
+        // Size modifier (Fist vs Medium) = 75%
+        // Final = 60 * 75 / 100 = 45
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
         let damage = BattleFormula::physical_damage(&player, &mob, 150, 1);
-        assert_eq!(damage, 60);
+        assert_eq!(damage, 45);
     }
 
     #[test]
@@ -406,11 +418,11 @@ mod tests {
         let mob = make_mob(5, 0, 0, 0, 0);
         let rng = Arc::new(MockRng::new(vec![10]));
 
-        // Base damage = 40, variance = 90 + 10 = 100
-        // Final = 40 * 100 / 100 = 40
+        // Base damage = 40, size mod = 75% -> 30, variance = 90 + 10 = 100
+        // Final = 30 * 100 / 100 = 30
         let damage =
             BattleFormula::physical_damage_with_variance(&player, &mob, 100, 1, rng.as_ref());
-        assert_eq!(damage, 40);
+        assert_eq!(damage, 30);
     }
 
     #[test]
@@ -445,12 +457,12 @@ mod tests {
         // Player: level 10, dex=20
         // HIT = dex*3 + base_level = 20*3 + 10 = 70
         // FLEE = 0
-        // Hit Rate = 95 + (70 - 0) / 2 = 95 + 35 = 130
+        // Hit Rate = 95 + (70 - 0) / 2 = 130, clamped to 95
         let player = make_player(10, 1, 20, 1, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
         let hit_rate = BattleFormula::hit_rate(&player, &mob);
-        assert_eq!(hit_rate, 130);
+        assert_eq!(hit_rate, 95);
     }
 
     #[test]
@@ -469,23 +481,23 @@ mod tests {
     #[test]
     fn test_crit_rate() {
         // Player: level 10, luk=30
-        // Crit = 0 + luk/3 = 0 + 10 = 10%
+        // Crit = 1 + luk/3 = 1 + 10 = 11%
         let player = make_player(10, 1, 1, 1, 1, 30);
         let mob = make_mob(5, 0, 0, 0, 0);
 
         let crit_rate = BattleFormula::crit_rate(&player, &mob);
-        assert_eq!(crit_rate, 10);
+        assert_eq!(crit_rate, 11);
     }
 
     #[test]
     fn test_crit_rate_zero_luk() {
         // Player: level 10, luk=0
-        // Crit = 0 + 0/3 = 0%
+        // Crit = 1 + 0/3 = 1% (base_crit = 1)
         let player = make_player(10, 1, 1, 1, 1, 0);
         let mob = make_mob(5, 0, 0, 0, 0);
 
         let crit_rate = BattleFormula::crit_rate(&player, &mob);
-        assert_eq!(crit_rate, 0);
+        assert_eq!(crit_rate, 1);
     }
 
     #[test]
