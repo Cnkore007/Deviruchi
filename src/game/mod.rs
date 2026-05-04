@@ -83,7 +83,7 @@ pub use mail::{MailAttachResult, MailError, MailItem, MailListEntry, MailMessage
 pub use map::{
     MapAdjacency, MapEdge, MapState, TeleportAction, TeleportManager, WarpError, WarpService,
 };
-pub use mercenary::{Mercenary, MercenaryData, MercenaryManager};
+pub use mercenary::{Mercenary, MercenaryClass, MercenaryData, MercenaryDatabase, MercenaryError, MercenaryManager, MercenarySkill};
 pub use mob::{MobAI, MobSpawnManager};
 pub use mount::{Mount, MountDatabase, MountError, MountManager, MountType, PlayerMountState};
 pub use npc::NpcHandler;
