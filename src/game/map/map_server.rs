@@ -135,7 +135,10 @@ impl MapServer {
             0x01B7 => self.handle_guild_request_info(data, session),
             0x01EC => self.handle_guild_chat(data, session),
             0x00B2 => self.handle_restart(session),
-            _ => None,
+            unknown_id => {
+                tracing::warn!("Unknown packet ID 0x{:04X} from session {}", unknown_id, session.id);
+                None
+            }
         }
     }
 
@@ -413,9 +416,9 @@ impl MapServer {
 
     /// Handle NPC interact (0x0190)
     fn handle_npc_interact(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
-        let _player_id = session.player_id?;
-        let _npc_pkt = CZContactNpc::from_slice(data)?;
-        // Simplified - NPC interaction handled elsewhere
+        let player_id = session.player_id?;
+        let npc_pkt = CZContactNpc::from_slice(data)?;
+        tracing::debug!("Player {} interacted with NPC {} (not yet implemented)", player_id, npc_pkt.npc_id);
         None
     }
 
@@ -447,9 +450,24 @@ impl MapServer {
 
     /// Handle party invite (0x0101)
     fn handle_party_invite(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
-        let _player_id = session.player_id?;
-        let _pkt = CZReqPartyInvite::from_slice(data)?;
-        // Simplified - party invite logic handled elsewhere
+        let player_id = session.player_id?;
+        let pkt = CZReqPartyInvite::from_slice(data)?;
+
+        // Check inviter is in a party
+        let party = self.party_manager.get_player_party(&player_id)?;
+        let inviter = self.map_state.get_player(&player_id)?;
+
+        // Find target player
+        let target = self.map_state.find_player_by_account_id(pkt.target_account_id)?;
+
+        tracing::info!(
+            "Player {} ({}) invited player {} ({}) to party {} ({})",
+            inviter.name, player_id, target.name, pkt.target_account_id, party.name, party.id
+        );
+
+        // TODO: Send actual invite packet to target via channel_bus
+        // For now, log the invite - target player would need a UI notification
+
         None
     }
 
