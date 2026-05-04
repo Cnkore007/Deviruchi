@@ -33,7 +33,9 @@ impl MapServer {
             return self.advance_dialogue(player_id, npc.id);
         }
 
-        // Otherwise, handle by NPC type (shop, etc.)
+        // Otherwise, handle by NPC type
+        // Quest 和 CashShop 类型的 NPC 如果没有脚本，显示名称
+        // Warp 类型 NPC 直接处理（不需要玩家引用）
         match npc.type_ {
             crate::game::npc::data::NpcType::Shop => {
                 let msg = ZcSayDialog {
@@ -41,6 +43,16 @@ impl MapServer {
                     message: format!("Welcome to {}!", npc.display_name),
                 };
                 Some(msg.to_packet())
+            }
+            crate::game::npc::data::NpcType::Warp => {
+                // Warp NPC 的目标坐标已存储在 dest_map/dest_x/dest_y
+                let dest_map = npc.dest_map.clone()
+                    .unwrap_or_else(|| npc.map_name.clone());
+                tracing::info!(
+                    "NPC warp: {} -> {} ({}, {})",
+                    npc.id, dest_map, npc.dest_x, npc.dest_y
+                );
+                Some(ZcCloseDialog { npc_id: npc.id }.to_packet())
             }
             _ => {
                 let msg = ZcSayDialog {
