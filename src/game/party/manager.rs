@@ -114,19 +114,29 @@ impl PartyManager {
     }
 
     /// Kick a member from party (only leader can do this)
+    /// 锁顺序：先 parties（单次），释放后再 player_party（与 leave_party 一致）
     pub fn kick_member(&self, party_id: &Uuid, leader_id: &Uuid, target_id: &Uuid) -> bool {
         if !self.is_leader(party_id, leader_id) {
             return false;
         }
 
-        let mut parties = self.parties.write();
-        if let Some(party) = parties.get_mut(party_id) {
-            party.members.retain(|m| m.player_id != *target_id);
+        // Step 1: 从 party 成员列表移除
+        let removed = {
+            let mut parties = self.parties.write();
+            if let Some(party) = parties.get_mut(party_id) {
+                party.members.retain(|m| m.player_id != *target_id);
+                true
+            } else {
+                false
+            }
+        };
+
+        // Step 2: 从 player_party 映射移除（释放 parties 锁后再获取）
+        if removed {
             self.player_party.write().remove(target_id);
-            true
-        } else {
-            false
         }
+
+        removed
     }
 
     /// Update member position/status
