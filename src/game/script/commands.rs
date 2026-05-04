@@ -34,3 +34,22 @@ pub struct NpcScript {
     pub npc_id: u32,
     pub script: ScriptNode,
 }
+
+/// 解析错误
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseError {
+    /// 行号（1-based）
+    pub line: usize,
+    /// 原始行内容
+    pub source: String,
+    /// 错误描述
+    pub message: String,
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "第 {} 行解析错误: {} (原文: '{}')", self.line, self.message, self.source)
+    }
+}
+
+impl std::error::Error for ParseError {}

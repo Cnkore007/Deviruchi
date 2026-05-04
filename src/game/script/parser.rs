@@ -1,31 +1,81 @@
-use super::commands::{ScriptCommand, ScriptNode};
+use super::commands::{ParseError, ScriptCommand, ScriptNode};
 use std::collections::HashMap;
 
-/// 解析脚本文本
+/// 解析脚本文本（向后兼容，静默忽略错误行）
 pub fn parse_script(script_text: &str) -> ScriptNode {
+    match parse_script_checked(script_text) {
+        Ok(node) => node,
+        Err(_) => {
+            // 向后兼容：有错误时仍然返回能解析的部分
+            let mut commands = Vec::new();
+            let mut labels = HashMap::new();
+            for line in script_text.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("//") {
+                    continue;
+                }
+                if line.ends_with(':') {
+                    let label_name = line.trim_end_matches(':').to_string();
+                    labels.insert(label_name, commands.len());
+                    continue;
+                }
+                if let Some(cmd) = parse_line(line) {
+                    commands.push(cmd);
+                }
+            }
+            ScriptNode { commands, labels }
+        }
+    }
+}
+
+/// 解析脚本文本（带错误报告）
+pub fn parse_script_checked(script_text: &str) -> Result<ScriptNode, Vec<ParseError>> {
     let mut commands = Vec::new();
     let mut labels = HashMap::new();
+    let mut errors = Vec::new();
 
-    for line in script_text.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with("//") {
+    for (line_idx, line) in script_text.lines().enumerate() {
+        let line_num = line_idx + 1; // 1-based 行号
+        let trimmed = line.trim();
+
+        // 跳过空行和注释
+        if trimmed.is_empty() || trimmed.starts_with("//") {
             continue;
         }
 
         // 解析标签
-        if line.ends_with(':') {
-            let label_name = line.trim_end_matches(':').to_string();
-            labels.insert(label_name, commands.len());
+        if trimmed.ends_with(':') {
+            let label_name = trimmed.trim_end_matches(':').to_string();
+            if label_name.is_empty() {
+                errors.push(ParseError {
+                    line: line_num,
+                    source: trimmed.to_string(),
+                    message: "标签名不能为空".to_string(),
+                });
+            } else {
+                labels.insert(label_name, commands.len());
+            }
             continue;
         }
 
         // 解析命令
-        if let Some(cmd) = parse_line(line) {
-            commands.push(cmd);
+        match parse_line(trimmed) {
+            Some(cmd) => commands.push(cmd),
+            None => {
+                errors.push(ParseError {
+                    line: line_num,
+                    source: trimmed.to_string(),
+                    message: format!("未知命令或语法错误: '{}'", trimmed),
+                });
+            }
         }
     }
 
-    ScriptNode { commands, labels }
+    if errors.is_empty() {
+        Ok(ScriptNode { commands, labels })
+    } else {
+        Err(errors)
+    }
 }
 
 fn parse_line(line: &str) -> Option<ScriptCommand> {
@@ -237,5 +287,57 @@ mod tests {
         if let ScriptCommand::Goto(label) = &node.commands[0] {
             assert_eq!(label, "my_long_label_1");
         }
+    }
+
+    #[test]
+    fn test_parse_error_on_invalid_line() {
+        let result = parse_script_checked("this is not a valid command;");
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].line, 1);
+        assert!(errors[0].message.contains("未知命令"));
+    }
+
+    #[test]
+    fn test_parse_error_reports_line_number() {
+        let script = r#"
+            mes "Hello";
+            invalid_command;
+            mes "World";
+        "#;
+        let result = parse_script_checked(script);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert_eq!(errors.len(), 1);
+        // 第 3 行（跳过空行后）
+        assert!(errors[0].line >= 2 && errors[0].line <= 4);
+    }
+
+    #[test]
+    fn test_parse_error_multiple_errors() {
+        let script = r#"
+            bad_cmd_1;
+            mes "OK";
+            bad_cmd_2;
+        "#;
+        let result = parse_script_checked(script);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_valid_script_returns_ok() {
+        let script = r#"
+            mes "Hello!";
+            next;
+            mes "World!";
+            close;
+        "#;
+        let result = parse_script_checked(script);
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.commands.len(), 4);
     }
 }
