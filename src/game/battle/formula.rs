@@ -173,7 +173,7 @@ impl BattleFormula {
         (damage * variance) / 100
     }
 
-    /// 计算命中率
+    /// 计算命中率 (clamped 5..95)
     pub fn hit_rate(attacker: &Player, defender: &Mob) -> i32 {
         let hit = {
             let dex = attacker.dex() as i32;
@@ -181,21 +181,22 @@ impl BattleFormula {
             (dex * 3) + base_level
         };
         let flee = defender.flee as i32;
-        95 + (hit - flee) / 2
+        (95 + (hit - flee) / 2).clamp(5, 95)
     }
 
-    /// 计算闪避率
+    /// 计算闪避率 (rAthena: base 100 + AGI + LUK/5 + base_level)
     pub fn flee_rate(player: &Player, _mob: &Mob) -> i32 {
         let agi = player.agi() as i32;
+        let luk = player.luk() as i32;
         let base_level = player.base_level() as i32;
-        80 + agi - (base_level * 2)
+        100 + agi + luk / 5 + base_level
     }
 
-    /// 计算暴击率
+    /// 计算暴击率 (clamped 0..100)
     pub fn crit_rate(attacker: &Player, _defender: &Mob) -> i32 {
-        let base_crit = 0;
+        let base_crit = 1;
         let luk = attacker.luk() as i32;
-        base_crit + luk / 3
+        (base_crit + luk / 3).clamp(0, 100)
     }
 
     /// 计算暴击伤害
