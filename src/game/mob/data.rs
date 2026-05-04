@@ -330,14 +330,15 @@ impl Mob {
     }
 
     pub fn take_damage(&self, damage: u32) -> bool {
-        let current_hp = *self.hp.read();
-        if current_hp <= damage {
-            *self.hp.write() = 0;
+        let mut hp = self.hp.write();
+        if *hp <= damage {
+            *hp = 0;
+            drop(hp);
             *self.ai_state.write() = MobAIState::Dead;
             *self.death_time.write() = Some(Instant::now());
             true
         } else {
-            *self.hp.write() = current_hp - damage;
+            *hp -= damage;
             false
         }
     }
