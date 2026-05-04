@@ -42,6 +42,11 @@ pub struct Npc {
 
     // NPC脚本 (如果有)
     pub script: Option<String>,
+
+    // 传送目标（仅 Warp 类型 NPC 使用）
+    pub dest_map: Option<String>,
+    pub dest_x: u16,
+    pub dest_y: u16,
 }
 
 impl Npc {
@@ -60,6 +65,9 @@ impl Npc {
             shop_items: RwLock::new(Vec::new()),
             skills: RwLock::new(Vec::new()),
             script: None,
+            dest_map: None,
+            dest_x: 0,
+            dest_y: 0,
         }
     }
 
@@ -81,12 +89,15 @@ impl Npc {
         x: u16,
         y: u16,
         map: &str,
-        _dest_map: &str,
-        _dest_x: u16,
-        _dest_y: u16,
+        dest_map: &str,
+        dest_x: u16,
+        dest_y: u16,
     ) -> Self {
         let mut npc = Self::new(id, name, x, y, map);
         npc.type_ = NpcType::Warp;
+        npc.dest_map = Some(dest_map.to_string());
+        npc.dest_x = dest_x;
+        npc.dest_y = dest_y;
         npc
     }
 

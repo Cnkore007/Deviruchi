@@ -60,11 +60,16 @@ impl NpcHandler {
                 npc_id,
                 skills: npc.skills.read().clone(),
             },
-            super::data::NpcType::Warp => NpcResponse::Warp {
-                map: npc.map_name.clone(),
-                x: npc.pos_x,
-                y: npc.pos_y,
-            },
+            super::data::NpcType::Warp => {
+                // 返回传送目标坐标（而非 NPC 自身坐标）
+                let dest_map = npc.dest_map.clone()
+                    .unwrap_or_else(|| npc.map_name.clone());
+                NpcResponse::Warp {
+                    map: dest_map,
+                    x: npc.dest_x,
+                    y: npc.dest_y,
+                }
+            }
             _ => NpcResponse::Message(npc.display_name.clone()),
         }
     }
@@ -264,4 +269,95 @@ pub enum LearnResult {
     SkillNotFound,
     NotEnoughZeny,
     AlreadyLearned,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::map::Player;
+    use crate::storage::Character;
+
+    fn create_test_player() -> Player {
+        let char = Character {
+            char_id: 1,
+            char_num: 0,
+            name: "TestPlayer".to_string(),
+            class: 0,
+            base_level: 1,
+            job_level: 1,
+            base_exp: 0,
+            job_exp: 0,
+            zeny: 10000,
+            str: 10,
+            agi: 10,
+            vit: 10,
+            int: 10,
+            dex: 10,
+            luk: 10,
+            hp: 100,
+            max_hp: 100,
+            sp: 50,
+            max_sp: 50,
+            hair: 0,
+            hair_color: 0,
+            clothes_color: 0,
+            weapon: 0,
+            shield: 0,
+            head_top: 0,
+            head_mid: 0,
+            head_bottom: 0,
+            last_map: "new_1-1.gat".to_string(),
+            last_x: 50,
+            last_y: 50,
+            save_map: "new_1-1.gat".to_string(),
+            save_x: 50,
+            save_y: 50,
+            delete_timer: 0,
+            created_at: 0,
+            updated_at: 0,
+        };
+        Player::from_character(char)
+    }
+
+    #[test]
+    fn test_warp_npc_returns_dest_coordinates() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+
+        // NPC 3 是 Prontera 传送门
+        let response = handler.interact(&player, 3);
+        match response {
+            NpcResponse::Warp { map, x, y } => {
+                assert_eq!(map, "prontera.gat", "应返回目标地图，而非 NPC 所在地图");
+                assert_eq!(x, 150, "应返回目标 X 坐标");
+                assert_eq!(y, 100, "应返回目标 Y 坐标");
+            }
+            other => panic!("期望 Warp 响应，实际: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_warp_npc_stores_dest_fields() {
+        let npc = crate::game::npc::data::Npc::warp(
+            100,
+            "Test Warp",
+            50,
+            50,
+            "prontera.gat",
+            "geffen.gat",
+            120,
+            100,
+        );
+        assert_eq!(npc.dest_map.as_deref(), Some("geffen.gat"));
+        assert_eq!(npc.dest_x, 120);
+        assert_eq!(npc.dest_y, 100);
+    }
+
+    #[test]
+    fn test_npc_not_found() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+        let response = handler.interact(&player, 9999);
+        assert!(matches!(response, NpcResponse::NotFound));
+    }
 }
