@@ -1,5 +1,6 @@
 use super::data::{Skill, SkillType};
 use crate::game::map::Player;
+use crate::game::status::{StatusChange, StatusEffect, StatusSource};
 
 /// 技能效果应用
 pub struct SkillEffect;
@@ -36,8 +37,36 @@ impl SkillEffect {
         }
     }
 
-    fn apply_support(skill: &Skill, _caster: &Player, _target: &Player, _level: u8) -> SkillResult {
-        // 辅助技能效果
+    fn apply_support(skill: &Skill, _caster: &Player, target: &Player, level: u8) -> SkillResult {
+        // 根据技能ID应用对应的增益效果
+        let status_change = match skill.id {
+            29 => StatusChange::IncreaseAgi, // 加速术
+            34 => StatusChange::Blessing,    // 祝福
+            _ => StatusChange::Blessing,     // 默认使用祝福作为通用增益
+        };
+
+        let duration_ms = skill.skill_time as u64;
+        let val1 = level as i32; // 技能等级作为效果值
+
+        let effect = StatusEffect::with_values(
+            status_change,
+            duration_ms,
+            StatusSource::Skill(skill.id),
+            val1,
+            0,
+            0,
+        );
+
+        target.add_status(effect);
+
+        tracing::info!(
+            "Applied {:?} buff to {} (duration: {}ms, level: {})",
+            status_change,
+            target.name,
+            duration_ms,
+            level
+        );
+
         SkillResult::Buff {
             buff_type: skill.id,
             duration: skill.skill_time,
