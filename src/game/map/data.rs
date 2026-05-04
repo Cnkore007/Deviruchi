@@ -108,7 +108,22 @@ impl MapDatabase {
         let mut db = Self {
             maps: HashMap::new(),
         };
-        db.init_default_maps();
+
+        // 尝试从 assets/maps/ 加载 .gat 文件
+        let maps_dir = std::path::Path::new("assets/maps");
+        if maps_dir.exists() {
+            match db.load_from_directory(maps_dir) {
+                Ok(count) => tracing::info!("从文件加载了 {} 张地图", count),
+                Err(e) => tracing::warn!("加载地图文件失败: {}", e),
+            }
+        }
+
+        // 如果没有加载到任何地图，使用硬编码默认值
+        if db.maps.is_empty() {
+            tracing::info!("使用硬编码默认地图");
+            db.init_default_maps();
+        }
+
         db
     }
 
