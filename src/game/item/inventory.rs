@@ -1,4 +1,5 @@
 use super::data::{Item, ItemDatabase};
+use crate::game::constants;
 use std::sync::Arc;
 
 /// 背包格子
@@ -51,13 +52,13 @@ impl Inventory {
 
     /// 添加物品
     pub fn add_item(&mut self, item_id: u16, amount: u16) -> bool {
-        if amount == 0 || amount > 300 {
+        if amount == 0 || amount > constants::MAX_INVENTORY_STACK {
             return false;
         }
 
         // 先找相同物品的空位
         for slot in &mut self.slots {
-            if slot.item_id == item_id && slot.amount + amount <= 300 {
+            if slot.item_id == item_id && slot.amount + amount <= constants::MAX_INVENTORY_STACK {
                 slot.amount += amount;
                 self.update_weight();
                 return true;
@@ -178,13 +179,13 @@ impl Inventory {
 
     /// 检查能否添加物品（仅检查空间，不检查重量）
     pub fn can_add_item(&self, item_id: u16, amount: u16) -> bool {
-        if amount == 0 || amount > 300 {
+        if amount == 0 || amount > constants::MAX_INVENTORY_STACK {
             return false;
         }
 
         // 先找相同物品的空位
         for slot in &self.slots {
-            if slot.item_id == item_id && slot.amount + amount <= 300 {
+            if slot.item_id == item_id && slot.amount + amount <= constants::MAX_INVENTORY_STACK {
                 return true;
             }
         }

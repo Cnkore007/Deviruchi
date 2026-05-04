@@ -130,6 +130,7 @@ impl Default for RespawnService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
     use crate::game::map::player::{Player, PlayerState, CombatStats, Position, LevelStats, Attributes, Economy, SavePoint};
     use parking_lot::RwLock;
     use uuid::Uuid;
@@ -149,7 +150,7 @@ mod tests {
                 state: PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: RwLock::new(Position { x, y }),
             level: RwLock::new(LevelStats {
@@ -169,7 +170,7 @@ mod tests {
             economy: RwLock::new(Economy {
                 zeny: 0,
                 current_weight: 0,
-                max_weight: 20000,
+                max_weight: constants::BASE_MAX_WEIGHT,
                 job: 0,
                 shop_id: None,
                 group_id: 0,

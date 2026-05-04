@@ -149,6 +149,7 @@ impl GameLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
     use crate::game::mob::data::MobPathManager;
     use uuid::Uuid;
 
@@ -251,7 +252,7 @@ mod tests {
             hit: 7,
             flee: 5,
             crit: 0,
-            walk_speed: 150,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
             atk_range: 1,
             element: crate::game::battle::element::Element::Neutral,
             element_level: crate::game::battle::element::ElementLevel::Level1,

@@ -1,6 +1,6 @@
 use crate::game::map::Player;
 
-pub const MAX_ZENY: u32 = 999_999_999;
+pub use super::constants::MAX_ZENY;
 
 pub struct ZenyManager;
 

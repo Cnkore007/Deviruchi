@@ -222,6 +222,7 @@ impl Default for MountManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
     use crate::game::map::player::PlayerState;
     use parking_lot::RwLock;
     use std::sync::Arc;
@@ -241,7 +242,7 @@ mod tests {
                 state: PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: RwLock::new(crate::game::map::player::Position { x: 100, y: 100 }),
             level: RwLock::new(crate::game::map::player::LevelStats {
@@ -261,7 +262,7 @@ mod tests {
             economy: RwLock::new(crate::game::map::player::Economy {
                 zeny: 0,
                 current_weight: 0,
-                max_weight: 20000,
+                max_weight: constants::BASE_MAX_WEIGHT,
                 job: 0,
                 shop_id: None,
                 group_id: 0,

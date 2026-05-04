@@ -2,6 +2,7 @@ use parking_lot::RwLock;
 use std::time::Instant;
 use uuid::Uuid;
 use crate::game::battle::element::{Element, ElementLevel, MobSize};
+use crate::game::constants;
 
 /// 怪物掉落物品
 #[derive(Debug, Clone)]
@@ -248,7 +249,7 @@ impl Mob {
             hit: 0,
             flee: 0,
             crit: 0,
-            walk_speed: 150,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
             atk_range: 1,
             element: Element::Neutral,
             element_level: ElementLevel::Level1,
@@ -382,7 +383,7 @@ impl MobDatabase {
                 hit: 7,
                 flee: 5,
                 crit: 0,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
                 atk_range: 1,
                 sight_range: 12,
                 chase_range: 20,
@@ -447,7 +448,7 @@ impl MobDatabase {
                 hit: 8,
                 flee: 7,
                 crit: 0,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
                 atk_range: 1,
                 sight_range: 12,
                 chase_range: 20,
@@ -479,7 +480,7 @@ impl MobDatabase {
                 hit: 15,
                 flee: 12,
                 crit: 0,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
                 atk_range: 1,
                 sight_range: 12,
                 chase_range: 20,
@@ -550,7 +551,7 @@ impl MobTemplate {
             hit: 10,
             flee: 10,
             crit: 0,
-            walk_speed: 150,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
             atk_range: 1,
             sight_range: 12,
             chase_range: 20,

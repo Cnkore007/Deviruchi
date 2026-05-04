@@ -416,6 +416,7 @@ impl Default for MobAI {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
     use crate::game::map::{MapState, Player};
     use crate::game::mob::data::{MobPathManager, MobPosition};
     use crate::game::rand::{GameRng, MockRng};
@@ -472,7 +473,7 @@ mod tests {
             hit: 10,
             flee: 5,
             crit: 0,
-            walk_speed: 150,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
             atk_range: 1,
             element: crate::game::battle::element::Element::Neutral,
             element_level: crate::game::battle::element::ElementLevel::Level1,
@@ -515,7 +516,7 @@ mod tests {
                 state: crate::game::map::player::PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: position.0, y: position.1 }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
@@ -535,7 +536,7 @@ mod tests {
             economy: parking_lot::RwLock::new(crate::game::map::player::Economy {
                 zeny: 0,
                 current_weight: 0,
-                max_weight: 20000,
+                max_weight: constants::BASE_MAX_WEIGHT,
                 job: 0,
                 shop_id: None,
                 group_id: 0,
@@ -618,7 +619,7 @@ mod tests {
             hit: 10,
             flee: 5,
             crit: 0,
-            walk_speed: 150,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
             atk_range: 1,
             element: crate::game::battle::element::Element::Neutral,
             element_level: crate::game::battle::element::ElementLevel::Level1,
@@ -881,7 +882,7 @@ mod tests {
                 state: crate::game::map::player::PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: 105, y: 105 }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
@@ -901,7 +902,7 @@ mod tests {
             economy: parking_lot::RwLock::new(crate::game::map::player::Economy {
                 zeny: 0,
                 current_weight: 0,
-                max_weight: 20000,
+                max_weight: constants::BASE_MAX_WEIGHT,
                 job: 0,
                 shop_id: None,
                 group_id: 0,

@@ -1,3 +1,4 @@
+use crate::game::constants;
 use crate::game::item::Equipment;
 use crate::game::status::{PlayerStatus, StatusChange, StatusEffect, StatusSource};
 use crate::storage::Character;
@@ -195,7 +196,7 @@ impl Player {
                 state: PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: RwLock::new(Position {
                 x: char.last_x as u16,
@@ -218,7 +219,7 @@ impl Player {
             economy: RwLock::new(Economy {
                 zeny: char.zeny,
                 current_weight: 0,
-                max_weight: 20000 + (char.str as u32) * 200,
+                max_weight: constants::BASE_MAX_WEIGHT + (char.str as u32) * constants::WEIGHT_PER_STR,
                 job: char.class,
                 shop_id: None,
                 group_id: 0,
@@ -255,7 +256,7 @@ impl Player {
                 state: PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: RwLock::new(Position {
                 x: char.last_x as u16,
@@ -278,7 +279,7 @@ impl Player {
             economy: RwLock::new(Economy {
                 zeny: char.zeny,
                 current_weight: 0,
-                max_weight: 20000 + (char.str as u32) * 200,
+                max_weight: constants::BASE_MAX_WEIGHT + (char.str as u32) * constants::WEIGHT_PER_STR,
                 job: char.job,
                 shop_id: None,
                 group_id: 0,
@@ -593,10 +594,10 @@ impl Player {
         eco.zeny += amount.min(can_add);
     }
 
-    /// 计算最大负重 (基础20000 + STR*200, 单位0.1)
+    /// 计算最大负重 (基础负重 + STR*每点负重, 单位0.1)
     pub fn calc_max_weight(&self) -> u32 {
         let s = self.attrs.read();
-        20000 + (s.str as u32) * 200
+        constants::BASE_MAX_WEIGHT + (s.str as u32) * constants::WEIGHT_PER_STR
     }
 
     /// 更新最大负重
@@ -820,7 +821,7 @@ mod tests {
                 state: PlayerState::Alive,
                 in_combat: false,
                 is_sitting: false,
-                walk_speed: 150,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
             }),
             pos: RwLock::new(Position { x: 100, y: 100 }),
             level: RwLock::new(LevelStats {
@@ -840,7 +841,7 @@ mod tests {
             economy: RwLock::new(Economy {
                 zeny: 0,
                 current_weight: 0,
-                max_weight: 20000,
+                max_weight: constants::BASE_MAX_WEIGHT,
                 job: 0,
                 shop_id: None,
                 group_id: 0,
