@@ -12,6 +12,8 @@ pub struct Account {
     pub email: Option<String>,
     pub group_id: i32,
     pub state: i32,
+    pub unban_time: i64,
+    pub expiration_time: i64,
     pub logcount: i32,
     pub last_login: Option<i64>,
     pub created_at: i64,
@@ -33,7 +35,7 @@ impl Database {
     pub fn get_account_by_userid(&self, user_id: &str) -> Result<Option<Account>> {
         self.query_row_optional(
             "SELECT account_id, user_id, password_hash, sex, email, group_id,
-                    state, logcount, last_login, created_at
+                    state, unban_time, expiration_time, logcount, last_login, created_at
              FROM accounts WHERE user_id = ?1",
             params![user_id],
             |row| {
@@ -45,9 +47,11 @@ impl Database {
                     email: row.get(4)?,
                     group_id: row.get(5)?,
                     state: row.get(6)?,
-                    logcount: row.get(7)?,
-                    last_login: row.get(8)?,
-                    created_at: row.get(9)?,
+                    unban_time: row.get(7)?,
+                    expiration_time: row.get(8)?,
+                    logcount: row.get(9)?,
+                    last_login: row.get(10)?,
+                    created_at: row.get(11)?,
                 })
             },
         )
@@ -65,7 +69,7 @@ impl Database {
     pub fn get_account_by_id(&self, account_id: u32) -> Result<Option<Account>> {
         self.query_row_optional(
             "SELECT account_id, user_id, password_hash, sex, email, group_id,
-                    state, logcount, last_login, created_at
+                    state, unban_time, expiration_time, logcount, last_login, created_at
              FROM accounts WHERE account_id = ?1",
             params![account_id],
             |row| {
@@ -77,11 +81,43 @@ impl Database {
                     email: row.get(4)?,
                     group_id: row.get(5)?,
                     state: row.get(6)?,
-                    logcount: row.get(7)?,
-                    last_login: row.get(8)?,
-                    created_at: row.get(9)?,
+                    unban_time: row.get(7)?,
+                    expiration_time: row.get(8)?,
+                    logcount: row.get(9)?,
+                    last_login: row.get(10)?,
+                    created_at: row.get(11)?,
                 })
             },
         )
+    }
+
+    /// 检查封禁是否已过期，如果已过期则自动解除
+    pub fn check_and_clear_ban(&self, account: &mut Account) -> Result<bool> {
+        if account.state == 0 {
+            return Ok(true); // 未被封禁
+        }
+
+        let now = chrono_now();
+
+        // 检查 unban_time：> 0 表示有时间限制的封禁
+        if account.unban_time > 0 && now >= account.unban_time {
+            // 封禁已过期，自动解除
+            self.execute_with_params(
+                "UPDATE accounts SET state = 0, unban_time = 0 WHERE account_id = ?1",
+                params![account.account_id],
+            )?;
+            account.state = 0;
+            account.unban_time = 0;
+            tracing::info!("Account {} ban expired, auto-unbanned", account.account_id);
+            return Ok(true);
+        }
+
+        // 检查 expiration_time：> 0 表示账号有过期时间
+        if account.expiration_time > 0 && now >= account.expiration_time {
+            // 账号已过期
+            return Ok(false);
+        }
+
+        Ok(false) // 仍在封禁中
     }
 }
