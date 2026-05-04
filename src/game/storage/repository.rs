@@ -97,16 +97,16 @@ impl StorageRepository {
 
         tokio::task::spawn_blocking(move || {
             db.with_transaction(|conn| {
-                // 清理旧记录
+                // 先清理该角色的旧记录，再插入新记录（事务保证原子性）
                 conn.execute(
                     "DELETE FROM storage WHERE char_id = ?",
                     rusqlite::params![char_id as i64],
                 )?;
 
-                // 插入新记录
+                // 使用 INSERT OR REPLACE 防止 slot_index 冲突
                 for slot in &slots {
                     conn.execute(
-                        "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
+                        "INSERT OR REPLACE INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         rusqlite::params![
                             char_id as i64,
@@ -123,7 +123,7 @@ impl StorageRepository {
                     )?;
                 }
 
-                // 保存仓库元数据（max_size）
+                // 保存仓库元数据（max_size）—— 使用 UPSERT
                 conn.execute(
                     "INSERT INTO storage_meta (char_id, max_size)
                      VALUES (?, ?)

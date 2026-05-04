@@ -113,9 +113,12 @@ impl NpcDialogueState {
 
     /// 处理玩家输入（如选择菜单）
     /// input: 1-based 选择索引（rAthena 协议发送 1-based 索引）
+    /// 自动将选择结果存储到 @menu 变量，脚本可通过 goto_if "@menu", N, "label" 分支
     pub fn handle_input(&mut self, input: usize) -> DialogueResponse {
         self.pending_next = false;
         self.last_select = input;
+        // rAthena 约定：select 命令的选择结果存储到 @menu 变量
+        self.variables.insert("@menu".to_string(), input as i64);
         self.process()
     }
 

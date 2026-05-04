@@ -38,7 +38,7 @@ pub enum EvolutionStage {
     /// 进化形态 (H)
     Evolved,
     /// S 级进化形态 (H2)
-    S级进化,
+    SuperEvolved,
 }
 
 /// 生命体技能

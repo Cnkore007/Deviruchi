@@ -18,8 +18,8 @@ pub struct StorageSyncManager {
     storage_manager: Arc<StorageManager>,
     /// 仓库仓库
     repository: StorageRepository,
-    /// 同步调度器
-    scheduler: StorageSyncScheduler,
+    /// 同步调度器（使用 Arc 共享，clone 时不创建新后台任务）
+    scheduler: Arc<StorageSyncScheduler>,
     /// 默认仓库大小
     default_storage_size: u16,
 }
@@ -32,11 +32,11 @@ impl StorageSyncManager {
         sync_interval: Duration,
         default_storage_size: u16,
     ) -> Self {
-        let scheduler = StorageSyncScheduler::new(
+        let scheduler = Arc::new(StorageSyncScheduler::new(
             repository.clone(),
             storage_manager.clone(),
             sync_interval,
-        );
+        ));
 
         Self {
             storage_manager,
@@ -316,11 +316,7 @@ impl Clone for StorageSyncManager {
         Self {
             storage_manager: self.storage_manager.clone(),
             repository: self.repository.clone(),
-            scheduler: StorageSyncScheduler::new(
-                self.repository.clone(),
-                self.storage_manager.clone(),
-                Duration::from_secs(30),
-            ),
+            scheduler: self.scheduler.clone(), // Arc 共享同一个调度器实例
             default_storage_size: self.default_storage_size,
         }
     }

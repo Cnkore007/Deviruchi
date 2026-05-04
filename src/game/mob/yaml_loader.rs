@@ -9,6 +9,46 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
+/// 物品名称到 ID 的映射（rAthena 常用物品）
+/// 完整映射应从 item_db.yml 动态加载，此处为最小集保证掉落表可用
+fn item_name_to_id(name: &str) -> u32 {
+    match name {
+        // 消耗品
+        "Red_Potion" | "Red_Potion_" => 501,
+        "Orange_Potion" => 502,
+        "Yellow_Potion" => 503,
+        "White_Potion" => 504,
+        "Blue_Potion" => 505,
+        "Green_Potion" => 506,
+        // 材料
+        "Jellopy" => 909,
+        "Fluff" => 914,
+        "Feather" => 949,
+        "Sticky_Mucus" => 938,
+        "Scale_Shell" => 947,
+        "Boody_Red" => 990,
+        "Scorpion_Tail" => 904,
+        "Shell" => 935,
+        "Worm_Peelings" => 955,
+        "Mushroom_Spore" => 921,
+        "Tree_Root" => 902,
+        "Resin" => 907,
+        "Clover" => 705,
+        "Four_Leaf_Clover" => 706,
+        // 装备
+        "Knife" => 1202,
+        "Dagger" => 1201,
+        "Main_Gauche" => 1207,
+        "Sword" => 1101,
+        "Falchion" => 1104,
+        // 其他
+        _ => {
+            tracing::warn!("未知物品名称: {}，item_id 设为 0", name);
+            0
+        }
+    }
+}
+
 /// rAthena mob_db.yml 文件结构
 #[derive(Deserialize, Debug)]
 struct MobYamlFile {
@@ -250,8 +290,9 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                         drops
                             .iter()
                             .map(|d| {
-                                // Rate 是万分比 (10000 = 100%)
-                                MobDrop::new(0, d.Rate)
+                                // 将物品名称映射到 ID，Rate 是万分比 (10000 = 100%)
+                                let item_id = item_name_to_id(&d.Item);
+                                MobDrop::new(item_id, d.Rate)
                             })
                             .collect()
                     })

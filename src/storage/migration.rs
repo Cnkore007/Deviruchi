@@ -4,8 +4,8 @@
 //! 每个迁移有 up (升级) 和 down (降级) 操作。
 //! 迁移按版本号单调递增，幂等执行。
 
+use crate::error::Result;
 use crate::storage::Database;
-use anyhow::{Context, Result};
 use std::collections::BTreeMap;
 
 /// 迁移定义
@@ -76,20 +76,28 @@ impl MigrationManager {
                     migration.description
                 );
 
-                db.execute(migration.up)
-                    .with_context(|| format!("迁移 v{} 失败", version))?;
+                // 将迁移 SQL 和版本记录写入同一个事务，保证原子性
+                let up_sql = migration.up;
+                let desc = migration.description;
+                db.with_transaction(|conn| {
+                    // 执行迁移 SQL（可能包含多条语句，用 execute_batch）
+                    conn.execute_batch(up_sql)
+                        .map_err(|e| crate::error::Error::Database(e))?;
 
-                // 获取当前时间戳（秒）
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs() as i64;
+                    // 获取当前时间戳（秒）
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as i64;
 
-                db.execute_with_params(
-                    "INSERT INTO schema_version (version, description, applied_at) VALUES (?1, ?2, ?3)",
-                    rusqlite::params![version, migration.description, now],
-                )
-                .with_context(|| format!("记录迁移版本 v{} 失败", version))?;
+                    // 记录迁移版本
+                    conn.execute(
+                        "INSERT INTO schema_version (version, description, applied_at) VALUES (?1, ?2, ?3)",
+                        rusqlite::params![version, desc, now],
+                    )?;
+
+                    Ok(())
+                })?;
 
                 applied += 1;
             }
@@ -118,14 +126,12 @@ impl MigrationManager {
                         migration.description
                     );
 
-                    db.execute(down_sql)
-                        .with_context(|| format!("回滚迁移 v{} 失败", version))?;
+                    db.execute(down_sql)?;
 
                     db.execute_with_params(
                         "DELETE FROM schema_version WHERE version = ?1",
                         rusqlite::params![version],
-                    )
-                    .with_context(|| format!("删除迁移版本 v{} 记录失败", version))?;
+                    )?;
 
                     reverted += 1;
                 } else {
