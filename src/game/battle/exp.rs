@@ -91,7 +91,7 @@ impl ExpDistributor {
                 continue;
             }
             if let Some(player) = map_state.get_player(&member.player_id) {
-                nearby.push((member.player_id, *player.base_level.read()));
+                nearby.push((member.player_id, player.base_level()));
             }
         }
 
@@ -127,7 +127,7 @@ impl ExpDistributor {
             ExpShareMode::LevelBased => {
                 // 按等级加权分配
                 let killer = map_state.get_player(&killer_id);
-                let killer_level = killer.map(|p| *p.base_level.read()).unwrap_or(1) as u64;
+                let killer_level = killer.map(|p| p.base_level()).unwrap_or(1) as u64;
 
                 let total_level: u64 =
                     killer_level + nearby.iter().map(|(_, lvl)| *lvl as u64).sum::<u64>();
@@ -191,7 +191,7 @@ impl ExpDistributor {
             None => return,
         };
 
-        let player_level = *player.base_level.read() as i32;
+        let player_level = player.base_level() as i32;
         let mob_level = mob_level as i32;
         let level_diff = player_level - mob_level;
 

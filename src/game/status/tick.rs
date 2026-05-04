@@ -131,8 +131,8 @@ impl StatusTickProcessor {
         if let Some(effect) = status.get_status(StatusChange::Poison) {
             let damage = effect.val1 as u32; // val1: 每次Tick伤害
             result.total_dot_damage += damage;
-            let new_hp = (*player.hp.read()).saturating_sub(damage);
-            *player.hp.write() = new_hp;
+            let new_hp = (player.hp()).saturating_sub(damage);
+            player.combat_mut().hp = new_hp;
 
             tracing::trace!(
                 "Player {} took {} poison damage, HP: {}",
@@ -151,8 +151,8 @@ impl StatusTickProcessor {
         if let Some(effect) = status.get_status(StatusChange::Bleeding) {
             let damage = effect.val1 as u32; // val1: 每次Tick伤害
             result.total_dot_damage += damage;
-            let new_hp = (*player.hp.read()).saturating_sub(damage);
-            *player.hp.write() = new_hp;
+            let new_hp = (player.hp()).saturating_sub(damage);
+            player.combat_mut().hp = new_hp;
 
             tracing::trace!(
                 "Player {} took {} bleeding damage, HP: {}",
@@ -178,8 +178,8 @@ impl StatusTickProcessor {
         let modifiers = StatusCalculator::calculate_from_status(status);
 
         // HP 回复
-        let max_hp = *player.max_hp.read();
-        let current_hp = *player.hp.read();
+        let max_hp = player.max_hp();
+        let current_hp = player.hp();
 
         if current_hp < max_hp {
             let base_hp_regen = self.calculate_base_hp_regen(player);
@@ -187,14 +187,14 @@ impl StatusTickProcessor {
 
             if hp_regen > 0 {
                 let new_hp = (current_hp + hp_regen as u32).min(max_hp);
-                *player.hp.write() = new_hp;
+                player.combat_mut().hp = new_hp;
                 result.hp_healed = hp_regen as u32;
             }
         }
 
         // SP 回复
-        let max_sp = *player.max_sp.read();
-        let current_sp = *player.sp.read();
+        let max_sp = player.max_sp();
+        let current_sp = player.sp();
 
         if current_sp < max_sp {
             let base_sp_regen = self.calculate_base_sp_regen(player);
@@ -202,7 +202,7 @@ impl StatusTickProcessor {
 
             if sp_regen > 0 {
                 let new_sp = (current_sp + sp_regen as u32).min(max_sp);
-                *player.sp.write() = new_sp;
+                player.combat_mut().sp = new_sp;
                 result.sp_healed = sp_regen as u32;
             }
         }
@@ -210,8 +210,8 @@ impl StatusTickProcessor {
 
     /// 计算基础HP回复量
     fn calculate_base_hp_regen(&self, player: &Arc<Player>) -> i32 {
-        let vit = *player.vit.read() as i32;
-        let max_hp = *player.max_hp.read() as i32;
+        let vit = player.vit() as i32;
+        let max_hp = player.max_hp() as i32;
 
         // 基础回复: 1 + VIT/6 + max_hp/1000
         (1 + vit / 6 + max_hp / 1000).max(1)
@@ -219,8 +219,8 @@ impl StatusTickProcessor {
 
     /// 计算基础SP回复量
     fn calculate_base_sp_regen(&self, player: &Arc<Player>) -> i32 {
-        let int = *player.int.read() as i32;
-        let max_sp = *player.max_sp.read() as i32;
+        let int = player.int() as i32;
+        let max_sp = player.max_sp() as i32;
 
         // 基础回复: 1 + INT/6 + max_sp/1000
         (1 + int / 6 + max_sp / 1000).max(1)

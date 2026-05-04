@@ -28,7 +28,7 @@ impl SkillEffect {
 
     fn apply_healing(skill: &Skill, caster: &Player, _target: &Player, level: u8) -> SkillResult {
         let heal_amount = skill.damage * level as i32 / 10;
-        let matk = *caster.int.read() * 2 + *caster.dex.read();
+        let matk = caster.int() * 2 + caster.dex();
         let total_heal = (heal_amount * matk as i32 / 100).max(1);
 
         SkillResult::Heal {

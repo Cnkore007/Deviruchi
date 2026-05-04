@@ -3,11 +3,11 @@ use crate::game::map::{MapState, Player};
 
 /// @heal - 恢复 HP/SP
 pub fn cmd_heal(player: &mut Player, _args: &[String], _map_state: &MapState) -> CommandResult {
-    let max_hp = *player.max_hp.read();
-    let max_sp = *player.max_sp.read();
+    let max_hp = player.max_hp();
+    let max_sp = player.max_sp();
 
-    *player.hp.write() = max_hp;
-    *player.sp.write() = max_sp;
+    player.combat_mut().hp = max_hp;
+    player.combat_mut().sp = max_sp;
 
     CommandResult::Success("HP 和 SP 已回满".to_string())
 }
@@ -18,7 +18,7 @@ pub fn cmd_revive(player: &mut Player, _args: &[String], _map_state: &MapState) 
         return CommandResult::Failure("你并没有死亡".to_string());
     }
 
-    player.respawn(*player.pos_x.read(), *player.pos_y.read());
+    player.respawn(player.pos_x(), player.pos_y());
     CommandResult::Success("已复活".to_string())
 }
 
@@ -37,7 +37,7 @@ pub fn cmd_level(player: &mut Player, args: &[String], _map_state: &MapState) ->
         return CommandResult::Failure("等级不能超过 99".to_string());
     }
 
-    *player.base_level.write() = level;
+    player.level_stats_mut().base_level = level;
     CommandResult::Success(format!("等级设置为 {}", level))
 }
 
@@ -67,8 +67,8 @@ pub fn cmd_hp(player: &mut Player, args: &[String], _map_state: &MapState) -> Co
         Err(_) => return CommandResult::Failure("无效的数量".to_string()),
     };
 
-    let max_hp = *player.max_hp.read();
-    *player.hp.write() = amount.min(max_hp);
+    let max_hp = player.max_hp();
+    player.combat_mut().hp = amount.min(max_hp);
     CommandResult::Success(format!("HP 设置为 {}", amount.min(max_hp)))
 }
 
@@ -83,7 +83,7 @@ pub fn cmd_sp(player: &mut Player, args: &[String], _map_state: &MapState) -> Co
         Err(_) => return CommandResult::Failure("无效的数量".to_string()),
     };
 
-    let max_sp = *player.max_sp.read();
-    *player.sp.write() = amount.min(max_sp);
+    let max_sp = player.max_sp();
+    player.combat_mut().sp = amount.min(max_sp);
     CommandResult::Success(format!("SP 设置为 {}", amount.min(max_sp)))
 }

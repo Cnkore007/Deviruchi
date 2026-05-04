@@ -95,17 +95,17 @@ impl GameLoop {
 
                 // 2. 应用食物效果
                 if food_hp > 0 || food_sp > 0 {
-                    let current_hp = *player.hp.read();
-                    let max_hp = *player.max_hp.read();
-                    let current_sp = *player.sp.read();
-                    let max_sp = *player.max_sp.read();
+                    let current_hp = player.hp();
+                    let max_hp = player.max_hp();
+                    let current_sp = player.sp();
+                    let max_sp = player.max_sp();
 
                     let new_hp = (current_hp + food_hp).min(max_hp);
                     let new_sp = (current_sp + food_sp).min(max_sp);
 
                     if new_hp != current_hp || new_sp != current_sp {
-                        *player.hp.write() = new_hp;
-                        *player.sp.write() = new_sp;
+                        player.combat_mut().hp = new_hp;
+                        player.combat_mut().sp = new_sp;
                         tracing::trace!(
                             "Player {} food effect: +{} HP, +{} SP",
                             player.name,

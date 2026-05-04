@@ -103,7 +103,7 @@ impl NpcHandler {
         }
 
         // 检查重量
-        let max_weight = *player.max_weight.read();
+        let max_weight = player.max_weight();
         if !inventory.can_carry_weight(item_id, amount as u16, max_weight) {
             return BuyResult::Overweight;
         }

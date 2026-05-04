@@ -50,12 +50,12 @@ impl MapServer {
 
         // Load account group_id for permission checks
         if let Ok(Some(account)) = self.db.get_account_by_id(account_id) {
-            *player.group_id.write() = account.group_id;
+            player.economy_mut().group_id = account.group_id;
         }
 
         let player_id = player.id;
-        let pos_x = *player.pos_x.read();
-        let pos_y = *player.pos_y.read();
+        let pos_x = player.pos_x();
+        let pos_y = player.pos_y();
         let map_name = player.map_name.clone();
 
         // Add to map state
@@ -82,8 +82,8 @@ impl MapServer {
 
         let move_pkt = CZRequestMove::from_slice(data)?;
 
-        let from_x = *player.pos_x.read();
-        let from_y = *player.pos_y.read();
+        let from_x = player.pos_x();
+        let from_y = player.pos_y();
 
         // Validate coordinates are within map bounds
         if move_pkt.pos_x >= 4000 || move_pkt.pos_y >= 4000 {

@@ -201,10 +201,10 @@ impl TradeSession {
         let weight_gain_1 = Self::calc_weight_gain(&self.items2.read(), item_db);
         let weight_gain_2 = Self::calc_weight_gain(&self.items1.read(), item_db);
 
-        let max_weight_1 = *player1.max_weight.read();
-        let max_weight_2 = *player2.max_weight.read();
-        let current_weight_1 = *player1.current_weight.read();
-        let current_weight_2 = *player2.current_weight.read();
+        let max_weight_1 = player1.max_weight();
+        let max_weight_2 = player2.max_weight();
+        let current_weight_1 = player1.current_weight();
+        let current_weight_2 = player2.current_weight();
 
         // 检查玩家1是否会超重
         if current_weight_1 + weight_gain_1 > max_weight_1 {
@@ -219,8 +219,8 @@ impl TradeSession {
         // 检查Zeny是否足够
         let zeny1 = *self.zeny1.read();
         let zeny2 = *self.zeny2.read();
-        let current_zeny_1 = *player1.zeny.read();
-        let current_zeny_2 = *player2.zeny.read();
+        let current_zeny_1 = player1.zeny();
+        let current_zeny_2 = player2.zeny();
 
         if current_zeny_1 < zeny1 {
             return Err(TradeError::NotEnoughZeny(player1.name.clone()));

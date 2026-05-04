@@ -88,7 +88,7 @@ impl BattleHandler {
         defender: &Mob,
         skill_damage: i32,
     ) -> AttackResult {
-        let matk = (*attacker.int.read() as i32) * 2 + (*attacker.dex.read() as i32) / 3;
+        let matk = (attacker.int() as i32) * 2 + (attacker.dex() as i32) / 3;
         let damage = BattleFormula::magical_damage(attacker, defender, skill_damage, matk);
 
         let killed = defender.take_damage(safe_damage(damage));

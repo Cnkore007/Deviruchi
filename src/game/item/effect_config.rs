@@ -173,26 +173,26 @@ impl ItemRequirements {
     pub fn check(&self, player: &crate::game::map::Player) -> Option<String> {
         // 检查等级
         if let Some(min_level) = self.min_level
-            && *player.base_level.read() < min_level
+            && player.base_level() < min_level
         {
             return Some(format!("需要等级 {}", min_level));
         }
 
         // 检查职业
         if let Some(required_jobs) = &self.job_ids {
-            let player_job = player.get_job();
+            let player_job = player.job();
             if !required_jobs.contains(&player_job) {
                 return Some("此物品需要特定职业才能使用".to_string());
             }
         }
 
         // 检查存活状态
-        if self.must_be_alive && *player.hp.read() == 0 {
+        if self.must_be_alive && player.hp() == 0 {
             return Some("死亡状态无法使用".to_string());
         }
 
         // 检查死亡状态
-        if self.must_be_dead && *player.hp.read() != 0 {
+        if self.must_be_dead && player.hp() != 0 {
             return Some("必须在死亡状态使用".to_string());
         }
 

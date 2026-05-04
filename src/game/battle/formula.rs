@@ -33,10 +33,10 @@ impl BattleFormula {
         weapon_type: i32,
     ) -> i32 {
         let base_atk = {
-            let base_level = *attacker.base_level.read() as i32;
-            let str = *attacker.str.read() as i32;
-            let dex = *attacker.dex.read() as i32;
-            let agi = *attacker.agi.read() as i32;
+            let base_level = attacker.base_level() as i32;
+            let str = attacker.str() as i32;
+            let dex = attacker.dex() as i32;
+            let agi = attacker.agi() as i32;
 
             base_level
                 .saturating_mul(2)
@@ -80,10 +80,10 @@ impl BattleFormula {
         rng: &dyn GameRng,
     ) -> i32 {
         let base_atk = {
-            let base_level = *attacker.base_level.read() as i32;
-            let str = *attacker.str.read() as i32;
-            let dex = *attacker.dex.read() as i32;
-            let agi = *attacker.agi.read() as i32;
+            let base_level = attacker.base_level() as i32;
+            let str = attacker.str() as i32;
+            let dex = attacker.dex() as i32;
+            let agi = attacker.agi() as i32;
 
             base_level
                 .saturating_mul(2)
@@ -125,9 +125,9 @@ impl BattleFormula {
         matk: i32,
     ) -> i32 {
         let base_matk = {
-            let int = *attacker.int.read() as i32;
-            let dex = *attacker.dex.read() as i32;
-            let base_level = *attacker.base_level.read() as i32;
+            let int = attacker.int() as i32;
+            let dex = attacker.dex() as i32;
+            let base_level = attacker.base_level() as i32;
 
             int.saturating_mul(2)
                 .saturating_add(dex / 3)
@@ -154,9 +154,9 @@ impl BattleFormula {
         rng: &dyn GameRng,
     ) -> i32 {
         let base_matk = {
-            let int = *attacker.int.read() as i32;
-            let dex = *attacker.dex.read() as i32;
-            let base_level = *attacker.base_level.read() as i32;
+            let int = attacker.int() as i32;
+            let dex = attacker.dex() as i32;
+            let base_level = attacker.base_level() as i32;
 
             int.saturating_mul(2)
                 .saturating_add(dex / 3)
@@ -176,8 +176,8 @@ impl BattleFormula {
     /// 计算命中率
     pub fn hit_rate(attacker: &Player, defender: &Mob) -> i32 {
         let hit = {
-            let dex = *attacker.dex.read() as i32;
-            let base_level = *attacker.base_level.read() as i32;
+            let dex = attacker.dex() as i32;
+            let base_level = attacker.base_level() as i32;
             (dex * 3) + base_level
         };
         let flee = defender.flee as i32;
@@ -186,15 +186,15 @@ impl BattleFormula {
 
     /// 计算闪避率
     pub fn flee_rate(player: &Player, _mob: &Mob) -> i32 {
-        let agi = *player.agi.read() as i32;
-        let base_level = *player.base_level.read() as i32;
+        let agi = player.agi() as i32;
+        let base_level = player.base_level() as i32;
         80 + agi - (base_level * 2)
     }
 
     /// 计算暴击率
     pub fn crit_rate(attacker: &Player, _defender: &Mob) -> i32 {
         let base_crit = 0;
-        let luk = *attacker.luk.read() as i32;
+        let luk = attacker.luk() as i32;
         base_crit + luk / 3
     }
 
@@ -208,7 +208,7 @@ impl BattleFormula {
     /// Note: 玩家防御力基于装备，后续从装备系统获取
     pub fn mob_physical_damage(mob: &Mob, player: &Player) -> i32 {
         let atk = mob.atk as i32;
-        let player_vit = *player.vit.read() as i32;
+        let player_vit = player.vit() as i32;
 
         // 基础伤害 = ATK - VIT/2
         let base_damage = (atk - player_vit / 2).max(1);
@@ -225,8 +225,8 @@ impl BattleFormula {
     pub fn mob_hit_rate(mob: &Mob, player: &Player) -> i32 {
         let mob_hit = mob.hit as i32;
         let player_flee = {
-            let agi = *player.agi.read() as i32;
-            let base_level = *player.base_level.read() as i32;
+            let agi = player.agi() as i32;
+            let base_level = player.base_level() as i32;
             80 + agi - (base_level * 2)
         };
         95 + (mob_hit - player_flee) / 2

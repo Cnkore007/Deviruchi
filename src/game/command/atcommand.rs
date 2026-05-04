@@ -93,7 +93,7 @@ impl AtCommandHandler {
 
     /// 获取玩家权限等级
     fn get_player_level(&self, player: &Player) -> u8 {
-        *player.group_id.read() as u8
+        player.group_id() as u8
     }
 
     /// 获取权限等级名称

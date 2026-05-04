@@ -231,10 +231,10 @@ impl ItemIntegrationHandler {
                 hp_percent,
                 sp_percent,
             } => {
-                let max_hp = *player.max_hp.read();
-                let max_sp = *player.max_sp.read();
-                let _current_hp = *player.hp.read();
-                let _current_sp = *player.sp.read();
+                let max_hp = player.max_hp();
+                let max_sp = player.max_sp();
+                let _current_hp = player.hp();
+                let _current_sp = player.sp();
 
                 let hp_amount = (max_hp as i32 * *hp_percent as i32 / 100).max(0);
                 let sp_amount = (max_sp as i32 * *sp_percent as i32 / 100).max(0);
@@ -294,10 +294,10 @@ impl ItemIntegrationHandler {
 
             ItemEffectType::Revive { hp_percent } => {
                 // 复活
-                if *player.hp.read() == 0 {
-                    let max_hp = *player.max_hp.read();
+                if player.hp() == 0 {
+                    let max_hp = player.max_hp();
                     let res_hp = max_hp * *hp_percent / 100;
-                    *player.hp.write() = res_hp;
+                    player.combat_mut().hp = res_hp;
                     // 移除死亡状态
                     player.status.remove_status(StatusChange::Stone);
                     ItemUseResult::Revive {
@@ -351,26 +351,26 @@ impl ItemIntegrationHandler {
     fn apply_heal(&self, player: &Player, hp: i32, sp: i32) {
         // 治愈HP
         if hp != 0 {
-            let current = *player.hp.read();
-            let max = *player.max_hp.read();
+            let current = player.hp();
+            let max = player.max_hp();
             let new_hp = if hp > 0 {
                 (current + hp as u32).min(max)
             } else {
                 current.saturating_sub((-hp) as u32)
             };
-            *player.hp.write() = new_hp;
+            player.combat_mut().hp = new_hp;
         }
 
         // 治愈SP
         if sp != 0 {
-            let current = *player.sp.read();
-            let max = *player.max_sp.read();
+            let current = player.sp();
+            let max = player.max_sp();
             let new_sp = if sp > 0 {
                 (current + sp as u32).min(max)
             } else {
                 current.saturating_sub((-sp) as u32)
             };
-            *player.sp.write() = new_sp;
+            player.combat_mut().sp = new_sp;
         }
     }
 
@@ -425,17 +425,17 @@ impl ItemIntegrationHandler {
             super::data::ItemType::Heal => {
                 // 恢复HP
                 if item.hp_restore > 0 {
-                    let current = *player.hp.read();
-                    let max = *player.max_hp.read();
+                    let current = player.hp();
+                    let max = player.max_hp();
                     let new_hp = (current + item.hp_restore as u32).min(max);
-                    *player.hp.write() = new_hp;
+                    player.combat_mut().hp = new_hp;
                 }
                 // 恢复SP
                 if item.sp_restore > 0 {
-                    let current = *player.sp.read();
-                    let max = *player.max_sp.read();
+                    let current = player.sp();
+                    let max = player.max_sp();
                     let new_sp = (current + item.sp_restore as u32).min(max);
-                    *player.sp.write() = new_sp;
+                    player.combat_mut().sp = new_sp;
                 }
                 inventory.use_item(0);
                 ItemUseResult::Success(format!("使用了 {}", item.name))
@@ -465,16 +465,16 @@ impl ItemIntegrationHandler {
         match item.type_ {
             super::data::ItemType::Heal => {
                 if item.hp_restore > 0 {
-                    let current = *player.hp.read();
-                    let max = *player.max_hp.read();
+                    let current = player.hp();
+                    let max = player.max_hp();
                     let new_hp = (current + item.hp_restore as u32).min(max);
-                    *player.hp.write() = new_hp;
+                    player.combat_mut().hp = new_hp;
                 }
                 if item.sp_restore > 0 {
-                    let current = *player.sp.read();
-                    let max = *player.max_sp.read();
+                    let current = player.sp();
+                    let max = player.max_sp();
                     let new_sp = (current + item.sp_restore as u32).min(max);
-                    *player.sp.write() = new_sp;
+                    player.combat_mut().sp = new_sp;
                 }
                 inventory.use_item(slot_index);
                 ItemUseResult::Success(format!("使用了 {}", item.name))

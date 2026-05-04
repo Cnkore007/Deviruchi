@@ -38,12 +38,12 @@ impl SkillHandler {
 
         // 检查SP
         let sp_cost = skill.sp_cost as u32 * level as u32;
-        if *player.sp.read() < sp_cost {
+        if player.sp() < sp_cost {
             return SkillError::NotEnoughSP;
         }
 
         // 检查HP
-        if *player.hp.read() < skill.hp_cost {
+        if player.hp() < skill.hp_cost {
             return SkillError::NotEnoughHP;
         }
 
@@ -79,10 +79,12 @@ impl SkillHandler {
 
         // 消耗SP/HP
         let sp_cost = skill.sp_cost as u32 * level as u32;
-        *caster.sp.write() -= sp_cost;
-
-        if skill.hp_cost > 0 {
-            *caster.hp.write() -= skill.hp_cost;
+        {
+            let mut c = caster.combat_mut();
+            c.sp -= sp_cost;
+            if skill.hp_cost > 0 {
+                c.hp -= skill.hp_cost;
+            }
         }
 
         // 获取目标玩家

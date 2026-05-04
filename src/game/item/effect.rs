@@ -155,31 +155,31 @@ impl ItemEffect {
     pub fn apply(&self, player: &Player) -> EffectResult {
         match self {
             ItemEffect::HealHp(amount) => {
-                let current = *player.hp.read();
-                let max = *player.max_hp.read();
+                let current = player.hp();
+                let max = player.max_hp();
                 let heal_amount = if *amount < 0 {
                     current.saturating_sub((-amount) as u32)
                 } else {
                     (current + *amount as u32).min(max)
                 };
-                *player.hp.write() = heal_amount;
+                player.combat_mut().hp = heal_amount;
                 EffectResult::Success
             }
             ItemEffect::HealSp(amount) => {
-                let current = *player.sp.read();
-                let max = *player.max_sp.read();
+                let current = player.sp();
+                let max = player.max_sp();
                 let heal_amount = if *amount < 0 {
                     current.saturating_sub((-amount) as u32)
                 } else {
                     (current + *amount as u32).min(max)
                 };
-                *player.sp.write() = heal_amount;
+                player.combat_mut().sp = heal_amount;
                 EffectResult::Success
             }
             ItemEffect::DamageHp(amount) => {
-                let current = *player.hp.read();
+                let current = player.hp();
                 let new_hp = current.saturating_sub(*amount as u32);
-                *player.hp.write() = new_hp;
+                player.combat_mut().hp = new_hp;
                 if new_hp == 0 {
                     // 触发死亡逻辑
                 }
@@ -198,24 +198,24 @@ impl ItemEffect {
                 sp_percent,
             } => {
                 // 基于百分比的治疗
-                let max_hp = *player.max_hp.read();
-                let max_sp = *player.max_sp.read();
-                let current_hp = *player.hp.read();
-                let current_sp = *player.sp.read();
+                let max_hp = player.max_hp();
+                let max_sp = player.max_sp();
+                let current_hp = player.hp();
+                let current_sp = player.sp();
 
                 let hp_heal = (max_hp as i32 * hp_percent / 100).max(0) as u32;
                 let sp_heal = (max_sp as i32 * sp_percent / 100).max(0) as u32;
 
-                *player.hp.write() = (current_hp + hp_heal).min(max_hp);
-                *player.sp.write() = (current_sp + sp_heal).min(max_sp);
+                player.combat_mut().hp = (current_hp + hp_heal).min(max_hp);
+                player.combat_mut().sp = (current_sp + sp_heal).min(max_sp);
                 EffectResult::Success
             }
             ItemEffect::ItemHeal { hp, sp } => {
                 // itemheal 有上限限制 (通常是max_hp/max_sp的50%)
-                let max_hp = *player.max_hp.read();
-                let max_sp = *player.max_sp.read();
-                let current_hp = *player.hp.read();
-                let current_sp = *player.sp.read();
+                let max_hp = player.max_hp();
+                let max_sp = player.max_sp();
+                let current_hp = player.hp();
+                let current_sp = player.sp();
 
                 let cap_hp = max_hp / 2;
                 let cap_sp = max_sp / 2;
@@ -237,16 +237,16 @@ impl ItemEffect {
                     current_sp.saturating_sub((-actual_sp) as u32)
                 };
 
-                *player.hp.write() = new_hp;
-                *player.sp.write() = new_sp;
+                player.combat_mut().hp = new_hp;
+                player.combat_mut().sp = new_sp;
                 EffectResult::Success
             }
             ItemEffect::StatusHeal { hp, sp } => {
                 // 无上限治愈
-                let current_hp = *player.hp.read();
-                let current_sp = *player.sp.read();
-                let max_hp = *player.max_hp.read();
-                let max_sp = *player.max_sp.read();
+                let current_hp = player.hp();
+                let current_sp = player.sp();
+                let max_hp = player.max_hp();
+                let max_sp = player.max_sp();
 
                 let hp_val = *hp;
                 let sp_val = *sp;
@@ -262,14 +262,14 @@ impl ItemEffect {
                     current_sp.saturating_sub((-sp_val) as u32)
                 };
 
-                *player.hp.write() = new_hp.min(max_hp);
-                *player.sp.write() = new_sp.min(max_sp);
+                player.combat_mut().hp = new_hp.min(max_hp);
+                player.combat_mut().sp = new_sp.min(max_sp);
                 EffectResult::Success
             }
             ItemEffect::Restore => {
                 // 完全恢复
-                *player.hp.write() = *player.max_hp.read();
-                *player.sp.write() = *player.max_sp.read();
+                player.combat_mut().hp = player.max_hp();
+                player.combat_mut().sp = player.max_sp();
                 EffectResult::Success
             }
             ItemEffect::StatusEnd(status) => {
@@ -286,10 +286,10 @@ impl ItemEffect {
             }
             ItemEffect::Resurrection(hp_percent) => {
                 // 复活效果，设置HP为指定百分比
-                if *player.hp.read() == 0 {
-                    let max_hp = *player.max_hp.read();
+                if player.hp() == 0 {
+                    let max_hp = player.max_hp();
                     let res_hp = max_hp * (*hp_percent as u32) / 100;
-                    *player.hp.write() = res_hp;
+                    player.combat_mut().hp = res_hp;
                     // 移除死亡状态
                     player.status.remove_status(StatusChange::Stone);
                 }

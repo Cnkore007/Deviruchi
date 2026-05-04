@@ -63,7 +63,7 @@ impl MountManager {
             None => return false,
         };
 
-        if *player.base_level.read() < mount.required_level {
+        if player.base_level() < mount.required_level {
             return false;
         }
 
@@ -97,7 +97,7 @@ impl MountManager {
             .ok_or(MountError::MountNotFound(mount_id))?;
 
         // 检查等级
-        let player_level = *player.base_level.read();
+        let player_level = player.base_level();
         if player_level < mount.required_level {
             return Err(MountError::LevelTooLow {
                 required: mount.required_level,
@@ -106,13 +106,13 @@ impl MountManager {
         }
 
         // 保存原始速度
-        let original_speed = *player.walk_speed.read();
+        let original_speed = player.walk_speed();
 
         // 计算新速度
         let new_speed = mount.calculate_speed(original_speed);
 
         // 更新玩家速度
-        *player.walk_speed.write() = new_speed;
+        player.combat_mut().walk_speed = new_speed;
 
         // 记录坐骑状态
         self.player_mounts.write().insert(
@@ -145,7 +145,7 @@ impl MountManager {
         let state = mounts.remove(&player.id).ok_or(MountError::NotMounted)?;
 
         // 恢复原始速度
-        *player.walk_speed.write() = state.original_speed;
+        player.combat_mut().walk_speed = state.original_speed;
 
         Ok(())
     }
@@ -296,7 +296,7 @@ mod tests {
         let player = create_test_player(60);
 
         // 初始速度
-        assert_eq!(*player.walk_speed.read(), 150);
+        assert_eq!(player.walk_speed(), 150);
 
         // 上马
         let result = manager.mount(&player, 1); // Peco Peco
@@ -329,7 +329,7 @@ mod tests {
     fn test_cannot_mount_dead_player() {
         let manager = MountManager::new();
         let player = create_test_player(60);
-        *player.state.write() = PlayerState::Dead;
+        player.combat_mut().state = PlayerState::Dead;
 
         let result = manager.mount(&player, 1);
         assert!(matches!(result, Err(MountError::CannotMountWhileDead)));
@@ -343,7 +343,7 @@ mod tests {
         // Peco是150%速度
         manager.mount(&player, 1).unwrap();
         // 150 * 1.5 = 225
-        assert_eq!(*player.walk_speed.read(), 225);
+        assert_eq!(player.walk_speed(), 225);
     }
 
     #[test]

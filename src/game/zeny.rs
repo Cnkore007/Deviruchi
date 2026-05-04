@@ -7,20 +7,18 @@ pub struct ZenyManager;
 impl ZenyManager {
     /// 增加Zeny，返回实际增加数量
     pub fn add(player: &Player, amount: u32) -> u32 {
-        let mut zeny = player.zeny.write();
-        let current = *zeny;
-        let can_add = MAX_ZENY - current;
+        let mut eco = player.economy_mut();
+        let can_add = MAX_ZENY - eco.zeny;
         let actual_add = amount.min(can_add);
-        *zeny = current + actual_add;
+        eco.zeny += actual_add;
         actual_add
     }
 
     /// 扣除Zeny，返回是否成功
     pub fn sub(player: &Player, amount: u32) -> bool {
-        let mut zeny = player.zeny.write();
-        let current = *zeny;
-        if current >= amount {
-            *zeny = current - amount;
+        let mut eco = player.economy_mut();
+        if eco.zeny >= amount {
+            eco.zeny -= amount;
             true
         } else {
             false
@@ -29,17 +27,17 @@ impl ZenyManager {
 
     /// 检查是否足够（注意：此检查不具有原子性保证，仅用于快速预检）
     pub fn can_spend(player: &Player, amount: u32) -> bool {
-        *player.zeny.read() >= amount
+        player.zeny() >= amount
     }
 
     /// 获取当前Zeny
     pub fn get(player: &Player) -> u32 {
-        *player.zeny.read()
+        player.zeny()
     }
 
     /// 设置Zeny（用于初始化）
     pub fn set(player: &Player, amount: u32) {
-        *player.zeny.write() = amount.min(MAX_ZENY);
+        player.economy_mut().zeny = amount.min(MAX_ZENY);
     }
 }
 
@@ -101,7 +99,7 @@ mod tests {
     #[test]
     fn test_add_zeny_capped() {
         let player = create_test_player();
-        *player.zeny.write() = MAX_ZENY - 100;
+        player.economy_mut().zeny = MAX_ZENY - 100;
         let added = ZenyManager::add(&player, 500);
         assert_eq!(added, 100);
         assert_eq!(ZenyManager::get(&player), MAX_ZENY);

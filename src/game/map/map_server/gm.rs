@@ -13,7 +13,7 @@ impl MapServer {
         player: &crate::game::map::Player,
         min_level: i32,
     ) -> bool {
-        *player.group_id.read() >= min_level
+        player.group_id() >= min_level
     }
 
     /// Handle GM warp command (0x0138)
@@ -321,7 +321,7 @@ impl MapServer {
         // 更新数据库位置（best effort）
         if let Err(e) = self.db.execute_with_params(
             "UPDATE characters SET last_map = ?1, last_x = ?2, last_y = ?3, hp = ?4, sp = ?5 WHERE char_id = ?6",
-            rusqlite::params![save_point.map_name, save_point.x as i32, save_point.y as i32, *player.max_hp.read(), *player.max_sp.read(), char_id],
+            rusqlite::params![save_point.map_name, save_point.x as i32, save_point.y as i32, player.max_hp(), player.max_sp(), char_id],
         ) {
             tracing::warn!("Failed to update character position in DB: {}", e);
         }

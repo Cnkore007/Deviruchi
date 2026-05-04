@@ -66,7 +66,7 @@ impl HealService {
     }
 
     fn heal_player(&self, player: &Player, threshold_hp: u32, threshold_sp: u32) {
-        if *player.state.read() == PlayerState::Dead {
+        if player.combat().state == PlayerState::Dead {
             return;
         }
 
@@ -74,11 +74,11 @@ impl HealService {
 
         // 一次性读取所有 HP/SP 相关值，避免竞态
         let (current_hp, max_hp, current_sp, max_sp) = {
-            let hp = player.hp.read();
-            let max_hp_val = *player.max_hp.read();
-            let sp = player.sp.read();
-            let max_sp_val = *player.max_sp.read();
-            (*hp, max_hp_val, *sp, max_sp_val)
+            let hp = player.hp();
+            let max_hp_val = player.max_hp();
+            let sp = player.sp();
+            let max_sp_val = player.max_sp();
+            (hp, max_hp_val, sp, max_sp_val)
         };
 
         let mut changed = false;
@@ -124,14 +124,14 @@ impl HealService {
 
         // 一次性写入
         if changed {
-            *player.hp.write() = new_hp;
-            *player.sp.write() = new_sp;
+            player.combat_mut().hp = new_hp;
+            player.combat_mut().sp = new_sp;
         }
     }
 
     pub fn calculate_hp_heal(&self, player: &Player, is_sitting: bool) -> u32 {
-        let vit = *player.vit.read() as u32;
-        let max_hp = *player.max_hp.read();
+        let vit = player.vit() as u32;
+        let max_hp = player.max_hp();
 
         // 基础回复: 1 + VIT/2 + max_hp/200
         let base_heal = 1u32.saturating_add(vit / 2).saturating_add(max_hp / 200);
@@ -148,8 +148,8 @@ impl HealService {
     }
 
     pub fn calculate_sp_heal(&self, player: &Player, is_sitting: bool) -> u32 {
-        let int = *player.int.read() as u32;
-        let max_sp = *player.max_sp.read();
+        let int = player.int() as u32;
+        let max_sp = player.max_sp();
 
         // 基础回复: 1 + INT/2 + max_sp/100
         let base_heal = 1u32.saturating_add(int / 2).saturating_add(max_sp / 100);
@@ -347,7 +347,7 @@ mod tests {
         let (service, player) = create_test_heal_service();
 
         // 设置玩家为超重状态 (超过50%)
-        *player.current_weight.write() = player.max_weight.read() * 60 / 100;
+        player.economy_mut().current_weight = player.max_weight() * 60 / 100;
         assert!(player.is_overweight());
 
         let base_hp = service.calculate_hp_heal(&player, false);
@@ -369,7 +369,7 @@ mod tests {
         let (service, player) = create_test_heal_service();
 
         // 设置玩家为严重超重状态 (超过90%)
-        *player.current_weight.write() = player.max_weight.read() * 95 / 100;
+        player.economy_mut().current_weight = player.max_weight() * 95 / 100;
         assert!(player.is_overweight_90());
 
         let base_hp = service.calculate_hp_heal(&player, false);

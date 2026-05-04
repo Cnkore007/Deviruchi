@@ -34,18 +34,18 @@ impl ItemHandler {
 
         // 恢复HP
         if item.hp_restore > 0 {
-            let current = *player.hp.read();
-            let max = *player.max_hp.read();
+            let current = player.hp();
+            let max = player.max_hp();
             let new_hp = (current + item.hp_restore as u32).min(max);
-            *player.hp.write() = new_hp;
+            player.combat_mut().hp = new_hp;
         }
 
         // 恢复SP
         if item.sp_restore > 0 {
-            let current = *player.sp.read();
-            let max = *player.max_sp.read();
+            let current = player.sp();
+            let max = player.max_sp();
             let new_sp = (current + item.sp_restore as u32).min(max);
-            *player.sp.write() = new_sp;
+            player.combat_mut().sp = new_sp;
         }
 
         // 消耗物品
