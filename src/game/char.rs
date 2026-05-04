@@ -156,15 +156,15 @@ impl CharServer {
             return Some(vec![0x00]);
         }
 
-        // 校验名称长度
-        let name = make_char.name.trim_matches('\0');
-        if name.is_empty() || name.len() > 24 {
+        // 校验角色名称（长度 + 特殊字符 + 重复检查）
+        if let Err(err_msg) = self.validate_character_name(&make_char.name) {
             warn!(
-                "Character creation rejected: invalid name length for account_id={}",
-                account_id
+                "Character creation rejected: {} (account_id={})",
+                err_msg, account_id
             );
             return Some(vec![0x00]);
         }
+        let name = make_char.name.trim_matches('\0');
 
         // 创建角色
         match self.db.create_character(
@@ -364,6 +364,57 @@ impl CharServer {
         }
 
         None
+    }
+
+    /// 验证角色名称是否合法
+    /// 返回 Ok(()) 表示合法，Err(String) 包含错误信息
+    fn validate_character_name(&self, name: &str) -> Result<(), String> {
+        // 检查名称长度
+        let trimmed = name.trim_matches('\0');
+        if trimmed.is_empty() {
+            return Err("角色名不能为空".to_string());
+        }
+        if trimmed.len() > 24 {
+            return Err("角色名过长（最大24字节）".to_string());
+        }
+
+        // 检查最小长度（rAthena 最少 4 个字符）
+        if trimmed.len() < 4 {
+            return Err("角色名过短（最少4字节）".to_string());
+        }
+
+        // 检查特殊字符：只允许字母、数字、中文、韩文、日文等
+        // rAthena 默认不允许以下字符
+        for ch in trimmed.chars() {
+            match ch {
+                // 允许：英文字母、数字、中文(CJK统一汉字)、韩文、日文平假名/片假名
+                'a'..='z' | 'A'..='Z' | '0'..='9' => {}
+                '\u{4E00}'..='\u{9FFF}'   // CJK统一汉字
+                | '\u{3400}'..='\u{4DBF}' // CJK扩展A
+                | '\u{AC00}'..='\u{D7AF}' // 韩文音节
+                | '\u{3040}'..='\u{309F}' // 日文平假名
+                | '\u{30A0}'..='\u{30FF}' // 日文片假名
+                | '\u{FF66}'..='\u{FF9F}' // 半角片假名
+                => {}
+                _ => {
+                    return Err(format!("角色名包含不允许的字符: '{}'", ch));
+                }
+            }
+        }
+
+        // 检查名称是否已存在（含已标记删除但未过期的角色）
+        match self.db.get_character_by_name(trimmed) {
+            Ok(Some(_)) => {
+                // 检查该角色是否已标记删除且已过期
+                // 如果已过期，cleanup 会清理掉，此处当作已存在
+                Err("角色名已被使用".to_string())
+            }
+            Ok(None) => Ok(()),
+            Err(e) => {
+                error!("Database error checking name: {}", e);
+                Err("服务器内部错误".to_string())
+            }
+        }
     }
 }
 
@@ -763,5 +814,103 @@ mod tests {
         let data = CHCancelDelete { char_id: 1 }.to_packet();
         let result = server.handle_cancel_delete(&data[4..], &mut session);
         assert!(result.is_none(), "无 account_id 时应返回 None");
+    }
+
+    #[test]
+    fn test_handle_make_char_duplicate_name() {
+        let server = create_test_server();
+        let mut session1 = create_session_with_account(1);
+
+        // 创建第一个角色
+        let data1 = CHMakeChar {
+            name: "TakenName".to_string(),
+            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
+            hair_color: 0, hair: 1,
+        }
+        .to_packet();
+        let result1 = server.handle_make_char(&data1[4..], &mut session1);
+        assert_eq!(result1.unwrap(), vec![0x01], "第一个角色应创建成功");
+
+        // 尝试创建同名角色
+        let mut session2 = create_session_with_account(1);
+        let data2 = CHMakeChar {
+            name: "TakenName".to_string(),
+            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
+            hair_color: 0, hair: 1,
+        }
+        .to_packet();
+        let result2 = server.handle_make_char(&data2[4..], &mut session2);
+        assert_eq!(result2.unwrap(), vec![0x00], "重复名称应返回失败");
+    }
+
+    #[test]
+    fn test_handle_make_char_name_too_short() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        let data = CHMakeChar {
+            name: "Ab".to_string(), // 只有 2 字节，少于最少 4 字节
+            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
+            hair_color: 0, hair: 1,
+        }
+        .to_packet();
+
+        let result = server.handle_make_char(&data[4..], &mut session);
+        assert_eq!(result.unwrap(), vec![0x00], "过短名称应返回失败");
+    }
+
+    #[test]
+    fn test_handle_make_char_special_characters() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        let data = CHMakeChar {
+            name: "Test@#$".to_string(), // 包含特殊字符
+            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
+            hair_color: 0, hair: 1,
+        }
+        .to_packet();
+
+        let result = server.handle_make_char(&data[4..], &mut session);
+        assert_eq!(result.unwrap(), vec![0x00], "含特殊字符的名称应返回失败");
+    }
+
+    #[test]
+    fn test_handle_make_char_chinese_name_allowed() {
+        let server = create_test_server();
+        let mut session = create_session_with_account(1);
+
+        let data = CHMakeChar {
+            name: "测试角色".to_string(), // 中文名称应被允许
+            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
+            hair_color: 0, hair: 1,
+        }
+        .to_packet();
+
+        let result = server.handle_make_char(&data[4..], &mut session);
+        assert_eq!(result.unwrap(), vec![0x01], "中文名称应创建成功");
+    }
+
+    #[test]
+    fn test_validate_name_boundary() {
+        let server = create_test_server();
+
+        // 空名称
+        assert!(server.validate_character_name("").is_err());
+        assert!(server.validate_character_name("\0\0\0").is_err());
+
+        // 3 字节（少于 4）
+        assert!(server.validate_character_name("abc").is_err());
+
+        // 4 字节（刚好）
+        assert!(server.validate_character_name("abcd").is_ok());
+
+        // 24 字节（刚好）
+        let name_24 = "a".repeat(24);
+        assert!(server.validate_character_name(&name_24).is_ok());
+
+        // 25 字节（超出）
+        let name_25 = "a".repeat(25);
+        assert!(server.validate_character_name(&name_25).is_err());
     }
 }
