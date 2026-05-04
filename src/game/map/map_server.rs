@@ -210,8 +210,36 @@ impl MapServer {
 
         let move_pkt = CZRequestMove::from_slice(data)?;
 
-        let _from_x = *player.pos_x.read();
-        let _from_y = *player.pos_y.read();
+        let from_x = *player.pos_x.read();
+        let from_y = *player.pos_y.read();
+
+        // Validate coordinates are within map bounds
+        if move_pkt.pos_x >= 4000 || move_pkt.pos_y >= 4000 {
+            tracing::warn!(
+                player_id = %player_id,
+                "Move rejected: out-of-bounds coordinates ({}, {})",
+                move_pkt.pos_x, move_pkt.pos_y
+            );
+            return None;
+        }
+
+        // Validate step distance (squared Euclidean distance)
+        let dx = move_pkt.pos_x as i32 - from_x as i32;
+        let dy = move_pkt.pos_y as i32 - from_y as i32;
+        let dist_sq = dx * dx + dy * dy;
+        if dist_sq > 225 {
+            tracing::warn!(
+                player_id = %player_id,
+                from_x = from_x,
+                from_y = from_y,
+                to_x = move_pkt.pos_x,
+                to_y = move_pkt.pos_y,
+                dist_sq = dist_sq,
+                "Move rejected: distance too large (possible speed hack)"
+            );
+            return None;
+        }
+
         player.move_to(move_pkt.pos_x, move_pkt.pos_y);
 
         // Update channel position
