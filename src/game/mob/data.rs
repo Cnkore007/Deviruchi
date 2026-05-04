@@ -1,6 +1,7 @@
 use parking_lot::RwLock;
-use uuid::Uuid;
 use std::time::Instant;
+use uuid::Uuid;
+use crate::game::battle::element::{Element, ElementLevel, MobSize};
 
 /// 怪物掉落物品
 #[derive(Debug, Clone)]
@@ -14,11 +15,21 @@ pub struct MobDrop {
 
 impl MobDrop {
     pub fn new(item_id: u32, chance: u32) -> Self {
-        Self { item_id, min_amount: 1, max_amount: 1, chance }
+        Self {
+            item_id,
+            min_amount: 1,
+            max_amount: 1,
+            chance,
+        }
     }
 
     pub fn with_amount(item_id: u32, min: u16, max: u16, chance: u32) -> Self {
-        Self { item_id, min_amount: min, max_amount: max, chance }
+        Self {
+            item_id,
+            min_amount: min,
+            max_amount: max,
+            chance,
+        }
     }
 }
 
@@ -100,6 +111,36 @@ pub enum MobType {
     Event,
 }
 
+/// 怪物行为模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MobBehavior {
+    /// 被动：不主动攻击，被攻击后反击
+    Passive,
+    /// 主动攻击：进入视野范围后主动攻击
+    Aggressive,
+    /// 协助：友方被攻击时加入战斗
+    Assist,
+    /// 被动+协助
+    PassiveAssist,
+    /// 逃跑：HP低于阈值时逃跑
+    FleeWhenLowHp,
+    /// 固定不动：不会移动，仅攻击进入范围的目标
+    Immobile,
+}
+
+/// 怪物技能数据
+#[derive(Debug, Clone)]
+pub struct MobSkill {
+    pub skill_id: u16,
+    pub level: u8,
+    /// 使用概率（万分比）
+    pub chance: u32,
+    /// 施放条件：HP百分比低于此值时使用
+    pub hp_condition: Option<u32>,
+    /// 冷却时间（毫秒）
+    pub cooldown_ms: u64,
+}
+
 /// 怪物AI状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MobAIState {
@@ -139,9 +180,16 @@ pub struct Mob {
     pub walk_speed: u16,
     pub atk_range: u16,
 
+    // 元素与体型
+    pub element: Element,
+    pub element_level: ElementLevel,
+    pub size: MobSize,
+
     // AI状态
     pub ai_state: RwLock<MobAIState>,
     pub target_id: RwLock<Option<Uuid>>,
+    pub behavior: MobBehavior,
+    pub skills: Vec<MobSkill>,
 
     // AI参数
     pub sight_range: u16,
@@ -164,7 +212,7 @@ pub struct Mob {
     pub drops: Vec<MobDrop>,
     pub base_exp: u64,
     pub job_exp: u64,
-    pub zeny: Option<u64>,  // Zeny 掉落（运行时设置）
+    pub zeny: Option<u64>, // Zeny 掉落（运行时设置）
     pub drops_processed: RwLock<bool>,
 
     // 路径管理
@@ -197,8 +245,13 @@ impl Mob {
             crit: 0,
             walk_speed: 150,
             atk_range: 1,
+            element: Element::Neutral,
+            element_level: ElementLevel::Level1,
+            size: MobSize::Medium,
             ai_state: RwLock::new(MobAIState::Idle),
             target_id: RwLock::new(None),
+            behavior: MobBehavior::Passive,
+            skills: Vec::new(),
             sight_range: 12,
             chase_range: 20,
             aggro_rate: 0,
@@ -241,8 +294,13 @@ impl Mob {
             crit: template.crit,
             walk_speed: template.walk_speed,
             atk_range: template.atk_range,
+            element: template.element,
+            element_level: template.element_level,
+            size: template.size,
             ai_state: RwLock::new(MobAIState::Idle),
             target_id: RwLock::new(None),
+            behavior: template.behavior,
+            skills: template.skills.clone(),
             sight_range: template.sight_range,
             chase_range: template.chase_range,
             aggro_rate: template.aggro_rate,
@@ -327,14 +385,19 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                behavior: MobBehavior::Passive,
+                skills: Vec::new(),
                 drops: vec![
-                    MobDrop::new(909, 7000),   // Jellopy 70%
-                    MobDrop::new(1202, 500),   // Knife 5%
-                    MobDrop::new(938, 100),    // Sticky Mucus 1%
+                    MobDrop::new(909, 7000), // Jellopy 70%
+                    MobDrop::new(1202, 500), // Knife 5%
+                    MobDrop::new(938, 100),  // Sticky Mucus 1%
                 ],
                 base_exp: 2,
                 job_exp: 1,
                 zeny: Some(10),
+                element: Element::Water,
+                element_level: ElementLevel::Level1,
+                size: MobSize::Small,
             },
             1002 => MobTemplate {
                 name: "Lunatic".to_string(),
@@ -355,13 +418,18 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                behavior: MobBehavior::Passive,
+                skills: Vec::new(),
                 drops: vec![
-                    MobDrop::new(910, 6000),    // Fluff 60%
-                    MobDrop::new(938, 200),     // Sticky Mucus 2%
+                    MobDrop::new(910, 6000), // Fluff 60%
+                    MobDrop::new(938, 200),  // Sticky Mucus 2%
                 ],
                 base_exp: 6,
                 job_exp: 4,
                 zeny: Some(15),
+                element: Element::Neutral,
+                element_level: ElementLevel::Level1,
+                size: MobSize::Small,
             },
             1003 => MobTemplate {
                 name: "Blue Poring".to_string(),
@@ -382,13 +450,18 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                behavior: MobBehavior::Passive,
+                skills: Vec::new(),
                 drops: vec![
-                    MobDrop::new(909, 5000),    // Jellopy 50%
-                    MobDrop::new(947, 300),     // Scale Shell 3%
+                    MobDrop::new(909, 5000), // Jellopy 50%
+                    MobDrop::new(947, 300),  // Scale Shell 3%
                 ],
                 base_exp: 4,
                 job_exp: 3,
                 zeny: Some(12),
+                element: Element::Water,
+                element_level: ElementLevel::Level1,
+                size: MobSize::Small,
             },
             1312 => MobTemplate {
                 name: "Fabre".to_string(),
@@ -409,13 +482,18 @@ impl MobDatabase {
                 aggro_rate: 0,
                 spawn_delay: 1000,
                 respawn_time: 60000,
+                behavior: MobBehavior::Passive,
+                skills: Vec::new(),
                 drops: vec![
-                    MobDrop::new(914, 5500),    // Fluff 55%
-                    MobDrop::new(949, 400),     // Feather 4%
+                    MobDrop::new(914, 5500), // Fluff 55%
+                    MobDrop::new(949, 400),  // Feather 4%
                 ],
                 base_exp: 8,
                 job_exp: 5,
                 zeny: Some(20),
+                element: Element::Earth,
+                element_level: ElementLevel::Level1,
+                size: MobSize::Small,
             },
             _ => MobTemplate::default(mob_id),
         }
@@ -443,10 +521,15 @@ pub struct MobTemplate {
     pub aggro_rate: i16,
     pub spawn_delay: u32,
     pub respawn_time: u32,
+    pub behavior: MobBehavior,
+    pub skills: Vec<MobSkill>,
     pub drops: Vec<MobDrop>,
     pub base_exp: u64,
     pub job_exp: u64,
     pub zeny: Option<u64>,
+    pub element: Element,
+    pub element_level: ElementLevel,
+    pub size: MobSize,
 }
 
 impl MobTemplate {
@@ -470,10 +553,15 @@ impl MobTemplate {
             aggro_rate: 0,
             spawn_delay: 1000,
             respawn_time: 60000,
+            behavior: MobBehavior::Passive,
+            skills: Vec::new(),
             drops: Vec::new(),
             base_exp: 10,
             job_exp: 5,
             zeny: None,
+            element: Element::Neutral,
+            element_level: ElementLevel::Level1,
+            size: MobSize::Medium,
         }
     }
 }

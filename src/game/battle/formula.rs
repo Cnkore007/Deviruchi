@@ -1,6 +1,25 @@
+use crate::game::battle::element::{Element, WeaponType};
 use crate::game::map::Player;
 use crate::game::mob::Mob;
 use crate::game::rand::GameRng;
+
+/// 将 weapon_type i32 值映射到 WeaponType 枚举
+/// 默认返回 Fist（对所有体型 100%）
+fn weapon_type_from_i32(v: i32) -> WeaponType {
+    match v {
+        1 => WeaponType::Dagger,
+        2 => WeaponType::OneHandSword,
+        3 => WeaponType::TwoHandSword,
+        4 => WeaponType::OneHandSpear,
+        5 => WeaponType::TwoHandSpear,
+        6 => WeaponType::OneHandAxe,
+        7 => WeaponType::TwoHandAxe,
+        8 => WeaponType::Mace,
+        10 => WeaponType::Staff,
+        11 => WeaponType::Bow,
+        _ => WeaponType::Fist,
+    }
+}
 
 /// rAthena 风格战斗公式
 pub struct BattleFormula;
@@ -27,6 +46,20 @@ impl BattleFormula {
         let defense = defender.defense as i32;
 
         let damage = ((total_atk - defense).max(1) * skill_damage_bonus) / 100;
+
+        // 应用元素修正（普通攻击默认为无属性）
+        let element_mod = super::element::get_element_modifier(
+            Element::Neutral,
+            defender.element,
+            defender.element_level,
+        );
+        let damage = (damage as i64 * element_mod as i64 / 100) as i32;
+
+        // 应用体型修正
+        let weapon = weapon_type_from_i32(weapon_type);
+        let size_mod = super::element::get_size_modifier(weapon, defender.size);
+        let damage = (damage as i64 * size_mod as i64 / 100) as i32;
+
         // Note: variance needs RNG injection - using fixed value for now
         let variance = 100; // 100% (no variance)
         (damage * variance) / 100
@@ -54,6 +87,20 @@ impl BattleFormula {
         let defense = defender.defense as i32;
 
         let damage = ((total_atk - defense).max(1) * skill_damage_bonus) / 100;
+
+        // 应用元素修正（普通攻击默认为无属性）
+        let element_mod = super::element::get_element_modifier(
+            Element::Neutral,
+            defender.element,
+            defender.element_level,
+        );
+        let damage = (damage as i64 * element_mod as i64 / 100) as i32;
+
+        // 应用体型修正
+        let weapon = weapon_type_from_i32(weapon_type);
+        let size_mod = super::element::get_size_modifier(weapon, defender.size);
+        let damage = (damage as i64 * size_mod as i64 / 100) as i32;
+
         let variance = 90 + (rng.rand_range(0, 20) as i32);
         (damage * variance) / 100
     }
@@ -320,6 +367,9 @@ mod tests {
             crit: 0,
             walk_speed: 150,
             atk_range: 1,
+            element: crate::game::battle::element::Element::Neutral,
+            element_level: crate::game::battle::element::ElementLevel::Level1,
+            size: crate::game::battle::element::MobSize::Medium,
             ai_state: RwLock::new(crate::game::mob::MobAIState::Idle),
             target_id: RwLock::new(None),
             sight_range: 12,
