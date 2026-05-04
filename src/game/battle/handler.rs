@@ -34,7 +34,8 @@ impl BattleHandler {
         let base_damage = BattleFormula::physical_damage(attacker, defender, 100, 1);
 
         let damage = if is_crit {
-            (base_damage * BattleFormula::crit_multiplier()) / 100
+            // 使用 i64 中间值防止高基础伤害 * 140 溢出 i32
+            ((base_damage as i64 * BattleFormula::crit_multiplier() as i64) / 100) as i32
         } else {
             base_damage
         };
@@ -67,7 +68,7 @@ impl BattleHandler {
         let base_damage = BattleFormula::physical_damage(attacker, defender, skill_damage, 1);
 
         let damage = if is_crit {
-            (base_damage * BattleFormula::crit_multiplier()) / 100
+            ((base_damage as i64 * BattleFormula::crit_multiplier() as i64) / 100) as i32
         } else {
             base_damage
         };
