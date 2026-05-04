@@ -69,18 +69,32 @@ impl DropTableLoader {
     ///     is_mvp_bonus: false
     /// ```
     pub fn load_from_yaml(path: &str) -> HashMap<u32, MobDropTable> {
-        let content = fs::read_to_string(path)
-            .unwrap_or_else(|e| panic!("Failed to read drop table file '{}': {}", path, e));
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("Failed to read drop table file '{}': {}", path, e);
+                return HashMap::new();
+            }
+        };
 
-        let yaml_data: HashMap<String, Vec<YamlDropEntry>> = serde_yaml::from_str(&content)
-            .unwrap_or_else(|e| panic!("Failed to parse drop table YAML '{}': {}", path, e));
+        let yaml_data: HashMap<String, Vec<YamlDropEntry>> = match serde_yaml::from_str(&content) {
+            Ok(d) => d,
+            Err(e) => {
+                tracing::error!("Failed to parse drop table YAML '{}': {}", path, e);
+                return HashMap::new();
+            }
+        };
 
         let mut tables = HashMap::new();
 
         for (mob_id_str, entries) in yaml_data {
-            let mob_id: u32 = mob_id_str
-                .parse()
-                .unwrap_or_else(|e| panic!("Invalid mob ID '{}': {}", mob_id_str, e));
+            let mob_id: u32 = match mob_id_str.parse() {
+                Ok(id) => id,
+                Err(e) => {
+                    tracing::warn!("Invalid mob ID '{}': {}, skipping", mob_id_str, e);
+                    continue;
+                }
+            };
 
             let drop_entries: Vec<DropTableEntry> = entries
                 .into_iter()
