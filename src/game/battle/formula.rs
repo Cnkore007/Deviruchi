@@ -38,14 +38,20 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let agi = *attacker.agi.read() as i32;
 
-            base_level * 2 + str + dex / 2 + agi / 3
+            base_level
+                .saturating_mul(2)
+                .saturating_add(str)
+                .saturating_add(dex / 2)
+                .saturating_add(agi / 3)
         };
 
-        let weapon_atk = weapon_type * 2;
-        let total_atk = base_atk + weapon_atk;
+        let weapon_atk = weapon_type.saturating_mul(2);
+        let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk - defense).max(1) * skill_damage_bonus) / 100;
+        let damage = ((total_atk.saturating_sub(defense)).max(1)
+            .saturating_mul(skill_damage_bonus))
+            / 100;
 
         // 应用元素修正（普通攻击默认为无属性）
         let element_mod = super::element::get_element_modifier(
@@ -79,14 +85,20 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let agi = *attacker.agi.read() as i32;
 
-            base_level * 2 + str + dex / 2 + agi / 3
+            base_level
+                .saturating_mul(2)
+                .saturating_add(str)
+                .saturating_add(dex / 2)
+                .saturating_add(agi / 3)
         };
 
-        let weapon_atk = weapon_type * 2;
-        let total_atk = base_atk + weapon_atk;
+        let weapon_atk = weapon_type.saturating_mul(2);
+        let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk - defense).max(1) * skill_damage_bonus) / 100;
+        let damage = ((total_atk.saturating_sub(defense)).max(1)
+            .saturating_mul(skill_damage_bonus))
+            / 100;
 
         // 应用元素修正（普通攻击默认为无属性）
         let element_mod = super::element::get_element_modifier(
@@ -117,13 +129,17 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let base_level = *attacker.base_level.read() as i32;
 
-            int * 2 + dex / 3 + base_level / 4
+            int.saturating_mul(2)
+                .saturating_add(dex / 3)
+                .saturating_add(base_level / 4)
         };
 
         let magic_atk = matk.max(base_matk);
         let magic_defense = defender.magic_defense as i32;
 
-        let damage = ((magic_atk - magic_defense).max(1) * skill_damage_bonus) / 100;
+        let damage = ((magic_atk.saturating_sub(magic_defense)).max(1)
+            .saturating_mul(skill_damage_bonus))
+            / 100;
         // Note: variance needs RNG injection - using fixed value for now
         let variance = 100; // 100% (no variance)
         (damage * variance) / 100
@@ -142,13 +158,17 @@ impl BattleFormula {
             let dex = *attacker.dex.read() as i32;
             let base_level = *attacker.base_level.read() as i32;
 
-            int * 2 + dex / 3 + base_level / 4
+            int.saturating_mul(2)
+                .saturating_add(dex / 3)
+                .saturating_add(base_level / 4)
         };
 
         let magic_atk = matk.max(base_matk);
         let magic_defense = defender.magic_defense as i32;
 
-        let damage = ((magic_atk - magic_defense).max(1) * skill_damage_bonus) / 100;
+        let damage = ((magic_atk.saturating_sub(magic_defense)).max(1)
+            .saturating_mul(skill_damage_bonus))
+            / 100;
         let variance = 90 + (rng.rand_range(0, 20) as i32);
         (damage * variance) / 100
     }
