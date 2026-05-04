@@ -154,6 +154,19 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
         }
     }
 
+    // goto_if "$var", value, "label"
+    if let Some(args) = line.strip_prefix("goto_if ") {
+        let parts: Vec<&str> = args.splitn(3, ',').collect();
+        if parts.len() == 3 {
+            let var_name = extract_string(parts[0]);
+            let value = parts[1].trim().parse::<i64>().ok();
+            let label = extract_string(parts[2]);
+            if let (Some(name), Some(val), Some(lbl)) = (var_name, value, label) {
+                return Some(ScriptCommand::GotoIf(name, val, lbl));
+            }
+        }
+    }
+
     None
 }
 
@@ -339,5 +352,18 @@ mod tests {
         assert!(result.is_ok());
         let node = result.unwrap();
         assert_eq!(node.commands.len(), 4);
+    }
+
+    #[test]
+    fn test_parse_goto_if() {
+        let node = parse_script(r#"goto_if "$done", 1, "end_label";"#);
+        assert_eq!(node.commands.len(), 1);
+        if let ScriptCommand::GotoIf(var, val, label) = &node.commands[0] {
+            assert_eq!(var, "$done");
+            assert_eq!(*val, 1);
+            assert_eq!(label, "end_label");
+        } else {
+            panic!("期望 GotoIf 命令");
+        }
     }
 }

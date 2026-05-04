@@ -93,6 +93,21 @@ impl NpcDialogueState {
                 self.current_index += 1;
                 DialogueResponse::Continue
             }
+
+            ScriptCommand::GotoIf(var_name, target_value, label) => {
+                let current_value = self.variables.get(var_name).copied().unwrap_or(0);
+                if current_value == *target_value {
+                    if let Some(&idx) = self.script.labels.get(label) {
+                        self.current_index = idx;
+                    } else {
+                        tracing::warn!("条件跳转标签 '{}' 未找到 (NPC: {})", label, self.npc_id);
+                        self.current_index += 1;
+                    }
+                } else {
+                    self.current_index += 1;
+                }
+                DialogueResponse::Continue
+            }
         }
     }
 
@@ -302,5 +317,71 @@ mod tests {
         let script = parse_script(r#"mes "Hi";"#);
         let state = NpcDialogueState::new(Uuid::new_v4(), 1, script);
         assert_eq!(state.get_variable("$nonexistent"), None);
+    }
+
+    #[test]
+    fn test_goto_if_condition_true() {
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            set "$done", 1;
+            goto_if "$done", 1, "skip";
+            mes "Should be skipped";
+        skip:
+            mes "Jumped!";
+            close;
+            "#,
+        ));
+
+        state.process(); // set "$done", 1
+        state.process(); // goto_if -> 条件为真，跳转到 skip
+        let response = state.process(); // mes "Jumped!"
+        match response {
+            DialogueResponse::Message(msg) => assert_eq!(msg, "Jumped!"),
+            other => panic!("期望 Message(\"Jumped!\"), 实际: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_goto_if_condition_false() {
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            set "$done", 0;
+            goto_if "$done", 1, "skip";
+            mes "Not skipped";
+        skip:
+            mes "End";
+            close;
+            "#,
+        ));
+
+        state.process(); // set "$done", 0
+        state.process(); // goto_if -> 条件为假，不跳转
+        let response = state.process(); // mes "Not skipped"
+        match response {
+            DialogueResponse::Message(msg) => assert_eq!(msg, "Not skipped"),
+            other => panic!("期望 Message(\"Not skipped\"), 实际: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_goto_if_undefined_variable() {
+        let mut state = NpcDialogueState::new(Uuid::new_v4(), 1, parse_script(
+            r#"
+            goto_if "$undefined", 1, "skip";
+            mes "Variable undefined, no jump";
+            close;
+            "#,
+        ));
+
+        // goto_if 条件为假（未定义变量默认 0 != 1），返回 Continue
+        let response = state.process();
+        assert!(matches!(response, DialogueResponse::Continue));
+
+        // 下一次 process 应该是 mes
+        let response = state.process();
+        match response {
+            DialogueResponse::Message(msg) => assert_eq!(msg, "Variable undefined, no jump"),
+            other => panic!("期望不跳转，实际: {:?}", other),
+        }
     }
 }

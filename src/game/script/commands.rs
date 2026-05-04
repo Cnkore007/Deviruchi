@@ -19,6 +19,8 @@ pub enum ScriptCommand {
     Goto(String),
     /// 设置变量
     Set(String, i64),
+    /// 条件跳转：如果变量等于指定值则跳转
+    GotoIf(String, i64, String),  // 变量名, 比较值, 目标标签
 }
 
 /// 脚本节点
