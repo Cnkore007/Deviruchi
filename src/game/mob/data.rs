@@ -338,7 +338,8 @@ impl Mob {
         let mut hp = self.hp.write();
         if *hp <= damage {
             *hp = 0;
-            drop(hp);
+            // Hold HP lock while setting death state to prevent TOCTOU window
+            // where hp==0 but ai_state!=Dead
             *self.ai_state.write() = MobAIState::Dead;
             *self.death_time.write() = Some(Instant::now());
             true
