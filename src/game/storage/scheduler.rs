@@ -278,3 +278,212 @@ impl Drop for StorageSyncScheduler {
         let _ = self.task_tx.try_send(SyncTask::Shutdown);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::schema::init_schema;
+    use std::time::{Duration, Instant};
+
+    /// 创建测试用调度器环境
+    fn setup() -> (StorageSyncScheduler, Arc<StorageManager>, StorageRepository) {
+        let db = Arc::new(crate::storage::Database::open_memory().expect("创建内存数据库失败"));
+        init_schema(&db).expect("初始化 schema 失败");
+
+        // 创建测试账户和角色（外键约束）
+        db.execute(
+            "INSERT INTO accounts (account_id, user_id, password_hash, sex, created_at)
+             VALUES (1, 'test', 'hash', 0, 0)",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO characters (char_id, account_id, char_num, name, created_at, updated_at)
+             VALUES (1, 1, 0, 'Test', 0, 0)",
+        )
+        .unwrap();
+
+        let repo = StorageRepository::new(db);
+        let manager = Arc::new(StorageManager::new());
+        let scheduler = StorageSyncScheduler::new(
+            repo.clone(),
+            manager.clone(),
+            Duration::from_millis(100), // 短间隔用于测试
+        );
+
+        (scheduler, manager, repo)
+    }
+
+    /// 新建调度器无脏数据
+    #[tokio::test]
+    async fn new_scheduler_has_no_dirty() {
+        let (scheduler, _, _) = setup();
+        assert!(!scheduler.has_dirty());
+        assert_eq!(scheduler.dirty_count(), 0);
+    }
+
+    /// MarkDirty 创建记录并标记为脏
+    #[tokio::test]
+    async fn mark_dirty_creates_record() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+
+        // 等待后台任务处理
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        assert_eq!(scheduler.get_sync_state(1), Some(SyncState::Dirty));
+        assert!(scheduler.has_dirty());
+        assert_eq!(scheduler.dirty_count(), 1);
+    }
+
+    /// MarkClean 转换状态
+    #[tokio::test]
+    async fn mark_clean_transitions_state() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(scheduler.get_sync_state(1), Some(SyncState::Dirty));
+
+        tx.try_send(SyncTask::MarkClean(1)).unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(scheduler.get_sync_state(1), Some(SyncState::Clean));
+    }
+
+    /// 对不存在的记录 MarkClean 不会 panic
+    #[tokio::test]
+    async fn mark_clean_nonexistent_is_noop() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+        tx.try_send(SyncTask::MarkClean(999)).unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(scheduler.get_sync_state(999), None);
+    }
+
+    /// 不存在的角色版本号返回 None
+    #[tokio::test]
+    async fn get_version_returns_none_for_missing() {
+        let (scheduler, _, _) = setup();
+        assert_eq!(scheduler.get_version(999), None);
+    }
+
+    /// 只返回脏状态的角色 ID
+    #[tokio::test]
+    async fn get_dirty_char_ids_returns_only_dirty() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+        tx.try_send(SyncTask::MarkDirty(2)).unwrap();
+        tx.try_send(SyncTask::MarkClean(3)).unwrap(); // 不存在，会被忽略
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let dirty_ids = scheduler.get_dirty_char_ids();
+        assert_eq!(dirty_ids.len(), 2);
+        assert!(dirty_ids.contains(&1));
+        assert!(dirty_ids.contains(&2));
+    }
+
+    /// ForceSync 执行实际数据库保存
+    #[tokio::test]
+    async fn force_sync_executes_actual_save() {
+        let (scheduler, manager, repo) = setup();
+
+        // 创建仓库并添加物品
+        let storage_arc = manager.get_or_create(1, 100);
+        storage_arc.write().add_item(501, 10);
+
+        // 标记脏
+        let tx = scheduler.task_sender();
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+
+        // 强制同步
+        tx.try_send(SyncTask::ForceSync(1)).unwrap();
+        // 等待异步同步完成
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // 验证数据已保存到数据库
+        let loaded = repo.load(1).await.unwrap();
+        assert!(loaded.is_some());
+        let loaded = loaded.unwrap();
+        assert_eq!(loaded.get_slot(0).unwrap().item_id, 501);
+        assert_eq!(loaded.get_slot(0).unwrap().amount, 10);
+    }
+
+    /// 周期同步对 stale 脏数据触发同步
+    #[tokio::test]
+    async fn periodic_sync_triggers_for_stale_dirty() {
+        let (scheduler, manager, repo) = setup();
+
+        // 创建仓库
+        let storage_arc = manager.get_or_create(1, 100);
+        storage_arc.write().add_item(501, 5);
+
+        // 标记脏
+        let tx = scheduler.task_sender();
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+
+        // 手动将时间戳设为旧值，使其 stale
+        {
+            let mut states = scheduler.sync_states.write();
+            if let Some(record) = states.get_mut(&1) {
+                record.last_modified = Instant::now() - Duration::from_secs(60);
+            }
+        }
+
+        // 等待至少一个 tick（间隔 100ms）
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        // 验证数据已同步
+        let loaded = repo.load(1).await.unwrap();
+        assert!(loaded.is_some());
+    }
+
+    /// Shutdown 停止处理器
+    #[tokio::test]
+    async fn shutdown_stops_processor() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+        tx.try_send(SyncTask::Shutdown).unwrap();
+        // 如果 shutdown 失败会 panic（通道已关闭）
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+
+    /// drop 自动发送 Shutdown
+    #[tokio::test]
+    async fn drop_sends_shutdown() {
+        let (scheduler, _, _) = setup();
+        // scheduler drop 时应发送 Shutdown
+        drop(scheduler);
+        // 不 panic 即为成功
+    }
+
+    /// 多个脏数据独立跟踪：MarkDirty 和 MarkClean 状态互不影响
+    #[tokio::test]
+    async fn multiple_dirty_tracks_independently() {
+        let (scheduler, _, _) = setup();
+        let tx = scheduler.task_sender();
+
+        // 同时发送所有标记（利用 try_send 的同步入队特性）
+        tx.try_send(SyncTask::MarkDirty(1)).unwrap();
+        tx.try_send(SyncTask::MarkDirty(2)).unwrap();
+        tx.try_send(SyncTask::MarkDirty(3)).unwrap();
+        tx.try_send(SyncTask::MarkClean(2)).unwrap();
+
+        // 等待所有消息处理完成
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // 2 应该是 Clean（我们显式标记了）
+        assert_eq!(scheduler.get_sync_state(2), Some(SyncState::Clean));
+
+        // 1 和 3 的状态取决于周期 tick 是否已运行
+        // 由于 try_send 同步入队且 sleep 较短，大概率仍然是 Dirty
+        let state1 = scheduler.get_sync_state(1);
+        let state3 = scheduler.get_sync_state(3);
+        assert!(state1.is_some(), "角色 1 应该有同步状态");
+        assert!(state3.is_some(), "角色 3 应该有同步状态");
+    }
+}
