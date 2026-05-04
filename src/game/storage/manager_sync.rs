@@ -32,7 +32,11 @@ impl StorageSyncManager {
         sync_interval: Duration,
         default_storage_size: u16,
     ) -> Self {
-        let scheduler = StorageSyncScheduler::new(repository.clone(), sync_interval);
+        let scheduler = StorageSyncScheduler::new(
+            repository.clone(),
+            storage_manager.clone(),
+            sync_interval,
+        );
 
         Self {
             storage_manager,
@@ -292,7 +296,11 @@ impl Clone for StorageSyncManager {
         Self {
             storage_manager: self.storage_manager.clone(),
             repository: self.repository.clone(),
-            scheduler: StorageSyncScheduler::new(self.repository.clone(), Duration::from_secs(30)),
+            scheduler: StorageSyncScheduler::new(
+                self.repository.clone(),
+                self.storage_manager.clone(),
+                Duration::from_secs(30),
+            ),
             default_storage_size: self.default_storage_size,
         }
     }
