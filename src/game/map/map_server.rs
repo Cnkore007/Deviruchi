@@ -227,7 +227,9 @@ impl MapServer {
             move_pkt.pos_y,
         ) {
             // Execute the warp
-            let _ = self.warp_service.execute_warp(session, warp_action);
+            if let Err(e) = self.warp_service.execute_warp(session, warp_action) {
+                tracing::error!("Warp execution failed for session={}: {}", session.id, e);
+            }
         }
 
         None

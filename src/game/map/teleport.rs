@@ -2,13 +2,13 @@
 //!
 //! 实现边缘触发式地图传送，当玩家走到地图边缘时自动传送到相邻地图
 
+use crate::network::session::Session;
+use crate::storage::Database;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use parking_lot::RwLock;
 use uuid::Uuid;
-use crate::network::session::Session;
-use crate::storage::Database;
 
 /// 地图边缘类型 - 定义触发传送的边界条件
 #[derive(Debug, Clone, PartialEq)]
@@ -328,8 +328,9 @@ impl WarpService {
     pub fn use_return(&self, session: &mut Session) -> Result<TeleportAction, WarpError> {
         let char_id = session.char_id.ok_or(WarpError::PlayerNotFound)?;
 
-        let save_point = self.get_save_point(char_id)
-            .ok_or_else(|| WarpError::InvalidTargetMap)?;
+        let save_point = self
+            .get_save_point(char_id)
+            .ok_or(WarpError::InvalidTargetMap)?;
 
         // Create teleport action to save point
         let action = TeleportAction {
@@ -358,9 +359,7 @@ impl WarpService {
         session: &mut Session,
         action: TeleportAction,
     ) -> Result<(), WarpError> {
-        let _player_id = session
-            .player_id
-            .ok_or(WarpError::PlayerNotFound)?;
+        let _player_id = session.player_id.ok_or(WarpError::PlayerNotFound)?;
 
         // For now, we return success since the actual player reference
         // would need to be passed from MapState. In a full implementation,
@@ -369,12 +368,14 @@ impl WarpService {
         // Update database with new position (best effort)
         if let Some(char_id) = session.char_id {
             // Ignore database errors for now as the table might not exist in tests
-            let _ = self.update_character_position(
+            if let Err(e) = self.update_character_position(
                 char_id,
                 &action.to_map,
                 action.to_pos.0 as i32,
                 action.to_pos.1 as i32,
-            );
+            ) {
+                tracing::error!("Failed to persist warp position for char_id={}: {}", char_id, e);
+            }
         }
 
         Ok(())
@@ -895,7 +896,7 @@ mod tests {
         service.set_save_point(1, "prontera.gat", 150, 180);
 
         let mut session = Session::new();
-        session.player_id = Some(Uuid::new_v4());  // Need player_id for execute_warp
+        session.player_id = Some(Uuid::new_v4()); // Need player_id for execute_warp
         session.char_id = Some(1);
 
         // Should succeed
