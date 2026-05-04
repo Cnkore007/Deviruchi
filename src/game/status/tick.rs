@@ -5,7 +5,7 @@
 use super::calculator::StatusCalculator;
 use super::player_status::PlayerStatus;
 use super::types::StatusChange;
-use crate::game::map::Player;
+use crate::game::map::{MapState, Player};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -233,12 +233,35 @@ impl StatusTickProcessor {
         status: &PlayerStatus,
         result: &mut StatusTickResult,
     ) {
-        // 隐身效果超时处理
-        if status.has_status(StatusChange::Hide) || status.has_status(StatusChange::Cloak) {
-            // 攻击或使用技能时取消隐身
-            // 这个逻辑应该在战斗处理中触发
-            let _ = player; // 避免未使用警告
-            let _ = result;
+        let stealth_statuses = [
+            StatusChange::Hide,
+            StatusChange::Cloak,
+            StatusChange::ChaseWalk,
+        ];
+
+        for stealth_type in stealth_statuses {
+            if let Some(effect) = status.get_status(stealth_type) {
+                if effect.is_expired() {
+                    // 隐身效果已过期，移除
+                    status.remove_status(stealth_type);
+                    result.expired_count += 1;
+                    result.expired.push(stealth_type);
+
+                    tracing::trace!(
+                        "Player {} stealth status {:?} expired, removed",
+                        player.name,
+                        stealth_type
+                    );
+                } else {
+                    // 隐身效果仍然有效，玩家保持隐藏
+                    tracing::trace!(
+                        "Player {} remains in stealth ({:?}), {}ms remaining",
+                        player.name,
+                        stealth_type,
+                        effect.remaining_ms()
+                    );
+                }
+            }
         }
     }
 
@@ -296,21 +319,47 @@ impl StatusTickService {
     }
 
     /// 启动状态Tick服务
-    pub fn start<F>(&self, _get_players: F)
-    where
-        F: Fn() -> Vec<Arc<Player>> + Send + Sync + 'static,
-    {
-        let processor = self.processor.clone();
+    pub fn start(&self, map_state: Arc<MapState>) {
+        let mut processor = self.processor.clone();
         let interval = Duration::from_millis(self.config.tick_interval_ms);
 
         std::thread::spawn(move || {
-            let _local_processor = processor;
             loop {
-                std::thread::sleep(interval);
+                let player_ids = map_state.get_all_player_ids();
 
-                // 获取当前玩家列表并处理
-                // 注意：这需要根据实际的游戏循环实现来调整
-                tracing::trace!("Status tick processing...");
+                for player_id in player_ids {
+                    let Some(player) = map_state.get_player(&player_id) else {
+                        // 玩家已断线，跳过
+                        continue;
+                    };
+
+                    if !player.is_alive() {
+                        continue;
+                    }
+
+                    let player = Arc::new(player);
+                    let result = processor.tick_player(&player, &player.status);
+
+                    if result.player_died {
+                        tracing::info!(
+                            "Player {} died from status effect DOT",
+                            player.name
+                        );
+                    }
+
+                    if result.has_effect() {
+                        tracing::trace!(
+                            "Player {} tick: {} DOT dmg, {} HP healed, {} SP healed, {} expired",
+                            player.name,
+                            result.total_dot_damage,
+                            result.hp_healed,
+                            result.sp_healed,
+                            result.expired_count
+                        );
+                    }
+                }
+
+                std::thread::sleep(interval);
             }
         });
 
