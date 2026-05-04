@@ -1,32 +1,42 @@
 pub mod data;
 
+use crate::game::item::{Inventory, ItemDatabase};
+use crate::game::map::Player;
+use crate::game::zeny::MAX_ZENY;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use uuid::Uuid;
-use parking_lot::RwLock;
-use crate::game::map::Player;
-use crate::game::item::{Inventory, ItemDatabase};
-use crate::game::zeny::MAX_ZENY;
+
+/// 交易状态
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TradeState {
+    Requesting, // 请求中，等待对方接受
+    Trading,    // 交易中，双方可以添加物品
+    Completed,  // 已完成
+    Cancelled,  // 已取消
+}
 
 /// 交易物品
 #[derive(Debug, Clone, Copy)]
 pub struct TradeItem {
-    pub inventory_index: u8,
+    pub inventory_index: u16,
     pub item_id: u16,
     pub amount: u16,
 }
 
-/// 交易会话
+/// 交易会话（使用内部可变性，允许多线程安全访问）
 #[derive(Debug)]
 pub struct TradeSession {
     pub id: Uuid,
     pub player1_id: Uuid,
     pub player2_id: Uuid,
+    pub state: RwLock<TradeState>,
     pub items1: RwLock<Vec<TradeItem>>,
     pub items2: RwLock<Vec<TradeItem>>,
     pub zeny1: RwLock<u32>,
     pub zeny2: RwLock<u32>,
-    pub confirmed1: RwLock<bool>,
-    pub confirmed2: RwLock<bool>,
+    pub locked1: RwLock<bool>,
+    pub locked2: RwLock<bool>,
 }
 
 impl Clone for TradeSession {
@@ -35,12 +45,13 @@ impl Clone for TradeSession {
             id: self.id,
             player1_id: self.player1_id,
             player2_id: self.player2_id,
+            state: RwLock::new(*self.state.read()),
             items1: RwLock::new(self.items1.read().clone()),
             items2: RwLock::new(self.items2.read().clone()),
             zeny1: RwLock::new(*self.zeny1.read()),
             zeny2: RwLock::new(*self.zeny2.read()),
-            confirmed1: RwLock::new(*self.confirmed1.read()),
-            confirmed2: RwLock::new(*self.confirmed2.read()),
+            locked1: RwLock::new(*self.locked1.read()),
+            locked2: RwLock::new(*self.locked2.read()),
         }
     }
 }
@@ -51,21 +62,128 @@ impl TradeSession {
             id: Uuid::new_v4(),
             player1_id,
             player2_id,
+            state: RwLock::new(TradeState::Requesting),
             items1: RwLock::new(Vec::new()),
             items2: RwLock::new(Vec::new()),
             zeny1: RwLock::new(0),
             zeny2: RwLock::new(0),
-            confirmed1: RwLock::new(false),
-            confirmed2: RwLock::new(false),
+            locked1: RwLock::new(false),
+            locked2: RwLock::new(false),
         }
+    }
+
+    /// 检查是否为交易参与者
+    pub fn is_participant(&self, player_id: Uuid) -> bool {
+        self.player1_id == player_id || self.player2_id == player_id
+    }
+
+    /// 获取对方玩家ID
+    pub fn get_partner_id(&self, player_id: Uuid) -> Option<Uuid> {
+        if player_id == self.player1_id {
+            Some(self.player2_id)
+        } else if player_id == self.player2_id {
+            Some(self.player1_id)
+        } else {
+            None
+        }
+    }
+
+    /// 开始交易（从 Requesting 转为 Trading）
+    pub fn start(&self) -> bool {
+        let mut state = self.state.write();
+        if *state == TradeState::Requesting {
+            *state = TradeState::Trading;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 添加物品到交易
+    pub fn add_item(&self, player_id: Uuid, item: TradeItem) -> bool {
+        if *self.state.read() != TradeState::Trading {
+            return false;
+        }
+        // 已锁定的玩家不能添加物品
+        if self.is_locked(player_id) {
+            return false;
+        }
+        if player_id == self.player1_id {
+            self.items1.write().push(item);
+            true
+        } else if player_id == self.player2_id {
+            self.items2.write().push(item);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 设置交易 Zeny
+    pub fn set_zeny(&self, player_id: Uuid, amount: u32) -> bool {
+        if *self.state.read() != TradeState::Trading {
+            return false;
+        }
+        if self.is_locked(player_id) {
+            return false;
+        }
+        if player_id == self.player1_id {
+            *self.zeny1.write() = amount;
+            true
+        } else if player_id == self.player2_id {
+            *self.zeny2.write() = amount;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 锁定交易（玩家点击确认）
+    pub fn lock(&self, player_id: Uuid) -> bool {
+        if *self.state.read() != TradeState::Trading {
+            return false;
+        }
+        if player_id == self.player1_id {
+            *self.locked1.write() = true;
+            true
+        } else if player_id == self.player2_id {
+            *self.locked2.write() = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 检查玩家是否已锁定
+    pub fn is_locked(&self, player_id: Uuid) -> bool {
+        if player_id == self.player1_id {
+            *self.locked1.read()
+        } else if player_id == self.player2_id {
+            *self.locked2.read()
+        } else {
+            false
+        }
+    }
+
+    /// 检查双方是否都已锁定
+    pub fn is_fully_locked(&self) -> bool {
+        *self.locked1.read() && *self.locked2.read()
+    }
+
+    /// 取消交易
+    pub fn cancel(&self) {
+        *self.state.write() = TradeState::Cancelled;
     }
 
     /// 计算重量增加
     fn calc_weight_gain(items: &[TradeItem], item_db: &ItemDatabase) -> u32 {
-        items.iter()
+        items
+            .iter()
             .map(|item| {
                 let item_data = item_db.get(item.item_id);
-                item_data.map(|i| (i.weight as u32) * (item.amount as u32)).unwrap_or(0)
+                item_data
+                    .map(|i| (i.weight as u32) * (item.amount as u32))
+                    .unwrap_or(0)
             })
             .sum()
     }
@@ -80,8 +198,8 @@ impl TradeSession {
         item_db: &ItemDatabase,
     ) -> Result<(), TradeError> {
         // 计算双方将要增加的重量
-        let weight_gain_1 = Self::calc_weight_gain(&*self.items2.read(), item_db);
-        let weight_gain_2 = Self::calc_weight_gain(&*self.items1.read(), item_db);
+        let weight_gain_1 = Self::calc_weight_gain(&self.items2.read(), item_db);
+        let weight_gain_2 = Self::calc_weight_gain(&self.items1.read(), item_db);
 
         let max_weight_1 = *player1.max_weight.read();
         let max_weight_2 = *player2.max_weight.read();
@@ -121,54 +239,6 @@ impl TradeSession {
 
         Ok(())
     }
-
-    /// 确认交易
-    pub fn confirm(&self, player_id: Uuid) -> bool {
-        if player_id == self.player1_id {
-            *self.confirmed1.write() = true;
-        } else if player_id == self.player2_id {
-            *self.confirmed2.write() = true;
-        } else {
-            return false;
-        }
-        // 检查双方是否都已确认
-        *self.confirmed1.read() && *self.confirmed2.read()
-    }
-
-    /// 取消确认
-    pub fn unconfirm(&self, player_id: Uuid) {
-        if player_id == self.player1_id {
-            *self.confirmed1.write() = false;
-        } else if player_id == self.player2_id {
-            *self.confirmed2.write() = false;
-        }
-    }
-
-    /// 添加物品到交易
-    pub fn add_item(&self, player_id: Uuid, item: TradeItem) -> bool {
-        if player_id == self.player1_id {
-            self.items1.write().push(item);
-            true
-        } else if player_id == self.player2_id {
-            self.items2.write().push(item);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// 设置Zeny
-    pub fn set_zeny(&self, player_id: Uuid, amount: u32) -> bool {
-        if player_id == self.player1_id {
-            *self.zeny1.write() = amount;
-            true
-        } else if player_id == self.player2_id {
-            *self.zeny2.write() = amount;
-            true
-        } else {
-            false
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -185,32 +255,101 @@ pub enum TradeError {
 /// 交易管理器
 #[derive(Debug)]
 pub struct TradeManager {
+    /// 活跃的交易会话（session_id -> TradeSession）
     sessions: RwLock<HashMap<Uuid, TradeSession>>,
+    /// 玩家到交易会话的映射（player_id -> session_id）
+    player_sessions: RwLock<HashMap<Uuid, Uuid>>,
 }
 
 impl TradeManager {
     pub fn new() -> Self {
         Self {
             sessions: RwLock::new(HashMap::new()),
+            player_sessions: RwLock::new(HashMap::new()),
         }
     }
 
-    /// 发起交易请求
+    /// 发起交易请求，创建新的交易会话
     pub fn request_trade(&self, player1_id: Uuid, player2_id: Uuid) -> Uuid {
         let session = TradeSession::new(player1_id, player2_id);
         let id = session.id;
         self.sessions.write().insert(id, session);
+        self.player_sessions.write().insert(player1_id, id);
+        self.player_sessions.write().insert(player2_id, id);
         id
     }
 
-    /// 获取交易会话
+    /// 根据玩家ID查找其参与的交易会话
+    pub fn find_session_for_player(&self, player_id: Uuid) -> Option<Uuid> {
+        self.player_sessions.read().get(&player_id).copied()
+    }
+
+    /// 获取交易会话（克隆，仅用于读取状态）
     pub fn get_session(&self, id: Uuid) -> Option<TradeSession> {
         self.sessions.read().get(&id).cloned()
     }
 
-    /// 结束交易
+    /// 开始交易（从 Requesting 转为 Trading）
+    pub fn start_trade(&self, session_id: Uuid) -> bool {
+        let sessions = self.sessions.read();
+        if let Some(session) = sessions.get(&session_id) {
+            session.start()
+        } else {
+            false
+        }
+    }
+
+    /// 添加物品到交易会话
+    pub fn add_item_to_session(
+        &self,
+        session_id: Uuid,
+        player_id: Uuid,
+        item: TradeItem,
+    ) -> bool {
+        let sessions = self.sessions.read();
+        if let Some(session) = sessions.get(&session_id) {
+            session.add_item(player_id, item)
+        } else {
+            false
+        }
+    }
+
+    /// 设置交易 Zeny
+    pub fn set_zeny_in_session(&self, session_id: Uuid, player_id: Uuid, amount: u32) -> bool {
+        let sessions = self.sessions.read();
+        if let Some(session) = sessions.get(&session_id) {
+            session.set_zeny(player_id, amount)
+        } else {
+            false
+        }
+    }
+
+    /// 锁定交易（玩家点击确认），返回是否双方都已锁定
+    pub fn lock_trade(&self, session_id: Uuid, player_id: Uuid) -> bool {
+        let sessions = self.sessions.read();
+        if let Some(session) = sessions.get(&session_id) {
+            if session.lock(player_id) {
+                return session.is_fully_locked();
+            }
+        }
+        false
+    }
+
+    /// 取消交易
+    pub fn cancel_trade(&self, session_id: Uuid) {
+        let sessions = self.sessions.read();
+        if let Some(session) = sessions.get(&session_id) {
+            session.cancel();
+        }
+    }
+
+    /// 结束交易，清理所有映射
     pub fn end_trade(&self, id: Uuid) {
-        self.sessions.write().remove(&id);
+        if let Some(session) = self.sessions.write().remove(&id) {
+            let mut player_sessions = self.player_sessions.write();
+            player_sessions.remove(&session.player1_id);
+            player_sessions.remove(&session.player2_id);
+        }
     }
 }
 

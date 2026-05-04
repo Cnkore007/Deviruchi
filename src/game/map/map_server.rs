@@ -591,6 +591,8 @@ impl MapServer {
     }
 
     /// Handle trade request (0x00E4)
+    /// Player requests to trade with a target player. Creates a trade session
+    /// and sends the request notification to the target.
     fn handle_trade_request(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         use crate::protocol::trade_packets::CZTradeRequest;
         use crate::protocol::trade_packets::ZCTradeRequest;
@@ -598,44 +600,121 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CZTradeRequest::from_packet(data)?;
 
-        // Get requester info
-        let player = self.map_state.get_player(&player_id)?;
-        let requester_name = player.name.clone();
+        // Don't allow trading with yourself
+        let requester = self.map_state.get_player(&player_id)?;
+        if requester.account_id == pkt.target_account_id {
+            return None;
+        }
 
-        // Create trade request notification for target
+        // Find target player by account_id
+        let target = self
+            .map_state
+            .find_player_by_account_id(pkt.target_account_id)?;
+        let target_id = target.id;
+
+        // Don't allow if either player is already in a trade
+        if self.trade_manager.find_session_for_player(player_id).is_some() {
+            return None;
+        }
+        if self
+            .trade_manager
+            .find_session_for_player(target_id)
+            .is_some()
+        {
+            return None;
+        }
+
+        // Create trade session via TradeManager
+        let _session_id = self.trade_manager.request_trade(player_id, target_id);
+
+        // Send ZCTradeRequest notification to the target player
         let notify = ZCTradeRequest {
-            requester_id: pkt.target_account_id,
-            requester_name,
+            requester_id: requester.account_id,
+            requester_name: requester.name.clone(),
         }
         .to_packet();
 
-        Some(notify)
+        // Deliver notification to target via channel bus
+        self.channel_bus.send_to_player(&target_id, notify);
+
+        // Return None to the requester (no direct response needed)
+        None
     }
 
     /// Handle trade acknowledge (accept/reject) (0x00E6)
+    /// Target player accepts or rejects the trade request.
+    /// If accepted, transitions the session to Trading state and notifies the requester.
     fn handle_trade_ack(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         use crate::protocol::trade_packets::{CZTradeAck, ZCTradeAck};
 
-        let _player_id = session.player_id?;
+        let player_id = session.player_id?;
         let pkt = CZTradeAck::from_packet(data)?;
 
-        // Send acknowledgement response
-        let response = ZCTradeAck { accept: pkt.accept }.to_packet();
+        // Find the trade session for this player
+        let session_id = self.trade_manager.find_session_for_player(player_id)?;
 
-        Some(response)
+        if pkt.accept {
+            // Start the trade (Requesting -> Trading)
+            if !self.trade_manager.start_trade(session_id) {
+                return None;
+            }
+        } else {
+            // Reject: cancel and clean up the trade session
+            self.trade_manager.cancel_trade(session_id);
+            self.trade_manager.end_trade(session_id);
+        }
+
+        // Get the partner to send them the ack
+        let trade_session = self.trade_manager.get_session(session_id)?;
+        let partner_id = trade_session.get_partner_id(player_id)?;
+
+        // Send ZCTradeAck to the requester (partner)
+        let response = ZCTradeAck { accept: pkt.accept }.to_packet();
+        self.channel_bus.send_to_player(&partner_id, response);
+
+        None
     }
 
     /// Handle trade add item (0x00B0)
+    /// Player adds an item from their inventory to the trade window.
+    /// Resolves the item from inventory, adds it to the session, and notifies the partner.
     fn handle_trade_add_item(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        use crate::game::trade::TradeItem;
         use crate::protocol::trade_packets::{CZTradeAddItem, ZCTradeAddItem};
 
-        let _player_id = session.player_id?;
+        let player_id = session.player_id?;
         let pkt = CZTradeAddItem::from_packet(data)?;
 
-        // Notify partner about added item
+        // Find the trade session
+        let session_id = self.trade_manager.find_session_for_player(player_id)?;
+
+        // Resolve item from player inventory
+        let player = self.map_state.get_player(&player_id)?;
+        let inventory = player.inventory.read();
+        let inv_index = pkt.inventory_index as usize;
+        let inv_item = inventory.get(inv_index)?;
+
+        let trade_item = TradeItem {
+            inventory_index: pkt.inventory_index,
+            item_id: inv_item.item_id,
+            amount: pkt.amount as u16,
+        };
+
+        // Add item to the trade session
+        if !self
+            .trade_manager
+            .add_item_to_session(session_id, player_id, trade_item)
+        {
+            return None;
+        }
+
+        // Get partner and notify them about the added item
+        let trade_session = self.trade_manager.get_session(session_id)?;
+        let partner_id = trade_session.get_partner_id(player_id)?;
+
         let notify = ZCTradeAddItem {
             amount: pkt.amount,
-            item_id: 0, // Would be resolved from inventory
+            item_id: inv_item.item_id,
             identified: true,
             damaged: false,
             refine: 0,
@@ -643,30 +722,69 @@ impl MapServer {
         }
         .to_packet();
 
-        Some(notify)
+        self.channel_bus.send_to_player(&partner_id, notify);
+        None
     }
 
     /// Handle trade add zeny (0x00B1)
+    /// Player sets the zeny amount for the trade.
     fn handle_trade_add_zeny(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         use crate::protocol::trade_packets::{CZTradeAddZeny, ZCTradeAddZeny};
 
-        let _player_id = session.player_id?;
+        let player_id = session.player_id?;
         let pkt = CZTradeAddZeny::from_packet(data)?;
 
-        // Notify partner about added zeny
-        let notify = ZCTradeAddZeny { amount: pkt.amount }.to_packet();
+        // Find the trade session
+        let session_id = self.trade_manager.find_session_for_player(player_id)?;
 
-        Some(notify)
+        // Set zeny in the trade session
+        if !self
+            .trade_manager
+            .set_zeny_in_session(session_id, player_id, pkt.amount)
+        {
+            return None;
+        }
+
+        // Get partner and notify them about the added zeny
+        let trade_session = self.trade_manager.get_session(session_id)?;
+        let partner_id = trade_session.get_partner_id(player_id)?;
+
+        let notify = ZCTradeAddZeny { amount: pkt.amount }.to_packet();
+        self.channel_bus.send_to_player(&partner_id, notify);
+        None
     }
 
     /// Handle trade lock (0x00EF)
-    fn handle_trade_lock(&self, _session: &mut Session) -> Option<Vec<u8>> {
-        use crate::protocol::trade_packets::ZCTradeLock;
+    /// Player clicks OK to lock their side of the trade.
+    /// When both players have locked, the trade is ready to execute.
+    fn handle_trade_lock(&self, session: &mut Session) -> Option<Vec<u8>> {
+        use crate::protocol::trade_packets::{ZCTradeCommit, ZCTradeLock};
 
-        // Notify partner that player has locked
-        let notify = ZCTradeLock.to_packet();
+        let player_id = session.player_id?;
 
-        Some(notify)
+        // Find the trade session
+        let session_id = self.trade_manager.find_session_for_player(player_id)?;
+
+        // Lock the trade for this player; returns true if both players are now locked
+        let both_locked = self.trade_manager.lock_trade(session_id, player_id);
+
+        // Get partner and notify them about the lock
+        let trade_session = self.trade_manager.get_session(session_id)?;
+        let partner_id = trade_session.get_partner_id(player_id)?;
+
+        if both_locked {
+            // Both sides locked - send commit notification to both players
+            let commit_pkt = ZCTradeCommit.to_packet();
+            self.channel_bus.send_to_player(&partner_id, commit_pkt.clone());
+            // Clean up the trade session
+            self.trade_manager.end_trade(session_id);
+        } else {
+            // Only this side locked - notify partner
+            let lock_pkt = ZCTradeLock.to_packet();
+            self.channel_bus.send_to_player(&partner_id, lock_pkt);
+        }
+
+        None
     }
 
     /// Handle use return (0x0119)

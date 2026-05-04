@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub enum ChatType {
     Map,
     Party,
+    Whisper,
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +146,12 @@ pub struct ChannelBus {
     channels: RwLock<HashMap<String, Channel>>,
 }
 
+impl Default for ChannelBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChannelBus {
     pub fn new() -> Self {
         Self {
@@ -190,16 +197,16 @@ impl ChannelBus {
     /// Update subscriber position
     pub fn update_position(&self, channel_name: &str, player_id: &Uuid, x: u16, y: u16) {
         let channels = self.channels.read();
-        if let Some(channel) = channels.get(channel_name) {
-            if channel.subscribers.contains_key(player_id) {
-                drop(channels);
-                let mut channels = self.channels.write();
-                if let Some(channel) = channels.get_mut(channel_name) {
-                    if let Some(sub) = channel.subscribers.get_mut(player_id) {
-                        sub.pos_x = x;
-                        sub.pos_y = y;
-                    }
-                }
+        if let Some(channel) = channels.get(channel_name)
+            && channel.subscribers.contains_key(player_id)
+        {
+            drop(channels);
+            let mut channels = self.channels.write();
+            if let Some(channel) = channels.get_mut(channel_name)
+                && let Some(sub) = channel.subscribers.get_mut(player_id)
+            {
+                sub.pos_x = x;
+                sub.pos_y = y;
             }
         }
     }
@@ -216,20 +223,18 @@ impl ChannelBus {
         let event_pos = event.position();
         let source_player_id = event.source_player_id();
 
-        for (_, sub) in &channel.subscribers {
+        for sub in channel.subscribers.values() {
             // Don't send to self
             if source_player_id == Some(sub.player_id) {
                 continue;
             }
 
             // Vision filtering for map channels
-            if !is_party_channel {
-                if let Some((ex, ey)) = event_pos {
-                    let dx = (sub.pos_x as i32 - ex as i32).unsigned_abs() as u16;
-                    let dy = (sub.pos_y as i32 - ey as i32).unsigned_abs() as u16;
-                    if dx > VISION_RADIUS || dy > VISION_RADIUS {
-                        continue;
-                    }
+            if !is_party_channel && let Some((ex, ey)) = event_pos {
+                let dx = (sub.pos_x as i32 - ex as i32).unsigned_abs() as u16;
+                let dy = (sub.pos_y as i32 - ey as i32).unsigned_abs() as u16;
+                if dx > VISION_RADIUS || dy > VISION_RADIUS {
+                    continue;
                 }
             }
 
@@ -238,6 +243,17 @@ impl ChannelBus {
                 // Will be cleaned up on next unsubscribe
             }
         }
+    }
+
+    /// Send raw packet bytes to a specific player across all channels
+    pub fn send_to_player(&self, player_id: &Uuid, packet: Vec<u8>) -> bool {
+        let channels = self.channels.read();
+        for channel in channels.values() {
+            if let Some(sub) = channel.subscribers.get(player_id) {
+                return sub.sender.send(packet).is_ok();
+            }
+        }
+        false
     }
 
     /// Get channel subscriber count
@@ -255,7 +271,14 @@ mod tests {
     use super::*;
     use tokio::sync::mpsc;
 
-    fn make_subscriber(_x: u16, _y: u16) -> (Uuid, mpsc::UnboundedSender<Vec<u8>>, mpsc::UnboundedReceiver<Vec<u8>>) {
+    fn make_subscriber(
+        _x: u16,
+        _y: u16,
+    ) -> (
+        Uuid,
+        mpsc::UnboundedSender<Vec<u8>>,
+        mpsc::UnboundedReceiver<Vec<u8>>,
+    ) {
         let player_id = Uuid::new_v4();
         let (tx, rx) = mpsc::unbounded_channel();
         (player_id, tx, rx)

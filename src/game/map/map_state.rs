@@ -85,6 +85,12 @@ impl MapState {
         players.values().find(|p| p.name == name).cloned()
     }
 
+    /// 根据 account_id 查找玩家
+    pub fn find_player_by_account_id(&self, account_id: u32) -> Option<Player> {
+        let players = self.players.read();
+        players.values().find(|p| p.account_id == account_id).cloned()
+    }
+
     /// 重生玩家：更新位置、地图、HP/SP、状态为 Alive
     pub fn respawn_player(&self, player_id: &Uuid, x: u16, y: u16, new_map: &str) -> bool {
         let mut players = self.players.write();
