@@ -1,18 +1,33 @@
+use super::data::MapDatabase;
 use super::player::Player;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct MapState {
     players: RwLock<HashMap<Uuid, Player>>,
     players_by_map: RwLock<HashMap<String, Vec<Uuid>>>,
+    /// 地图数据库引用（用于碰撞检测）
+    map_database: Arc<MapDatabase>,
 }
 
 impl MapState {
+    /// 创建 MapState，使用默认地图数据库
     pub fn new() -> Self {
         Self {
             players: RwLock::new(HashMap::new()),
             players_by_map: RwLock::new(HashMap::new()),
+            map_database: Arc::new(MapDatabase::new()),
+        }
+    }
+
+    /// 创建 MapState，使用指定的地图数据库
+    pub fn with_map_database(map_database: Arc<MapDatabase>) -> Self {
+        Self {
+            players: RwLock::new(HashMap::new()),
+            players_by_map: RwLock::new(HashMap::new()),
+            map_database,
         }
     }
 
@@ -163,10 +178,17 @@ impl MapState {
         }
     }
 
-    /// 检查位置是否可通行（简化版本，始终返回 true）
-    pub fn is_walkable(&self, _map_name: &str, _x: u16, _y: u16) -> bool {
-        tracing::debug!("is_walkable check not yet implemented, returning true");
-        true
+    /// 检查位置是否可通行（基于地图 cell 数据的真实碰撞检测）
+    pub fn is_walkable(&self, map_name: &str, x: u16, y: u16) -> bool {
+        self.map_database
+            .get(map_name)
+            .map(|map| map.is_walkable(x, y))
+            .unwrap_or(false)
+    }
+
+    /// 获取地图数据库引用
+    pub fn map_database(&self) -> &Arc<MapDatabase> {
+        &self.map_database
     }
 
     /// 获取所有唯一地图名称
@@ -286,8 +308,24 @@ mod tests {
     #[test]
     fn test_is_walkable() {
         let state = MapState::new();
-        // 当前简化实现始终返回 true
-        assert!(state.is_walkable("test_map", 100, 100));
-        assert!(state.is_walkable("any_map", 0, 0));
+
+        // new_1-1.gat 有硬编码的边界墙和水域
+        // 角落是墙
+        assert!(!state.is_walkable("new_1-1.gat", 0, 0));
+        // 中心区域应该是可行走的（避开水域 80-120 范围）
+        assert!(state.is_walkable("new_1-1.gat", 50, 50));
+        // 水域不可行走
+        assert!(!state.is_walkable("new_1-1.gat", 90, 90));
+        // 不存在的地图返回 false
+        assert!(!state.is_walkable("nonexistent.gat", 0, 0));
+    }
+
+    #[test]
+    fn test_is_walkable_boundary() {
+        let state = MapState::new();
+
+        // 超出地图范围
+        assert!(!state.is_walkable("new_1-1.gat", 200, 200));
+        assert!(!state.is_walkable("new_1-1.gat", 999, 999));
     }
 }
