@@ -278,7 +278,7 @@ impl Mob {
     }
 
     pub fn from_template(mob_id: u16, x: u16, y: u16, map: &str) -> Self {
-        let template = MobDatabase::get(mob_id);
+        let template = MobDatabase::default_instance().get(mob_id);
         Self {
             id: Uuid::new_v4(),
             mob_id,
@@ -366,13 +366,48 @@ impl Mob {
     }
 }
 
-/// 怪物数据库
-pub struct MobDatabase;
+/// 怪物数据库（支持 YAML 加载 + 硬编码回退）
+pub struct MobDatabase {
+    templates: std::collections::HashMap<u16, MobTemplate>,
+}
 
 impl MobDatabase {
-    pub fn get(mob_id: u16) -> MobTemplate {
-        match mob_id {
-            1001 => MobTemplate {
+    /// 创建怪物数据库，优先从 YAML 加载，失败则使用硬编码数据
+    pub fn new() -> Self {
+        let mut db = Self {
+            templates: std::collections::HashMap::new(),
+        };
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["rathena/db/re/mob_db.yml", "db/mob_db.yml"];
+
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match crate::game::mob::yaml_loader::load_mob_db(path) {
+                    Ok(mobs) => {
+                        let count = mobs.len();
+                        db.templates.extend(mobs);
+                        tracing::info!("从 {} 加载了 {} 个怪物模板", path, count);
+                        return db;
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        // 回退到硬编码数据
+        tracing::info!("使用硬编码怪物数据");
+        db.init_hardcoded();
+        db
+    }
+
+    /// 初始化硬编码怪物数据（作为 YAML 不可用时的回退）
+    fn init_hardcoded(&mut self) {
+        self.templates.insert(
+            1001,
+            MobTemplate {
                 name: "Poring".to_string(),
                 level: 1,
                 hp: 50,
@@ -405,7 +440,10 @@ impl MobDatabase {
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
             },
-            1002 => MobTemplate {
+        );
+        self.templates.insert(
+            1002,
+            MobTemplate {
                 name: "Lunatic".to_string(),
                 level: 3,
                 hp: 80,
@@ -437,7 +475,10 @@ impl MobDatabase {
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
             },
-            1003 => MobTemplate {
+        );
+        self.templates.insert(
+            1003,
+            MobTemplate {
                 name: "Blue Poring".to_string(),
                 level: 2,
                 hp: 60,
@@ -469,7 +510,10 @@ impl MobDatabase {
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
             },
-            1312 => MobTemplate {
+        );
+        self.templates.insert(
+            1312,
+            MobTemplate {
                 name: "Fabre".to_string(),
                 level: 4,
                 hp: 120,
@@ -501,8 +545,45 @@ impl MobDatabase {
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
             },
-            _ => MobTemplate::default(mob_id),
-        }
+        );
+    }
+
+    /// 获取怪物模板（返回引用，不存在则返回默认模板）
+    pub fn get(&self, mob_id: u16) -> &MobTemplate {
+        self.templates
+            .get(&mob_id)
+            .unwrap_or_else(|| {
+                // 返回默认模板的静态引用
+                static DEFAULT: std::sync::OnceLock<MobTemplate> = std::sync::OnceLock::new();
+                DEFAULT.get_or_init(|| MobTemplate::default(0))
+            })
+    }
+
+    /// 获取怪物模板（可选引用）
+    pub fn get_opt(&self, mob_id: u16) -> Option<&MobTemplate> {
+        self.templates.get(&mob_id)
+    }
+
+    /// 获取所有模板的迭代器
+    pub fn all(&self) -> impl Iterator<Item = (&u16, &MobTemplate)> {
+        self.templates.iter()
+    }
+
+    /// 获取模板总数
+    pub fn count(&self) -> usize {
+        self.templates.len()
+    }
+
+    /// 获取全局默认数据库实例
+    pub fn default_instance() -> &'static MobDatabase {
+        static INSTANCE: std::sync::OnceLock<MobDatabase> = std::sync::OnceLock::new();
+        INSTANCE.get_or_init(|| MobDatabase::new())
+    }
+}
+
+impl Default for MobDatabase {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
