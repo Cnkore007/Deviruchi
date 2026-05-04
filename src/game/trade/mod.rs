@@ -239,6 +239,23 @@ impl TradeSession {
 
         Ok(())
     }
+
+    /// 执行交易。双方都已锁定后调用，返回交易执行结果。
+    pub fn execute(&self) -> Result<TradeExecution, TradeError> {
+        if *self.state.read() != TradeState::Trading {
+            return Err(TradeError::InvalidTradeState);
+        }
+        if !self.is_fully_locked() {
+            return Err(TradeError::InvalidTradeState);
+        }
+        *self.state.write() = TradeState::Completed;
+        Ok(TradeExecution {
+            items_for_player1: self.items2.read().clone(),
+            items_for_player2: self.items1.read().clone(),
+            zeny_from_player1: *self.zeny1.read(),
+            zeny_from_player2: *self.zeny2.read(),
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -250,6 +267,19 @@ pub enum TradeError {
     ZenyOverflow(String),
     InventoryFull(String),
     ItemNotFound(String),
+}
+
+/// 交易执行结果：描述双方各收到什么
+#[derive(Debug, Clone)]
+pub struct TradeExecution {
+    /// 玩家1 收到的物品（来自玩家2）
+    pub items_for_player1: Vec<TradeItem>,
+    /// 玩家2 收到的物品（来自玩家1）
+    pub items_for_player2: Vec<TradeItem>,
+    /// 玩家1 支付的 Zeny（转给玩家2）
+    pub zeny_from_player1: u32,
+    /// 玩家2 支付的 Zeny（转给玩家1）
+    pub zeny_from_player2: u32,
 }
 
 /// 交易管理器

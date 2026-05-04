@@ -3,6 +3,7 @@
 use super::MapServer;
 use crate::game::map::channel::{ChatType, GameEvent};
 use crate::game::trade::TradeItem;
+use crate::game::zeny::ZenyManager;
 use crate::network::session::Session;
 use crate::protocol::packet_builder::Packed;
 use crate::protocol::party_packets::{
@@ -10,6 +11,8 @@ use crate::protocol::party_packets::{
 };
 use crate::protocol::storage_packets::*;
 use crate::protocol::trade_packets::*;
+use crate::storage::character::CharacterInventoryData;
+use uuid::Uuid;
 
 impl MapServer {
     /// Handle create party (0x0100)
@@ -410,9 +413,20 @@ impl MapServer {
         None
     }
 
+    /// 取消交易并向双方发送取消通知
+    fn cancel_trade_session(&self, session_id: Uuid, player1_id: Uuid, player2_id: Uuid) {
+        let cancel_pkt = ZCTradeCancel { reason: 0 }.to_packet();
+        self.channel_bus
+            .send_to_player(&player1_id, cancel_pkt.clone());
+        self.channel_bus
+            .send_to_player(&player2_id, cancel_pkt);
+        self.trade_manager.end_trade(session_id);
+    }
+
     /// Handle trade lock (0x00EF)
     /// Player clicks OK to lock their side of the trade.
-    /// When both players have locked, the trade is ready to execute.
+    /// When both players have locked, validates and executes the trade,
+    /// transferring items and zeny between players.
     pub(super) fn handle_trade_lock(&self, session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
 
@@ -422,15 +436,115 @@ impl MapServer {
         // Lock the trade for this player; returns true if both players are now locked
         let both_locked = self.trade_manager.lock_trade(session_id, player_id);
 
-        // Get partner and notify them about the lock
+        // Get the cloned session to read trade state
         let trade_session = self.trade_manager.get_session(session_id)?;
         let partner_id = trade_session.get_partner_id(player_id)?;
 
         if both_locked {
-            // Both sides locked - send commit notification to both players
+            // Both sides locked - validate and execute the trade
+            let player1 = self.map_state.get_player(&trade_session.player1_id)?;
+            let player2 = self.map_state.get_player(&trade_session.player2_id)?;
+            let item_db = self.item_integration_handler.item_db();
+
+            // Validate: check weight and zeny constraints
+            if let Err(e) = trade_session.validate(
+                &player1,
+                &crate::game::item::Inventory::from_character_inventory(
+                    &player1.inventory.read(),
+                    item_db.clone(),
+                ),
+                &player2,
+                &crate::game::item::Inventory::from_character_inventory(
+                    &player2.inventory.read(),
+                    item_db.clone(),
+                ),
+                &*item_db,
+            ) {
+                tracing::warn!(
+                    "Trade validation failed between {} and {}: {:?}",
+                    player1.name,
+                    player2.name,
+                    e
+                );
+                self.cancel_trade_session(
+                    session_id,
+                    trade_session.player1_id,
+                    trade_session.player2_id,
+                );
+                return None;
+            }
+
+            // Execute: mark trade as completed and get transfer data
+            let execution = match trade_session.execute() {
+                Ok(exec) => exec,
+                Err(e) => {
+                    tracing::warn!("Trade execution failed: {:?}", e);
+                    self.cancel_trade_session(
+                        session_id,
+                        trade_session.player1_id,
+                        trade_session.player2_id,
+                    );
+                    return None;
+                }
+            };
+
+            // Transfer items from player1 to player2
+            Self::transfer_items(
+                &player1,
+                &player2,
+                &execution.items_for_player2,
+            );
+
+            // Transfer items from player2 to player1
+            Self::transfer_items(
+                &player2,
+                &player1,
+                &execution.items_for_player1,
+            );
+
+            // Transfer zeny: player1 -> player2
+            if execution.zeny_from_player1 > 0 {
+                if !ZenyManager::sub(&player1, execution.zeny_from_player1) {
+                    tracing::warn!(
+                        "Failed to subtract {} zeny from {}",
+                        execution.zeny_from_player1,
+                        player1.name
+                    );
+                    self.cancel_trade_session(
+                        session_id,
+                        trade_session.player1_id,
+                        trade_session.player2_id,
+                    );
+                    return None;
+                }
+                ZenyManager::add(&player2, execution.zeny_from_player1);
+            }
+
+            // Transfer zeny: player2 -> player1
+            if execution.zeny_from_player2 > 0 {
+                if !ZenyManager::sub(&player2, execution.zeny_from_player2) {
+                    tracing::warn!(
+                        "Failed to subtract {} zeny from {}",
+                        execution.zeny_from_player2,
+                        player2.name
+                    );
+                    self.cancel_trade_session(
+                        session_id,
+                        trade_session.player1_id,
+                        trade_session.player2_id,
+                    );
+                    return None;
+                }
+                ZenyManager::add(&player1, execution.zeny_from_player2);
+            }
+
+            // Send commit notification to both players
             let commit_pkt = ZCTradeCommit.to_packet();
             self.channel_bus
-                .send_to_player(&partner_id, commit_pkt.clone());
+                .send_to_player(&trade_session.player1_id, commit_pkt.clone());
+            self.channel_bus
+                .send_to_player(&trade_session.player2_id, commit_pkt);
+
             // Clean up the trade session
             self.trade_manager.end_trade(session_id);
         } else {
@@ -440,5 +554,63 @@ impl MapServer {
         }
 
         None
+    }
+
+    /// 将物品从发送者转移到接收者的背包
+    fn transfer_items(
+        sender: &crate::game::map::Player,
+        receiver: &crate::game::map::Player,
+        items: &[TradeItem],
+    ) {
+        for item in items {
+            // 从发送者背包中移除物品
+            {
+                let mut sender_inv = sender.inventory.write();
+                if let Some(pos) = sender_inv
+                    .iter()
+                    .position(|i| i.index == item.inventory_index as u8)
+                {
+                    if sender_inv[pos].amount <= item.amount {
+                        sender_inv.remove(pos);
+                    } else {
+                        sender_inv[pos].amount -= item.amount;
+                    }
+                }
+            }
+
+            // 将物品添加到接收者背包
+            {
+                let mut receiver_inv = receiver.inventory.write();
+                // 尝试与已有同类物品堆叠
+                let mut stacked = false;
+                for slot in receiver_inv.iter_mut() {
+                    if slot.item_id == item.item_id {
+                        slot.amount += item.amount;
+                        stacked = true;
+                        break;
+                    }
+                }
+                if !stacked {
+                    // 寻找第一个空闲索引
+                    let mut used: Vec<u8> = receiver_inv.iter().map(|i| i.index).collect();
+                    used.sort_unstable();
+                    let next_index = used
+                        .iter()
+                        .enumerate()
+                        .find(|(i, idx)| **idx != *i as u8)
+                        .map(|(i, _)| i as u8)
+                        .unwrap_or(receiver_inv.len() as u8);
+
+                    receiver_inv.push(CharacterInventoryData {
+                        index: next_index,
+                        item_id: item.item_id,
+                        amount: item.amount,
+                        identified: true,
+                        refine: 0,
+                        cards: [0; 4],
+                    });
+                }
+            }
+        }
     }
 }
