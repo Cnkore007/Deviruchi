@@ -171,6 +171,11 @@ impl MapDatabase {
     pub fn all(&self) -> impl Iterator<Item = &MapData> {
         self.maps.values()
     }
+
+    /// 插入地图数据
+    pub fn insert(&mut self, map_data: MapData) {
+        self.maps.insert(map_data.name.clone(), map_data);
+    }
 }
 
 impl MapDatabase {

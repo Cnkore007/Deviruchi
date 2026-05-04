@@ -1,6 +1,8 @@
 //! Map Server - 地图服务器核心
 
 pub mod cell;
+#[cfg(test)]
+mod collision_tests;
 pub mod channel;
 pub mod data;
 pub mod drop_item;
