@@ -242,75 +242,10 @@ impl BattleFormula {
 mod tests {
     use super::*;
     use crate::game::mob::data::MobPathManager;
-    use crate::game::rand::GameRng;
+    use crate::game::rand::{GameRng, MockRng};
     use parking_lot::RwLock;
-    use std::cell::UnsafeCell;
     use std::sync::Arc;
     use uuid::Uuid;
-
-    /// Test-only mock RNG for BattleFormula tests
-    pub struct MockRng {
-        values: Vec<u32>,
-        index: UnsafeCell<usize>,
-    }
-
-    impl MockRng {
-        pub fn new(values: Vec<u32>) -> Self {
-            Self {
-                values,
-                index: UnsafeCell::new(0),
-            }
-        }
-    }
-
-    // Safety: MockRng is only used in single-threaded test context
-    unsafe impl Send for MockRng {}
-    unsafe impl Sync for MockRng {}
-
-    impl GameRng for MockRng {
-        fn rand_range(&self, min: u32, max: u32) -> u32 {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            let val = self
-                .values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(min);
-            val.min(max).max(min)
-        }
-
-        fn rand_bool(&self, _probability: f32) -> bool {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            let val = self
-                .values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(0);
-            val % 2 == 0
-        }
-
-        fn rand_bp(&self, _chance: u32) -> u32 {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            self.values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(0)
-        }
-    }
 
     /// Helper to create a test Player with specified stats
     fn make_player(

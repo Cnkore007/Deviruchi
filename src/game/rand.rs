@@ -5,6 +5,8 @@
 use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+#[cfg(test)]
+use std::cell::UnsafeCell;
 use std::sync::Arc;
 
 /// 可注入的随机数生成器 trait
@@ -62,74 +64,78 @@ pub fn thread_rng() -> Arc<dyn GameRng> {
     Arc::new(ThreadRng::new())
 }
 
+/// 测试用的确定性 Mock RNG（模块级别，供其他测试模块导入）
+#[cfg(test)]
+pub struct MockRng {
+    values: Vec<u32>,
+    index: UnsafeCell<usize>,
+}
+
+#[cfg(test)]
+impl MockRng {
+    pub fn new(values: Vec<u32>) -> Self {
+        Self {
+            values,
+            index: UnsafeCell::new(0),
+        }
+    }
+}
+
+// Safety: MockRng is only used in single-threaded test context
+#[cfg(test)]
+unsafe impl Send for MockRng {}
+#[cfg(test)]
+unsafe impl Sync for MockRng {}
+
+#[cfg(test)]
+impl GameRng for MockRng {
+    fn rand_range(&self, min: u32, max: u32) -> u32 {
+        let idx = {
+            let p = unsafe { &mut *self.index.get() };
+            let current = *p;
+            *p = current.wrapping_add(1);
+            current
+        };
+        let val = self
+            .values
+            .get(idx % self.values.len())
+            .copied()
+            .unwrap_or(min);
+        val.min(max).max(min)
+    }
+
+    fn rand_bool(&self, _probability: f32) -> bool {
+        let idx = {
+            let p = unsafe { &mut *self.index.get() };
+            let current = *p;
+            *p = current.wrapping_add(1);
+            current
+        };
+        let val = self
+            .values
+            .get(idx % self.values.len())
+            .copied()
+            .unwrap_or(0);
+        val % 2 == 0
+    }
+
+    fn rand_bp(&self, _chance: u32) -> u32 {
+        let idx = {
+            let p = unsafe { &mut *self.index.get() };
+            let current = *p;
+            *p = current.wrapping_add(1);
+            current
+        };
+        self.values
+            .get(idx % self.values.len())
+            .copied()
+            .unwrap_or(0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::UnsafeCell;
-
-    /// 测试用的确定性 Mock RNG
-    pub struct MockRng {
-        values: Vec<u32>,
-        index: UnsafeCell<usize>,
-    }
-
-    impl MockRng {
-        pub fn new(values: Vec<u32>) -> Self {
-            Self {
-                values,
-                index: UnsafeCell::new(0),
-            }
-        }
-    }
-
-    // Safety: MockRng is only used in single-threaded test context
-    unsafe impl Send for MockRng {}
-    unsafe impl Sync for MockRng {}
-
-    impl GameRng for MockRng {
-        fn rand_range(&self, min: u32, max: u32) -> u32 {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            let val = self
-                .values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(min);
-            val.min(max).max(min)
-        }
-
-        fn rand_bool(&self, _probability: f32) -> bool {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            let val = self
-                .values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(0);
-            val % 2 == 0
-        }
-
-        fn rand_bp(&self, _chance: u32) -> u32 {
-            let idx = {
-                let p = unsafe { &mut *self.index.get() };
-                let current = *p;
-                *p = current.wrapping_add(1);
-                current
-            };
-            self.values
-                .get(idx % self.values.len())
-                .copied()
-                .unwrap_or(0)
-        }
-    }
 
     #[test]
     fn test_thread_rng_rand_range() {
