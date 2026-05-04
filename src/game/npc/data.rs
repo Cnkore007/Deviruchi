@@ -143,6 +143,10 @@ impl NpcDatabase {
             1 => Some(Self::create_poring_merchant()),
             2 => Some(Self::create_basilisk_warrior()),
             3 => Some(Self::create_prontera_warp()),
+            4 => Some(Self::create_quest_npc()),
+            5 => Some(Self::create_cash_shop_npc()),
+            6 => Some(Self::create_geffen_warp()),
+            7 => Some(Self::create_healing_nurse()),
             _ => None,
         }
     }
@@ -188,6 +192,69 @@ close"#.to_string(),
         );
         npc.display_name = "前往普隆德拉".to_string();
         npc.sprite_id = 405;
+        npc
+    }
+
+    fn create_quest_npc() -> Npc {
+        let mut npc = Npc::new(4, "Quest Master", 160, 130, "prontera.gat");
+        npc.display_name = "任务大师".to_string();
+        npc.type_ = NpcType::Quest;
+        npc.sprite_id = 725;
+        npc.script = Some(
+            r#"mes "[Quest Master]"
+mes "I have many tasks for brave adventurers!"
+mes "What would you like to do?"
+next
+select("Accept Quest:Check Progress:Leave")
+close"#.to_string(),
+        );
+        npc
+    }
+
+    fn create_cash_shop_npc() -> Npc {
+        let mut npc = Npc::new(5, "Cash Shop", 150, 150, "prontera.gat");
+        npc.display_name = "现金商店".to_string();
+        npc.type_ = NpcType::CashShop;
+        npc.sprite_id = 112;
+        npc.script = Some(
+            r#"mes "[Cash Shop]"
+mes "Welcome to the Cash Shop!"
+mes "Here you can purchase special items."
+close"#.to_string(),
+        );
+        npc
+    }
+
+    fn create_geffen_warp() -> Npc {
+        let mut npc = Npc::warp(
+            6,
+            "To Geffen",
+            120,
+            100,
+            "prontera.gat",
+            "geffen.gat",
+            119,
+            59,
+        );
+        npc.display_name = "前往吉芬".to_string();
+        npc.sprite_id = 406;
+        npc
+    }
+
+    fn create_healing_nurse() -> Npc {
+        let mut npc = Npc::new(7, "Nurse", 150, 180, "prontera.gat");
+        npc.display_name = "护士".to_string();
+        npc.type_ = NpcType::SkillTrainer;
+        npc.sprite_id = 114;
+        npc.add_skill(28, 6, 0);  // Heal, 免费
+        npc.add_skill(29, 10, 500); // Increase AGI, 500 Zeny
+        npc.script = Some(
+            r#"mes "[Nurse]"
+mes "Hello! Do you need healing?"
+next
+select("Heal me:Learn Skills:Leave")
+close"#.to_string(),
+        );
         npc
     }
 }

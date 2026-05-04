@@ -24,14 +24,11 @@ impl NpcHandler {
     }
 
     fn init_default_npcs(&mut self) {
-        if let Some(npc) = super::data::NpcDatabase::get_npc(1) {
-            self.npcs.insert(1, Arc::new(npc));
-        }
-        if let Some(npc) = super::data::NpcDatabase::get_npc(2) {
-            self.npcs.insert(2, Arc::new(npc));
-        }
-        if let Some(npc) = super::data::NpcDatabase::get_npc(3) {
-            self.npcs.insert(3, Arc::new(npc));
+        // 加载所有 NPC 模板（ID 1-7）
+        for id in 1..=7 {
+            if let Some(npc) = super::data::NpcDatabase::get_npc(id) {
+                self.npcs.insert(id, Arc::new(npc));
+            }
         }
     }
 
@@ -61,10 +58,20 @@ impl NpcHandler {
                 npc_id,
                 items: npc.shop_items.read().clone(),
             },
-            super::data::NpcType::SkillTrainer => NpcResponse::SkillList {
-                npc_id,
-                skills: npc.skills.read().clone(),
-            },
+            super::data::NpcType::SkillTrainer => {
+                // 有脚本时优先使用脚本驱动对话
+                if npc.script.is_some() {
+                    NpcResponse::StartScript {
+                        npc_id,
+                        script: npc.script.clone().unwrap(),
+                    }
+                } else {
+                    NpcResponse::SkillList {
+                        npc_id,
+                        skills: npc.skills.read().clone(),
+                    }
+                }
+            }
             super::data::NpcType::Warp => {
                 // 返回传送目标坐标（而非 NPC 自身坐标）
                 let dest_map = npc.dest_map.clone()
@@ -75,7 +82,17 @@ impl NpcHandler {
                     y: npc.dest_y,
                 }
             }
-            _ => NpcResponse::Message(npc.display_name.clone()),
+            super::data::NpcType::Quest | super::data::NpcType::CashShop => {
+                // Quest 和 CashShop 类型通过脚本驱动
+                if let Some(ref script_text) = npc.script {
+                    NpcResponse::StartScript {
+                        npc_id,
+                        script: script_text.clone(),
+                    }
+                } else {
+                    NpcResponse::Message(npc.display_name.clone())
+                }
+            }
         }
     }
 
@@ -258,6 +275,11 @@ pub enum NpcResponse {
         map: String,
         x: u16,
         y: u16,
+    },
+    /// 启动脚本对话
+    StartScript {
+        npc_id: u32,
+        script: String,
     },
 }
 
@@ -459,5 +481,65 @@ mod tests {
 
         let result = handler.learn_skill(&player, 9999, 1);
         assert!(matches!(result, LearnResult::NpcNotFound));
+    }
+
+    #[test]
+    fn test_quest_npc_exists() {
+        let handler = NpcHandler::new();
+        let npc = handler.get_npc(4);
+        assert!(npc.is_some());
+        let npc = npc.unwrap();
+        assert_eq!(npc.type_, crate::game::npc::data::NpcType::Quest);
+        assert!(npc.script.is_some());
+    }
+
+    #[test]
+    fn test_cash_shop_npc_exists() {
+        let handler = NpcHandler::new();
+        let npc = handler.get_npc(5);
+        assert!(npc.is_some());
+        let npc = npc.unwrap();
+        assert_eq!(npc.type_, crate::game::npc::data::NpcType::CashShop);
+    }
+
+    #[test]
+    fn test_quest_npc_interaction_returns_script() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+        let response = handler.interact(&player, 4);
+        assert!(matches!(response, NpcResponse::StartScript { .. }));
+    }
+
+    #[test]
+    fn test_geffen_warp_target() {
+        let handler = NpcHandler::new();
+        let player = create_test_player();
+        let response = handler.interact(&player, 6);
+        match response {
+            NpcResponse::Warp { map, x, y } => {
+                assert_eq!(map, "geffen.gat");
+                assert_eq!(x, 119);
+                assert_eq!(y, 59);
+            }
+            other => panic!("期望 Warp 响应，实际: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_healing_nurse_has_skills() {
+        let handler = NpcHandler::new();
+        let npc = handler.get_npc(7).unwrap();
+        let skills = npc.skills.read();
+        assert_eq!(skills.len(), 2);
+        assert_eq!(skills[0].skill_id, 28); // Heal
+        assert_eq!(skills[0].price, 0);     // 免费
+    }
+
+    #[test]
+    fn test_get_npcs_on_map() {
+        let handler = NpcHandler::new();
+        let prontera_npcs = handler.get_npcs_on_map("prontera.gat");
+        // prontera.gat 应该有: Quest(4), CashShop(5), GeffenWarp(6), Nurse(7)
+        assert!(prontera_npcs.len() >= 4);
     }
 }
