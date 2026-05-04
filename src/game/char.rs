@@ -382,24 +382,25 @@ mod tests {
         let server = create_test_server();
         let mut session = create_session_with_account(1);
 
+        // 属性值在合法范围内 (1-9)，总和 <= 30
         let data = CHMakeChar {
             name: "NewChar".to_string(),
-            str: 10,
-            agi: 10,
-            vit: 10,
-            int: 10,
-            dex: 10,
-            luk: 10,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
             hair_color: 0,
             hair: 1,
         }
         .to_packet();
 
-        let result = server.handle_make_char(&data, &mut session);
+        let result = server.handle_make_char(&data[4..], &mut session);
         assert!(result.is_some());
-        // 成功时返回 vec![0]
+        // 成功时返回 vec![0x01]
         let packet_data = result.unwrap();
-        assert_eq!(packet_data, vec![0]);
+        assert_eq!(packet_data, vec![0x01], "角色创建成功应返回 0x01");
     }
 
     #[test]
