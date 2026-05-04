@@ -332,3 +332,274 @@ pub struct DirtyStats {
     pub count: usize,
     pub has_dirty: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::schema::init_schema;
+    use std::time::Duration;
+
+    /// 创建测试用同步管理器
+    fn setup() -> StorageSyncManager {
+        let db = Arc::new(crate::storage::Database::open_memory().expect("创建内存数据库失败"));
+        init_schema(&db).expect("初始化 schema 失败");
+
+        // 创建测试账户和角色（外键约束）
+        db.execute(
+            "INSERT INTO accounts (account_id, user_id, password_hash, sex, created_at)
+             VALUES (1, 'test', 'hash', 0, 0)",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO characters (char_id, account_id, char_num, name, created_at, updated_at)
+             VALUES (1, 1, 0, 'Test', 0, 0)",
+        )
+        .unwrap();
+
+        let repo = StorageRepository::new(db);
+        let manager = Arc::new(StorageManager::new());
+
+        StorageSyncManager::new(manager, repo, Duration::from_millis(100), 100)
+    }
+
+    /// 加载不存在的仓库时创建新的
+    #[tokio::test]
+    async fn load_storage_creates_new_when_empty() {
+        let sync_mgr = setup();
+        let response = sync_mgr.load_storage(1).await;
+
+        match response {
+            StorageResponse::Data { char_id, slots } => {
+                assert_eq!(char_id, 1);
+                assert_eq!(slots.len(), 100); // default_storage_size
+                assert!(slots.iter().all(|s| s.is_empty()));
+            }
+            _ => panic!("期望 Data 响应"),
+        }
+    }
+
+    /// 完整的 load -> modify -> save -> reload 流程
+    #[tokio::test]
+    async fn load_then_save_then_reload() {
+        let sync_mgr = setup();
+
+        // 1. 加载（创建新仓库）
+        sync_mgr.load_storage(1).await;
+
+        // 2. 修改内存中的仓库
+        {
+            let storage_arc = sync_mgr.storage_manager().get(1).unwrap();
+            let mut storage = storage_arc.write();
+            storage.add_item(501, 10);
+            storage.add_item(601, 1);
+        }
+
+        // 3. 保存
+        let save_response = sync_mgr.save_storage(1, vec![]).await;
+        match save_response {
+            StorageResponse::Saved { char_id } => assert_eq!(char_id, 1),
+            _ => panic!("期望 Saved 响应"),
+        }
+
+        // 4. 重新加载
+        sync_mgr.storage_manager().remove(&1); // 清除内存缓存
+        let load_response = sync_mgr.load_storage(1).await;
+        match load_response {
+            StorageResponse::Data { slots, .. } => {
+                assert_eq!(slots[0].item_id, 501);
+                assert_eq!(slots[0].amount, 10);
+                assert_eq!(slots[1].item_id, 601);
+            }
+            _ => panic!("期望 Data 响应"),
+        }
+    }
+
+    /// resize 后数据持久化到数据库
+    #[tokio::test]
+    async fn resize_storage_persists() {
+        let sync_mgr = setup();
+
+        // 加载并添加物品
+        sync_mgr.load_storage(1).await;
+        {
+            let storage_arc = sync_mgr.storage_manager().get(1).unwrap();
+            storage_arc.write().add_item(501, 5);
+        }
+
+        // 保存
+        sync_mgr.save_storage(1, vec![]).await;
+
+        // 调整大小
+        let resize_response = sync_mgr.resize_storage(1, 200).await;
+        match resize_response {
+            StorageResponse::Saved { char_id } => assert_eq!(char_id, 1),
+            _ => panic!("期望 Saved 响应"),
+        }
+
+        // 验证内存中的大小
+        {
+            let storage_arc = sync_mgr.storage_manager().get(1).unwrap();
+            assert_eq!(storage_arc.read().max_size(), 200);
+            assert_eq!(storage_arc.read().get_slot(0).unwrap().item_id, 501);
+        }
+
+        // 清除缓存后重新加载，验证持久化
+        sync_mgr.storage_manager().remove(&1);
+        let load_response = sync_mgr.load_storage(1).await;
+        match load_response {
+            StorageResponse::Data { slots, .. } => {
+                assert_eq!(slots.len(), 200); // 新大小
+                assert_eq!(slots[0].item_id, 501);
+            }
+            _ => panic!("期望 Data 响应"),
+        }
+    }
+
+    /// resize 不存在的仓库返回错误
+    #[tokio::test]
+    async fn resize_nonexistent_returns_error() {
+        let sync_mgr = setup();
+        let response = sync_mgr.resize_storage(999, 200).await;
+        match response {
+            StorageResponse::Error { char_id, .. } => assert_eq!(char_id, 999),
+            _ => panic!("期望 Error 响应"),
+        }
+    }
+
+    /// save 不存在的仓库返回错误
+    #[tokio::test]
+    async fn save_nonexistent_returns_error() {
+        let sync_mgr = setup();
+        let response = sync_mgr.save_storage(999, vec![]).await;
+        match response {
+            StorageResponse::Error { char_id, .. } => assert_eq!(char_id, 999),
+            _ => panic!("期望 Error 响应"),
+        }
+    }
+
+    /// unlock 从内存移除仓库
+    #[tokio::test]
+    async fn unlock_removes_from_memory() {
+        let sync_mgr = setup();
+
+        // 先加载到内存
+        sync_mgr.load_storage(1).await;
+
+        assert!(sync_mgr.storage_manager().has_storage(1));
+
+        let response = sync_mgr.unlock_storage(1);
+        match response {
+            StorageResponse::Saved { char_id } => assert_eq!(char_id, 1),
+            _ => panic!("期望 Saved 响应"),
+        }
+
+        assert!(!sync_mgr.storage_manager().has_storage(1));
+    }
+
+    /// get_sync_status 返回默认状态
+    #[tokio::test]
+    async fn get_sync_status_returns_default() {
+        let sync_mgr = setup();
+        let response = sync_mgr.get_sync_status(1);
+        match response {
+            StorageResponse::SyncStatus {
+                char_id,
+                is_dirty,
+                version,
+            } => {
+                assert_eq!(char_id, 1);
+                assert!(!is_dirty); // 默认 Clean
+                assert_eq!(version, 0);
+            }
+            _ => panic!("期望 SyncStatus 响应"),
+        }
+    }
+
+    /// force_sync 实际保存到数据库
+    #[tokio::test]
+    async fn force_sync_saves_to_db() {
+        let sync_mgr = setup();
+
+        // 加载并修改
+        sync_mgr.load_storage(1).await;
+        {
+            let storage_arc = sync_mgr.storage_manager().get(1).unwrap();
+            storage_arc.write().add_item(501, 10);
+        }
+
+        // 强制同步
+        sync_mgr.force_sync(1).await.unwrap();
+
+        // 清除缓存后重新加载
+        sync_mgr.storage_manager().remove(&1);
+        let load_response = sync_mgr.load_storage(1).await;
+        match load_response {
+            StorageResponse::Data { slots, .. } => {
+                assert_eq!(slots[0].item_id, 501);
+                assert_eq!(slots[0].amount, 10);
+            }
+            _ => panic!("期望 Data 响应"),
+        }
+    }
+
+    /// flush_dirty 保存所有脏数据
+    #[tokio::test]
+    async fn flush_dirty_saves_all_dirty() {
+        let sync_mgr = setup();
+
+        // 创建仓库并添加物品
+        {
+            let sm = sync_mgr.storage_manager();
+            sm.get_or_create(1, 100).write().add_item(501, 1);
+        }
+
+        // 标记脏
+        sync_mgr
+            .scheduler()
+            .task_sender()
+            .try_send(SyncTask::MarkDirty(1))
+            .unwrap();
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // flush
+        let count = sync_mgr.flush_dirty().await.unwrap();
+        assert_eq!(count, 1);
+    }
+
+    /// dirty_stats 初始状态正确
+    #[tokio::test]
+    async fn dirty_stats_reports_correctly() {
+        let sync_mgr = setup();
+        let stats = sync_mgr.dirty_stats();
+        assert_eq!(stats.count, 0);
+        assert!(!stats.has_dirty);
+    }
+
+    /// default_size 可配置
+    #[tokio::test]
+    async fn default_size_is_configurable() {
+        let sync_mgr = setup();
+        assert_eq!(sync_mgr.default_size(), 100);
+    }
+
+    /// handle_request 路由正确
+    #[tokio::test]
+    async fn handle_request_routes_correctly() {
+        let sync_mgr = setup();
+
+        // Load
+        let response = sync_mgr.handle_request(StorageRequest::Load { char_id: 1 }).await;
+        assert!(matches!(response, StorageResponse::Data { char_id: 1, .. }));
+
+        // SyncStatus
+        let response = sync_mgr
+            .handle_request(StorageRequest::SyncStatus { char_id: 1 })
+            .await;
+        assert!(matches!(response, StorageResponse::SyncStatus { .. }));
+
+        // Unlock
+        let response = sync_mgr.handle_request(StorageRequest::Unlock { char_id: 1 }).await;
+        assert!(matches!(response, StorageResponse::Saved { char_id: 1 }));
+    }
+}
