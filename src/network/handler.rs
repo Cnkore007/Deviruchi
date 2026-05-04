@@ -1,6 +1,8 @@
+use crate::game::battle::BattleHandler;
 use crate::game::guild::GuildManager;
 use crate::game::map::teleport::{SavePointManager, TeleportManager, WarpService};
 use crate::game::map::{ChannelBus, DropManager, MapServer, MapState};
+use crate::game::mob::MobSpawnManager;
 use crate::game::party::PartyManager;
 use crate::game::storage::StorageManager;
 use crate::game::token::TokenStore;
@@ -41,6 +43,9 @@ impl PacketHandler {
             db.clone(),
         ));
 
+        let battle_handler = Arc::new(BattleHandler::default());
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+
         let map_server = Arc::new(MapServer::new(
             db.clone(),
             token_store.clone(),
@@ -54,6 +59,8 @@ impl PacketHandler {
             teleport_manager,
             warp_service,
             false, // death_drop_items
+            battle_handler,
+            spawn_manager,
         ));
 
         Self {

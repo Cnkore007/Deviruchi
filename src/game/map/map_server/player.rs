@@ -196,14 +196,34 @@ impl MapServer {
         let action_pkt = CZRequestAction::from_slice(data)?;
 
         let player = self.map_state.get_player(&player_id)?;
+        let target_id = Uuid::from_u128(action_pkt.target_id as u128);
+
+        // 从 spawn_manager 查找目标怪物
+        let mob = self
+            .spawn_manager
+            .find_mob_by_id(&player.map_name, &target_id)?;
+
+        // 调用 BattleHandler 计算真实伤害
+        let result = self.battle_handler.normal_attack(&player, &mob);
+
+        let (damage, is_crit, killed) = match result {
+            crate::game::battle::AttackResult::Hit {
+                damage,
+                is_crit,
+                killed,
+            } => (damage.max(0) as u32, is_crit, killed),
+            crate::game::battle::AttackResult::Miss => (0, false, false),
+            crate::game::battle::AttackResult::Blocked
+            | crate::game::battle::AttackResult::Immune => (0, false, false),
+        };
 
         let channel_name = format!("map:{}", player.map_name);
         let event = GameEvent::PlayerAttack {
             attacker_id: player_id,
-            target_id: Uuid::from_u128(action_pkt.target_id as u128),
-            damage: 10,
-            is_crit: false,
-            killed: false,
+            target_id,
+            damage,
+            is_crit,
+            killed,
         };
         self.channel_bus.publish(&channel_name, &event, vec![]);
 

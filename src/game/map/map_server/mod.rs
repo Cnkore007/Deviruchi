@@ -13,12 +13,14 @@ mod npc;
 mod player;
 mod social;
 
+use crate::game::battle::BattleHandler;
 use crate::game::guild::GuildManager;
 use crate::game::item::{ItemDatabase, ItemEffectDatabase, ItemIntegrationHandler};
 use crate::game::map::MapState;
 use crate::game::map::channel::ChannelBus;
 use crate::game::map::drop_item::DropManager;
 use crate::game::map::teleport::{TeleportManager, WarpService};
+use crate::game::mob::MobSpawnManager;
 use crate::game::npc::handler::NpcHandler;
 use crate::game::party::PartyManager;
 use crate::game::script::dialogue::NpcDialogueState;
@@ -51,6 +53,8 @@ pub struct MapServer {
     pub item_integration_handler: Arc<ItemIntegrationHandler>,
     pub npc_handler: Arc<NpcHandler>,
     pub active_dialogues: RwLock<HashMap<Uuid, NpcDialogueState>>,
+    pub battle_handler: Arc<BattleHandler>,
+    pub spawn_manager: Arc<MobSpawnManager>,
 }
 
 impl MapServer {
@@ -67,6 +71,8 @@ impl MapServer {
         teleport_manager: Arc<RwLock<TeleportManager>>,
         warp_service: Arc<WarpService>,
         death_drop_items: bool,
+        battle_handler: Arc<BattleHandler>,
+        spawn_manager: Arc<MobSpawnManager>,
     ) -> Self {
         // 初始化物品和技能系统
         let effect_db = Arc::new(ItemEffectDatabase::new());
@@ -92,6 +98,8 @@ impl MapServer {
             item_integration_handler,
             npc_handler: Arc::new(NpcHandler::new()),
             active_dialogues: RwLock::new(HashMap::new()),
+            battle_handler,
+            spawn_manager,
         }
     }
 
@@ -222,8 +230,10 @@ mod tests {
 
     #[test]
     fn test_map_server_handles_unknown_packet() {
+        use crate::game::battle::BattleHandler;
         use crate::game::guild::GuildManager;
         use crate::game::map::teleport::{SavePointManager, TeleportManager, WarpService};
+        use crate::game::mob::MobSpawnManager;
         use crate::game::trade::TradeManager;
 
         let db = Arc::new(crate::storage::Database::open_memory().unwrap());
@@ -248,6 +258,8 @@ mod tests {
             teleport_manager,
             warp_service,
             false,
+            Arc::new(BattleHandler::default()),
+            Arc::new(MobSpawnManager::new()),
         );
         let mut session = Session::new();
         let result = server.handle_packet(0xFFFF, &[], &mut session);

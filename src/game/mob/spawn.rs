@@ -74,6 +74,14 @@ impl MobSpawnManager {
             .unwrap_or_default()
     }
 
+    /// 根据 UUID 查找指定地图上的怪物
+    pub fn find_mob_by_id(&self, map_name: &str, mob_id: &Uuid) -> Option<Arc<Mob>> {
+        self.active_mobs
+            .read()
+            .get(map_name)
+            .and_then(|mobs| mobs.iter().find(|m| &m.id == mob_id).cloned())
+    }
+
     /// 获取所有地图上的所有活跃怪物
     pub fn get_all_active_mobs(&self) -> Vec<Arc<Mob>> {
         self.active_mobs
