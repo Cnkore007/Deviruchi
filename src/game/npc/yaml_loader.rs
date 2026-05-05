@@ -21,7 +21,7 @@
 //!         sell_price: 25
 //! ```
 
-use super::data::{Npc, NpcDatabase, NpcType, ShopItem};
+use super::data::{Npc, NpcDatabase, NpcEvent, NpcType, ShopItem};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -55,6 +55,10 @@ struct NpcYamlEntry {
     dest_x: Option<u16>,
     /// 传送目标 Y（仅 Warp 类型）
     dest_y: Option<u16>,
+    /// 事件触发方式（OnClick/OnTouch/OnInit）
+    event: Option<String>,
+    /// 触发半径（OnTouch 事件时使用）
+    trigger_radius: Option<u16>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -80,6 +84,16 @@ fn parse_npc_type(s: &str) -> NpcType {
         "warp" => NpcType::Warp,
         "cashshop" | "cash_shop" => NpcType::CashShop,
         _ => NpcType::Shop,
+    }
+}
+
+/// 解析 NPC 事件触发方式
+fn parse_npc_event(s: &str) -> NpcEvent {
+    match s.to_lowercase().as_str() {
+        "onclick" | "click" => NpcEvent::OnClick,
+        "ontouch" | "touch" => NpcEvent::OnTouch,
+        "oninit" | "init" => NpcEvent::OnInit,
+        _ => NpcEvent::None,
     }
 }
 
@@ -112,6 +126,12 @@ pub fn load_npc_db(path: &str) -> Result<HashMap<u32, Npc>, Box<dyn std::error::
             dest_map: entry.dest_map,
             dest_x: entry.dest_x.unwrap_or(0),
             dest_y: entry.dest_y.unwrap_or(0),
+            event: entry
+                .event
+                .as_ref()
+                .map(|e| parse_npc_event(e))
+                .unwrap_or_default(),
+            trigger_radius: entry.trigger_radius.unwrap_or(0),
         };
 
         // 加载商店物品
@@ -221,6 +241,55 @@ npcs:
         assert_eq!(nurse.skills.read().len(), 1);
 
         // 清理
+        std::fs::remove_file(tmp_path).ok();
+    }
+
+    #[test]
+    fn test_parse_npc_event() {
+        assert_eq!(parse_npc_event("onclick"), NpcEvent::OnClick);
+        assert_eq!(parse_npc_event("click"), NpcEvent::OnClick);
+        assert_eq!(parse_npc_event("OnTouch"), NpcEvent::OnTouch);
+        assert_eq!(parse_npc_event("touch"), NpcEvent::OnTouch);
+        assert_eq!(parse_npc_event("OnInit"), NpcEvent::OnInit);
+        assert_eq!(parse_npc_event("init"), NpcEvent::OnInit);
+        assert_eq!(parse_npc_event("unknown"), NpcEvent::None);
+    }
+
+    #[test]
+    fn test_npc_with_event_and_trigger_radius() {
+        let yaml_str = r#"
+npcs:
+  - id: 10
+    name: "Touch NPC"
+    type: quest
+    map: test.gat
+    x: 100
+    y: 100
+    event: OnTouch
+    trigger_radius: 3
+  - id: 20
+    name: "Init NPC"
+    type: quest
+    map: test.gat
+    x: 200
+    y: 200
+    event: OnInit
+"#;
+
+        let tmp_path = "/tmp/test_npc_event.yml";
+        std::fs::write(tmp_path, yaml_str).unwrap();
+
+        let npcs = load_npc_db(tmp_path).unwrap();
+        assert_eq!(npcs.len(), 2);
+
+        let touch_npc = npcs.get(&10).unwrap();
+        assert_eq!(touch_npc.event, NpcEvent::OnTouch);
+        assert_eq!(touch_npc.trigger_radius, 3);
+
+        let init_npc = npcs.get(&20).unwrap();
+        assert_eq!(init_npc.event, NpcEvent::OnInit);
+        assert_eq!(init_npc.trigger_radius, 0); // 默认值
+
         std::fs::remove_file(tmp_path).ok();
     }
 

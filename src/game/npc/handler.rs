@@ -46,6 +46,8 @@ impl NpcHandler {
                 dest_map: npc_ref.dest_map.clone(),
                 dest_x: npc_ref.dest_x,
                 dest_y: npc_ref.dest_y,
+                event: npc_ref.event,
+                trigger_radius: npc_ref.trigger_radius,
             };
             self.npcs.insert(*id, Arc::new(npc));
         }

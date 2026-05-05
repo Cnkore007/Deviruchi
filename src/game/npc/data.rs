@@ -1,5 +1,24 @@
 use parking_lot::RwLock;
 
+/// NPC 事件触发方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NpcEvent {
+    /// 无事件
+    None,
+    /// 点击触发（默认）
+    OnClick,
+    /// 接近触发（进入触发半径时自动触发）
+    OnTouch,
+    /// 地图初始化时触发
+    OnInit,
+}
+
+impl Default for NpcEvent {
+    fn default() -> Self {
+        NpcEvent::OnClick
+    }
+}
+
 /// NPC类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NpcType {
@@ -47,6 +66,11 @@ pub struct Npc {
     pub dest_map: Option<String>,
     pub dest_x: u16,
     pub dest_y: u16,
+
+    // 事件触发方式
+    pub event: NpcEvent,
+    /// 触发半径（OnTouch 事件时，玩家进入此范围内自动触发）
+    pub trigger_radius: u16,
 }
 
 impl Npc {
@@ -68,6 +92,8 @@ impl Npc {
             dest_map: None,
             dest_x: 0,
             dest_y: 0,
+            event: NpcEvent::default(),
+            trigger_radius: 0,
         }
     }
 
