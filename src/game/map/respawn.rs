@@ -151,6 +151,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: RwLock::new(Position { x, y }),
             level: RwLock::new(LevelStats {
@@ -158,6 +159,7 @@ mod tests {
                 job_level: 5,
                 base_exp: 0,
                 job_exp: 0,
+                status_point: 0,
             }),
             attrs: RwLock::new(Attributes {
                 str: 10,

@@ -243,6 +243,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: RwLock::new(crate::game::map::player::Position { x: 100, y: 100 }),
             level: RwLock::new(crate::game::map::player::LevelStats {
@@ -250,6 +251,7 @@ mod tests {
                 job_level: 1,
                 base_exp: 0,
                 job_exp: 0,
+                status_point: 0,
             }),
             attrs: RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

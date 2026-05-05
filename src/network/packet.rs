@@ -82,6 +82,10 @@ pub mod id {
     pub const PACKET_CZ_ENTER: PacketId = 0x007C;
     pub const PACKET_ZC_ACCEPT_ENTER: PacketId = 0x02D3;
     pub const PACKET_ZC_NOTIFY_ACT: PacketId = 0x02D5;
+    pub const PACKET_CZ_REQUEST_TIME: PacketId = 0x00A7;
+    pub const PACKET_ZC_ACK_TIME: PacketId = 0x007F;
+    pub const PACKET_CZ_REQUEST_QUIT: PacketId = 0x00F3;
+    pub const PACKET_ZC_ACK_REQ_DISCONNECT: PacketId = 0x018A;
     pub const PACKET_CZ_REQUEST_MOVE: PacketId = 0x0085;
     pub const PACKET_ZC_MOVE: PacketId = 0x0086;
     pub const PACKET_CZ_USE_SKILL: PacketId = 0x0112;
@@ -102,6 +106,18 @@ pub mod id {
     pub const CZ_TRADE_ADD_ITEM: PacketId = 0x00B0;
     pub const CZ_TRADE_ADD_ZENY: PacketId = 0x00B1;
     pub const CZ_TRADE_LOCK: PacketId = 0x00EF;
+
+    // 方向改变
+    pub const CZ_REQUEST_CHANGE_DIRECTION: PacketId = 0x00D9;
+
+    // 私聊/密语
+    pub const CZ_WHISPER: PacketId = 0x00F7;
+    pub const ZC_WHISPER: PacketId = 0x0097;
+    pub const ZC_ACK_WHISPER: PacketId = 0x0098;
+
+    // 状态点分配
+    pub const CZ_STATUS_CHANGE: PacketId = 0x014D;
+    pub const ZC_STATUS_CHANGE_ACK: PacketId = 0x00BC;
     pub const ZC_TRADE_REQUEST: PacketId = 0x00E5;
     pub const ZC_TRADE_ACK: PacketId = 0x00E7;
     pub const ZC_TRADE_ADD_ITEM: PacketId = 0x00E8;

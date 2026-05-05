@@ -98,6 +98,60 @@ impl MapState {
         players.values().find(|p| p.name == name).cloned()
     }
 
+    /// 设置玩家朝向方向（原地修改，不返回克隆）
+    pub fn set_player_direction(&self, player_id: &Uuid, direction: u16) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.set_direction(direction);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 给玩家增加属性点（原地修改），返回是否成功
+    ///
+    /// status_id: 13=STR, 14=AGI, 15=VIT, 16=INT, 17=DEX, 18=LUK
+    pub fn allocate_player_stat(
+        &self,
+        player_id: &Uuid,
+        status_id: u16,
+        amount: u16,
+    ) -> bool {
+        let players = self.players.read();
+        let Some(player) = players.get(player_id) else {
+            return false;
+        };
+
+        // 检查状态点是否充足
+        let available = player.level.read().status_point;
+        if available < amount {
+            return false;
+        }
+
+        // 修改属性
+        {
+            let mut attrs = player.attrs.write();
+            match status_id {
+                13 => attrs.str += amount,
+                14 => attrs.agi += amount,
+                15 => attrs.vit += amount,
+                16 => attrs.int += amount,
+                17 => attrs.dex += amount,
+                18 => attrs.luk += amount,
+                _ => return false,
+            }
+        }
+
+        // 消耗状态点
+        player.level.write().status_point -= amount;
+
+        // 更新最大负重（STR 变化影响负重）
+        player.update_max_weight();
+
+        true
+    }
+
     /// 根据 account_id 查找玩家
     pub fn find_player_by_account_id(&self, account_id: u32) -> Option<Player> {
         let players = self.players.read();
@@ -237,6 +291,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: RwLock::new(crate::game::map::player::Position { x, y }),
             level: RwLock::new(crate::game::map::player::LevelStats {
@@ -244,6 +299,7 @@ mod tests {
                 job_level: 1,
                 base_exp: 0,
                 job_exp: 0,
+                status_point: 0,
             }),
             attrs: RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

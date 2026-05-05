@@ -3,6 +3,7 @@
 use super::MapServer;
 use crate::game::item::ItemUseResult;
 use crate::game::map::channel::GameEvent;
+use crate::network::packet::id::*;
 use crate::network::session::Session;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZRequestPickupItem, CZUseItem};
@@ -72,8 +73,22 @@ impl MapServer {
                 .subscribe(&channel_name, player_id, tx.clone(), pos_x, pos_y);
         }
 
-        // Return accept packet (simplified)
-        Some(vec![0x2D, 0xD3, 0x00, 0x00])
+        // 构建 ZC_ACCEPT_ENTER (0x0073) 包
+        // 格式: start_time(u32) + pos_x(u16) + pos_y(u16) + dir(u16) + font(u16)
+        let start_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+
+        let mut response = Vec::with_capacity(16);
+        response.extend_from_slice(&16u16.to_le_bytes()); // length
+        response.extend_from_slice(&0x0073u16.to_le_bytes()); // packet_id
+        response.extend_from_slice(&start_time.to_le_bytes());
+        response.extend_from_slice(&pos_x.to_le_bytes());
+        response.extend_from_slice(&pos_y.to_le_bytes());
+        response.extend_from_slice(&0u16.to_le_bytes()); // direction
+        response.extend_from_slice(&0u16.to_le_bytes()); // font
+        Some(response)
     }
 
     /// Handle player move (0x0085)
@@ -343,5 +358,419 @@ impl MapServer {
         }
 
         None
+    }
+
+    /// 处理状态点分配请求 (CZ_STATUS_CHANGE, 0x014D)
+    ///
+    /// 客户端发送格式：packet_id(2) + status_id(2) + amount(1)
+    /// rAthena status_id 映射：
+    /// - 13 = STR, 14 = AGI, 15 = VIT, 16 = INT, 17 = DEX, 18 = LUK
+    ///
+    /// 处理逻辑：
+    /// 1. 解析 status_id 和 amount
+    /// 2. 验证 amount > 0 且 status_id 合法
+    /// 3. 检查玩家是否有足够的状态点（status_point）
+    /// 4. 增加对应属性
+    /// 5. 消耗状态点
+    /// 6. 返回 ZC_STATUS_CHANGE_ACK (0x00BC)
+    pub(super) fn handle_status_change(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+
+        // 包体格式：status_id(2) + amount(1) = 3 字节
+        if data.len() < 3 {
+            return None;
+        }
+
+        let status_id = u16::from_le_bytes([data[0], data[1]]);
+        let amount = data[2];
+
+        // 验证 amount > 0
+        if amount == 0 {
+            return None;
+        }
+
+        // 验证 status_id 范围
+        if !(13..=18).contains(&status_id) {
+            if let Some(player) = self.map_state.get_player(&player_id) {
+                tracing::warn!(
+                    player = %player.name,
+                    status_id = status_id,
+                    "无效的 status_id"
+                );
+            }
+            return None;
+        }
+
+        let player = self.map_state.get_player(&player_id)?;
+
+        // 检查是否有足够的状态点
+        let available_points = player.status_point();
+        if available_points < amount as u16 {
+            tracing::warn!(
+                player = %player.name,
+                requested = amount,
+                available = available_points,
+                "状态点不足，分配请求被拒绝"
+            );
+            return Some(build_status_change_ack(status_id, &player, false));
+        }
+
+        // 通过 MapState 直接修改存储的玩家属性（内部可变性）
+        if !self.map_state.allocate_player_stat(&player_id, status_id, amount as u16) {
+            return Some(build_status_change_ack(status_id, &player, false));
+        }
+
+        // 重新获取修改后的玩家数据用于构建 ACK
+        let updated_player = self.map_state.get_player(&player_id)?;
+
+        tracing::info!(
+            player = %updated_player.name,
+            status_id = status_id,
+            amount = amount,
+            "状态点分配成功"
+        );
+
+        // 返回 ZC_STATUS_CHANGE_ACK
+        Some(build_status_change_ack(status_id, &updated_player, true))
+    }
+}
+
+/// 构建 ZC_STATUS_CHANGE_ACK (0x00BC) 包
+///
+/// rAthena 格式：length(2) + packet_id(2) + status_id(2) + value(2) + status_point(2)
+/// 实际 rAthena 字段更复杂，这里简化为基础确认格式
+fn build_status_change_ack(status_id: u16, player: &crate::game::map::Player, success: bool) -> Vec<u8> {
+    // 获取分配后的属性值
+    let value = match status_id {
+        13 => player.str(),
+        14 => player.agi(),
+        15 => player.vit(),
+        16 => player.int(),
+        17 => player.dex(),
+        18 => player.luk(),
+        _ => 0,
+    };
+
+    let status_point = player.status_point();
+
+    // ZC_STATUS_CHANGE_ACK 格式：
+    // length(2) + packet_id(2) + status_id(2) + value(2) + status_point(2) = 10 bytes
+    // 成功时 value 为新的属性值，失败时 value 为当前值
+    let mut pkt = Vec::with_capacity(10);
+    pkt.extend_from_slice(&10u16.to_le_bytes());
+    pkt.extend_from_slice(&ZC_STATUS_CHANGE_ACK.to_le_bytes());
+    pkt.extend_from_slice(&status_id.to_le_bytes());
+    if success {
+        pkt.extend_from_slice(&value.to_le_bytes());
+    } else {
+        // 失败时返回当前值（客户端可据此判断是否成功）
+        pkt.extend_from_slice(&value.to_le_bytes());
+    }
+    pkt.extend_from_slice(&status_point.to_le_bytes());
+    pkt
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::map::channel::ChannelBus;
+    use crate::game::map::player::{
+        Attributes, CombatStats, Economy, LevelStats, PlayerState, Position, SavePoint,
+    };
+    use crate::game::map::MapState;
+    use crate::game::status::PlayerStatus;
+    use crate::game::item::Equipment;
+    use crate::game::constants;
+    use parking_lot::RwLock;
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    /// 创建测试用 MapServer（简化版）
+    fn make_test_server(map_state: Arc<MapState>, channel_bus: Arc<ChannelBus>) -> MapServer {
+        let db = Arc::new(crate::storage::Database::open_memory().unwrap());
+        let teleport_manager = Arc::new(RwLock::new(
+            crate::game::map::teleport::TeleportManager::new(),
+        ));
+        let save_point_manager = Arc::new(RwLock::new(
+            crate::game::map::teleport::SavePointManager::new(),
+        ));
+        let warp_service = Arc::new(crate::game::map::teleport::WarpService::new(
+            teleport_manager.clone(),
+            save_point_manager.clone(),
+            db.clone(),
+        ));
+
+        MapServer::new(
+            db,
+            Arc::new(crate::game::token::TokenStore::new()),
+            map_state,
+            channel_bus,
+            Arc::new(crate::game::map::drop_item::DropManager::new()),
+            Arc::new(crate::game::party::PartyManager::new()),
+            Arc::new(crate::game::guild::GuildManager::new()),
+            Arc::new(crate::game::storage::StorageManager::new()),
+            Arc::new(crate::game::trade::TradeManager::new()),
+            teleport_manager,
+            warp_service,
+            false,
+            Arc::new(crate::game::battle::BattleHandler::default()),
+            Arc::new(crate::game::mob::MobSpawnManager::new()),
+        )
+    }
+
+    /// 创建测试用 Player
+    fn make_test_player(status_points: u16) -> crate::game::map::Player {
+        crate::game::map::Player {
+            id: Uuid::new_v4(),
+            char_id: 1,
+            account_id: 1,
+            name: "TestPlayer".to_string(),
+            map_name: "test_map".to_string(),
+            combat: RwLock::new(CombatStats {
+                hp: 100,
+                max_hp: 100,
+                sp: 50,
+                max_sp: 50,
+                state: PlayerState::Alive,
+                in_combat: false,
+                is_sitting: false,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
+            }),
+            pos: RwLock::new(Position { x: 100, y: 100 }),
+            level: RwLock::new(LevelStats {
+                base_level: 10,
+                job_level: 5,
+                base_exp: 5000,
+                job_exp: 3000,
+                status_point: status_points,
+            }),
+            attrs: RwLock::new(Attributes {
+                str: 1,
+                agi: 1,
+                vit: 1,
+                int: 1,
+                dex: 1,
+                luk: 1,
+            }),
+            economy: RwLock::new(Economy {
+                zeny: 0,
+                current_weight: 0,
+                max_weight: constants::BASE_MAX_WEIGHT,
+                job: 0,
+                shop_id: None,
+                group_id: 0,
+            }),
+            save_point: RwLock::new(SavePoint {
+                map: "test_map".to_string(),
+                x: 50,
+                y: 50,
+            }),
+            equipment: RwLock::new(Equipment::new()),
+            status: PlayerStatus::new(Uuid::new_v4()),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+        }
+    }
+
+    /// 构建 CZ_STATUS_CHANGE 数据包体
+    fn build_status_change_packet(status_id: u16, amount: u8) -> Vec<u8> {
+        let mut data = Vec::with_capacity(3);
+        data.extend_from_slice(&status_id.to_le_bytes());
+        data.push(amount);
+        data
+    }
+
+    // ==================== 状态点分配测试 ====================
+
+    #[test]
+    fn test_status_change_str_success() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(100);
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 分配 5 点到 STR (status_id = 13)
+        let data = build_status_change_packet(13, 5);
+        let result = server.handle_status_change(&data, &mut session);
+
+        // 应返回 ZC_STATUS_CHANGE_ACK
+        assert!(result.is_some());
+        let pkt = result.unwrap();
+        assert_eq!(pkt.len(), 10);
+        // 验证 packet_id = 0x00BC
+        assert_eq!(pkt[2], 0xBC);
+        assert_eq!(pkt[3], 0x00);
+
+        // 验证属性已增加
+        let player = map_state.get_player(&player_id).unwrap();
+        assert_eq!(player.str(), 6); // 原始 1 + 分配 5
+
+        // 验证状态点已消耗
+        assert_eq!(player.status_point(), 95); // 100 - 5
+    }
+
+    #[test]
+    fn test_status_change_all_stats() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(60);
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 分配 10 点到每个属性
+        let stat_ids = [13, 14, 15, 16, 17, 18]; // STR, AGI, VIT, INT, DEX, LUK
+        for &stat_id in &stat_ids {
+            let data = build_status_change_packet(stat_id, 10);
+            let result = server.handle_status_change(&data, &mut session);
+            assert!(result.is_some());
+        }
+
+        let player = map_state.get_player(&player_id).unwrap();
+        assert_eq!(player.str(), 11);  // 1 + 10
+        assert_eq!(player.agi(), 11);
+        assert_eq!(player.vit(), 11);
+        assert_eq!(player.int(), 11);
+        assert_eq!(player.dex(), 11);
+        assert_eq!(player.luk(), 11);
+        assert_eq!(player.status_point(), 0); // 60 - 60
+    }
+
+    #[test]
+    fn test_status_change_insufficient_points() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(3); // 只有 3 点
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 尝试分配 5 点（不足）
+        let data = build_status_change_packet(13, 5);
+        let result = server.handle_status_change(&data, &mut session);
+
+        // 应返回失败的 ACK
+        assert!(result.is_some());
+
+        // 属性不应改变
+        let player = map_state.get_player(&player_id).unwrap();
+        assert_eq!(player.str(), 1);
+        assert_eq!(player.status_point(), 3);
+    }
+
+    #[test]
+    fn test_status_change_rejects_zero_amount() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(100);
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        let data = build_status_change_packet(13, 0);
+        let result = server.handle_status_change(&data, &mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_status_change_rejects_invalid_status_id() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(100);
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 无效的 status_id (99)
+        let data = build_status_change_packet(99, 5);
+        let result = server.handle_status_change(&data, &mut session);
+        assert!(result.is_none());
+
+        // 状态点不应改变
+        let player = map_state.get_player(&player_id).unwrap();
+        assert_eq!(player.status_point(), 100);
+    }
+
+    #[test]
+    fn test_status_change_rejects_no_session() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let server = make_test_server(map_state, channel_bus);
+
+        let mut session = Session::new();
+        let data = build_status_change_packet(13, 5);
+        let result = server.handle_status_change(&data, &mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_status_change_rejects_short_data() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(100);
+        let player_id = player.id;
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 数据太短（只有 2 字节，需要 3 字节）
+        let data = vec![13, 0];
+        let result = server.handle_status_change(&data, &mut session);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_status_change_updates_max_weight() {
+        let map_state = Arc::new(MapState::new());
+        let channel_bus = Arc::new(ChannelBus::new());
+        let player = make_test_player(100);
+        let player_id = player.id;
+
+        let initial_max_weight = player.max_weight();
+        map_state.add_player(player);
+
+        let mut session = Session::new();
+        session.player_id = Some(player_id);
+
+        let server = make_test_server(map_state.clone(), channel_bus);
+
+        // 分配 10 点到 STR
+        let data = build_status_change_packet(13, 10);
+        server.handle_status_change(&data, &mut session);
+
+        // 最大负重应增加（每点 STR 增加 WEIGHT_PER_STR）
+        let player = map_state.get_player(&player_id).unwrap();
+        let new_max_weight = player.max_weight();
+        assert!(new_max_weight > initial_max_weight);
     }
 }

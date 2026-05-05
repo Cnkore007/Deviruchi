@@ -9,6 +9,7 @@
 
 mod gm;
 mod guild;
+mod movement;
 mod npc;
 mod player;
 mod social;
@@ -157,6 +158,11 @@ impl MapServer {
             0x01B7 => self.handle_guild_request_info(data, session),
             0x01EC => self.handle_guild_chat(data, session),
             0x00B2 => self.handle_restart(session),
+            PACKET_CZ_REQUEST_TIME => self.handle_request_time(),
+            PACKET_CZ_REQUEST_QUIT => self.handle_request_quit(session),
+            CZ_REQUEST_CHANGE_DIRECTION => self.handle_change_direction(data, session),
+            CZ_WHISPER => self.handle_whisper(data, session),
+            CZ_STATUS_CHANGE => self.handle_status_change(data, session),
             unknown_id => {
                 tracing::warn!(
                     "Unknown packet ID 0x{:04X} from session {}",

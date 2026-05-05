@@ -55,6 +55,10 @@ pub enum GameEvent {
     PlayerDeath {
         player_id: Uuid,
     },
+    PlayerDirectionChange {
+        player_id: Uuid,
+        direction: u16,
+    },
     PlayerRevive {
         player_id: Uuid,
         x: u16,
@@ -103,6 +107,7 @@ impl GameEvent {
             GameEvent::PlayerUseSkill { caster_id, .. } => Some(*caster_id),
             GameEvent::PlayerChat { player_id, .. } => Some(*player_id),
             GameEvent::PlayerDeath { player_id } => Some(*player_id),
+            GameEvent::PlayerDirectionChange { player_id, .. } => Some(*player_id),
             GameEvent::PlayerRevive { player_id, .. } => Some(*player_id),
             GameEvent::MobSpawn { .. } => None,
             GameEvent::MobMove { .. } => None,

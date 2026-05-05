@@ -14,7 +14,7 @@ pub enum PlayerState {
 
 // ==================== 分组内部结构 ====================
 
-/// 战斗相关状态（HP/SP/状态/移动速度）
+/// 战斗相关状态（HP/SP/状态/移动速度/朝向）
 /// 合并为单个锁，避免 TOCTOU：如读 hp 判断后再写 hp 之间被其他线程修改
 pub struct CombatStats {
     pub(crate) hp: u32,
@@ -25,6 +25,8 @@ pub struct CombatStats {
     pub(crate) in_combat: bool,
     pub(crate) is_sitting: bool,
     pub(crate) walk_speed: u16,
+    /// 朝向方向：0-7（8方向），对应 rAthena 方向编码
+    pub(crate) direction: u16,
 }
 
 /// 位置（原子更新 x/y）
@@ -33,12 +35,14 @@ pub struct Position {
     pub(crate) y: u16,
 }
 
-/// 等级与经验值
+/// 等级与经验值、状态点
 pub struct LevelStats {
     pub(crate) base_level: u16,
     pub(crate) job_level: u16,
     pub(crate) base_exp: u64,
     pub(crate) job_exp: u64,
+    /// 可分配的状态点数（升级获得）
+    pub(crate) status_point: u16,
 }
 
 /// 六维属性
@@ -126,6 +130,7 @@ impl Clone for CombatStats {
             in_combat: self.in_combat,
             is_sitting: self.is_sitting,
             walk_speed: self.walk_speed,
+            direction: self.direction,
         }
     }
 }
@@ -141,6 +146,7 @@ impl Clone for LevelStats {
             job_level: self.job_level,
             base_exp: self.base_exp,
             job_exp: self.job_exp,
+            status_point: self.status_point,
         }
     }
 }
@@ -196,6 +202,7 @@ impl Player {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: RwLock::new(Position {
                 x: char.last_x as u16,
@@ -206,6 +213,7 @@ impl Player {
                 job_level: char.job_level,
                 base_exp: char.base_exp as u64,
                 job_exp: char.job_exp as u64,
+                status_point: 0,
             }),
             attrs: RwLock::new(Attributes {
                 str: char.str,
@@ -337,6 +345,10 @@ impl Player {
     }
     pub fn job_exp(&self) -> u64 {
         self.level.read().job_exp
+    }
+    /// 获取可分配的状态点数
+    pub fn status_point(&self) -> u16 {
+        self.level.read().status_point
     }
 
     // --- Attributes 字段 ---
@@ -476,6 +488,16 @@ impl Player {
     #[allow(dead_code)]
     pub fn set_combat(&self, in_combat: bool) {
         self.combat.write().in_combat = in_combat;
+    }
+
+    /// 获取朝向方向（0-7）
+    pub fn direction(&self) -> u16 {
+        self.combat.read().direction
+    }
+
+    /// 设置朝向方向（0-7），超过7则取模
+    pub fn set_direction(&self, dir: u16) {
+        self.combat.write().direction = dir % 8;
     }
 
     /// 设置职业ID
@@ -762,6 +784,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: RwLock::new(Position { x: 100, y: 100 }),
             level: RwLock::new(LevelStats {
@@ -769,6 +792,7 @@ mod tests {
                 job_level: 5,
                 base_exp: 5000,
                 job_exp: 3000,
+                status_point: 100,
             }),
             attrs: RwLock::new(Attributes {
                 str: 1,

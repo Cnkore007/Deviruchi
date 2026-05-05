@@ -296,6 +296,17 @@ impl CashShopManager {
             };
         }
 
+        // 记录购买日志（即使购买系统未完全实现）
+        self.log_purchase(
+            player.char_id,
+            item_id,
+            item.name.clone(),
+            amount,
+            total_cost,
+            PurchaseType::Buy,
+            None,
+        );
+
         // 购买系统尚未完全实现（物品不会添加到背包），不扣除点数
         warn!("Cash shop purchase not yet implemented: item_id={}, player={}", item_id, player.name);
         PurchaseResult::InternalError("Cash shop purchase system not yet implemented".to_string())
@@ -409,8 +420,7 @@ impl CashShopManager {
         *record.items.entry(item_id).or_insert(0) += amount;
     }
 
-    /// 记录购买日志（购买/赠送系统实现后启用）
-    #[allow(dead_code)]
+    /// 记录购买日志
     fn log_purchase(
         &self,
         char_id: u32,
@@ -571,6 +581,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: 100, y: 100 }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
@@ -578,6 +589,7 @@ mod tests {
                 job_level: 5,
                 base_exp: 5000,
                 job_exp: 3000,
+                status_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

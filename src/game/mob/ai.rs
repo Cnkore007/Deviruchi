@@ -519,6 +519,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: position.0, y: position.1 }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
@@ -526,6 +527,7 @@ mod tests {
                 job_level: 5,
                 base_exp: 0,
                 job_exp: 0,
+                status_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 10,
@@ -887,6 +889,7 @@ mod tests {
                 in_combat: false,
                 is_sitting: false,
                 walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
             }),
             pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: 105, y: 105 }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
@@ -894,6 +897,7 @@ mod tests {
                 job_level: 5,
                 base_exp: 0,
                 job_exp: 0,
+                status_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 10,
