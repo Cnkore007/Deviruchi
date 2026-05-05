@@ -350,6 +350,7 @@ mod tests {
             target_id: RwLock::new(None),
             behavior: crate::game::mob::MobBehavior::Passive,
             skills: Vec::new(),
+            skill_cooldowns: RwLock::new(std::collections::HashMap::new()),
             sight_range: 12,
             chase_range: 20,
             aggro_rate: 0,

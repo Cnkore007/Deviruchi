@@ -26,7 +26,7 @@ pub enum SkillTarget {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skill {
     pub id: u16,
-    pub name: &'static str,
+    pub name: String,
     pub type_: SkillType,
     pub target: SkillTarget,
     pub level: u8,
@@ -46,7 +46,7 @@ impl Skill {
     pub fn new(id: u16) -> Self {
         Self {
             id,
-            name: "Unknown",
+            name: "Unknown".to_string(),
             type_: SkillType::Active,
             target: SkillTarget::Enemy,
             level: 1,
@@ -74,6 +74,28 @@ impl SkillDatabase {
         let mut db = Self {
             skills: HashMap::new(),
         };
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["db/skill_db.yml"];
+
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match crate::game::skill::yaml_loader::load_skill_db(path) {
+                    Ok(skills) => {
+                        let count = skills.len();
+                        db.skills = skills;
+                        tracing::info!("从 {} 加载了 {} 个技能", path, count);
+                        return db;
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        // 回退到硬编码数据
+        tracing::info!("使用硬编码技能数据");
         db.init_default_skills();
         db
     }
@@ -84,7 +106,7 @@ impl SkillDatabase {
             1,
             Skill {
                 id: 1,
-                name: "Bash",
+                name: "Bash".to_string(),
                 type_: SkillType::Attack,
                 target: SkillTarget::Enemy,
                 level: 1,
@@ -106,7 +128,7 @@ impl SkillDatabase {
             25,
             Skill {
                 id: 25,
-                name: "Fire Ball",
+                name: "Fire Ball".to_string(),
                 type_: SkillType::Attack,
                 target: SkillTarget::Enemy,
                 level: 1,
@@ -128,7 +150,7 @@ impl SkillDatabase {
             28,
             Skill {
                 id: 28,
-                name: "Heal",
+                name: "Heal".to_string(),
                 type_: SkillType::Healing,
                 target: SkillTarget::Ally,
                 level: 1,
@@ -150,7 +172,7 @@ impl SkillDatabase {
             29,
             Skill {
                 id: 29,
-                name: "Increase AGI",
+                name: "Increase AGI".to_string(),
                 type_: SkillType::Support,
                 target: SkillTarget::Ally,
                 level: 1,
@@ -174,6 +196,12 @@ impl SkillDatabase {
 
     pub fn all(&self) -> impl Iterator<Item = &Skill> {
         self.skills.values()
+    }
+
+    /// 获取全局默认技能数据库实例
+    pub fn default_instance() -> &'static SkillDatabase {
+        static INSTANCE: std::sync::OnceLock<SkillDatabase> = std::sync::OnceLock::new();
+        INSTANCE.get_or_init(|| SkillDatabase::new())
     }
 }
 

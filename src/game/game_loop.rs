@@ -263,6 +263,7 @@ mod tests {
             target_id: parking_lot::RwLock::new(None),
             behavior: crate::game::mob::MobBehavior::Aggressive,
             skills: Vec::new(),
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
             sight_range: 12,
             chase_range: 20,
             aggro_rate: 0,
