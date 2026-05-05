@@ -3,7 +3,7 @@
 //! 从 rAthena mob_db.yml 格式加载怪物模板数据。
 //! rAthena 格式: Header (Type + Version) -> Body (条目列表) -> Footer (Imports)
 
-use super::data::{MobBehavior, MobDrop, MobSkill, MobTemplate};
+use super::data::{MobBehavior, MobDrop, MobRace, MobSkill, MobTemplate, MobType};
 use crate::game::battle::element::{Element, ElementLevel, MobSize};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -221,6 +221,23 @@ fn parse_size(s: &str) -> MobSize {
     }
 }
 
+/// 解析怪物种族
+fn parse_race(s: &str) -> MobRace {
+    match s.to_lowercase().as_str() {
+        "formless" => MobRace::Formless,
+        "undead" => MobRace::Undead,
+        "brute" => MobRace::Brute,
+        "plant" => MobRace::Plant,
+        "insect" => MobRace::Insect,
+        "fish" => MobRace::Fish,
+        "demon" => MobRace::Demon,
+        "demihuman" | "demi_human" => MobRace::DemiHuman,
+        "angel" => MobRace::Angel,
+        "dragon" => MobRace::Dragon,
+        _ => MobRace::Formless,
+    }
+}
+
 /// 解析 AI 行为类型
 ///
 /// rAthena AI 类型:
@@ -303,6 +320,30 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                 element: parse_element(&entry.Element),
                 element_level: parse_element_level(entry.ElementLevel),
                 size: parse_size(&entry.Size),
+                race: parse_race(&entry.Race),
+                mob_type: if entry
+                    .Modes
+                    .as_ref()
+                    .and_then(|m| m.get("Boss").copied())
+                    .unwrap_or(false)
+                {
+                    MobType::Boss
+                } else {
+                    MobType::Normal
+                },
+                mvp_drops: entry
+                    .MvpDrops
+                    .as_ref()
+                    .map(|drops| {
+                        drops
+                            .iter()
+                            .map(|d| {
+                                let item_id = item_name_to_id(&d.Item);
+                                MobDrop::new(item_id, d.Rate)
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
             };
 
             mobs.insert(entry.Id, template);
@@ -331,6 +372,22 @@ mod tests {
         assert_eq!(parse_size("Medium"), MobSize::Medium);
         assert_eq!(parse_size("Large"), MobSize::Large);
         assert_eq!(parse_size("unknown"), MobSize::Medium);
+    }
+
+    #[test]
+    fn test_parse_race() {
+        assert_eq!(parse_race("Formless"), MobRace::Formless);
+        assert_eq!(parse_race("Undead"), MobRace::Undead);
+        assert_eq!(parse_race("Brute"), MobRace::Brute);
+        assert_eq!(parse_race("Plant"), MobRace::Plant);
+        assert_eq!(parse_race("Insect"), MobRace::Insect);
+        assert_eq!(parse_race("Fish"), MobRace::Fish);
+        assert_eq!(parse_race("Demon"), MobRace::Demon);
+        assert_eq!(parse_race("DemiHuman"), MobRace::DemiHuman);
+        assert_eq!(parse_race("Demi_Human"), MobRace::DemiHuman);
+        assert_eq!(parse_race("Angel"), MobRace::Angel);
+        assert_eq!(parse_race("Dragon"), MobRace::Dragon);
+        assert_eq!(parse_race("unknown"), MobRace::Formless);
     }
 
     #[test]

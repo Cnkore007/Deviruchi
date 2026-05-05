@@ -257,6 +257,8 @@ mod tests {
             element: crate::game::battle::element::Element::Neutral,
             element_level: crate::game::battle::element::ElementLevel::Level1,
             size: crate::game::battle::element::MobSize::Medium,
+            race: crate::game::mob::MobRace::Formless,
+            mob_type: crate::game::mob::MobType::Normal,
             ai_state: parking_lot::RwLock::new(MobAIState::Idle),
             target_id: parking_lot::RwLock::new(None),
             behavior: crate::game::mob::MobBehavior::Aggressive,

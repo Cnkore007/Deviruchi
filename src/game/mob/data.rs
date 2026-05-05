@@ -103,6 +103,27 @@ impl Default for MobPathManager {
     }
 }
 
+/// 怪物种族
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MobRace {
+    Formless,
+    Undead,
+    Brute,
+    Plant,
+    Insect,
+    Fish,
+    Demon,
+    DemiHuman,
+    Angel,
+    Dragon,
+}
+
+impl Default for MobRace {
+    fn default() -> Self {
+        MobRace::Formless
+    }
+}
+
 /// 怪物类型
 #[derive(Debug, Clone, Copy)]
 pub enum MobType {
@@ -192,6 +213,10 @@ pub struct Mob {
     pub element_level: ElementLevel,
     pub size: MobSize,
 
+    // 种族与类型
+    pub race: MobRace,
+    pub mob_type: MobType,
+
     // AI状态
     pub ai_state: RwLock<MobAIState>,
     pub target_id: RwLock<Option<Uuid>>,
@@ -254,6 +279,8 @@ impl Mob {
             element: Element::Neutral,
             element_level: ElementLevel::Level1,
             size: MobSize::Medium,
+            race: MobRace::Formless,
+            mob_type: MobType::Normal,
             ai_state: RwLock::new(MobAIState::Idle),
             target_id: RwLock::new(None),
             behavior: MobBehavior::Passive,
@@ -302,6 +329,8 @@ impl Mob {
             element: template.element,
             element_level: template.element_level,
             size: template.size,
+            race: template.race,
+            mob_type: template.mob_type,
             ai_state: RwLock::new(MobAIState::Idle),
             target_id: RwLock::new(None),
             behavior: template.behavior,
@@ -439,6 +468,9 @@ impl MobDatabase {
                 element: Element::Water,
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
+                race: MobRace::Plant,
+                mob_type: MobType::Normal,
+                mvp_drops: Vec::new(),
             },
         );
         self.templates.insert(
@@ -474,6 +506,9 @@ impl MobDatabase {
                 element: Element::Neutral,
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
+                race: MobRace::Brute,
+                mob_type: MobType::Normal,
+                mvp_drops: Vec::new(),
             },
         );
         self.templates.insert(
@@ -509,6 +544,9 @@ impl MobDatabase {
                 element: Element::Water,
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
+                race: MobRace::Plant,
+                mob_type: MobType::Normal,
+                mvp_drops: Vec::new(),
             },
         );
         self.templates.insert(
@@ -544,6 +582,9 @@ impl MobDatabase {
                 element: Element::Earth,
                 element_level: ElementLevel::Level1,
                 size: MobSize::Small,
+                race: MobRace::Insect,
+                mob_type: MobType::Normal,
+                mvp_drops: Vec::new(),
             },
         );
     }
@@ -617,6 +658,12 @@ pub struct MobTemplate {
     pub element: Element,
     pub element_level: ElementLevel,
     pub size: MobSize,
+    /// 怪物种族
+    pub race: MobRace,
+    /// 怪物类型（Normal/Boss/Guardian/Event）
+    pub mob_type: MobType,
+    /// MVP 掉落列表
+    pub mvp_drops: Vec<MobDrop>,
 }
 
 impl MobTemplate {
@@ -649,6 +696,9 @@ impl MobTemplate {
             element: Element::Neutral,
             element_level: ElementLevel::Level1,
             size: MobSize::Medium,
+            race: MobRace::Formless,
+            mob_type: MobType::Normal,
+            mvp_drops: Vec::new(),
         }
     }
 }
