@@ -1,116 +1,131 @@
-use crate::error::Result;
-use rusqlite::{Connection, OptionalExtension, Row};
-use std::path::Path;
-use std::sync::Arc;
-use parking_lot::RwLock;
+//! 数据库操作入口
+//!
+//! 提供统一的数据库操作接口，通过 Backend enum 支持多种后端。
+//! 消除 rusqlite 类型泄漏，上层代码仅依赖 IntoValue/Row/TransactionOps。
 
-/// SQLite 数据库封装
+use crate::error::Result;
+use crate::storage::backend::{Backend, IntoValue, Row, TransactionOps};
+use crate::storage::sqlite_backend::{SqliteBackend, SqliteConfig};
+use std::sync::Arc;
+
+/// 数据库操作入口
 ///
-/// 使用 RwLock 实现读写分离：WAL 模式下多个读操作可并发执行，
-/// 写操作（execute/transaction）获取独占锁。
+/// 内部持有 Arc<Backend>，Backend 为 enum dispatch，
+/// 避免 dyn 兼容性问题，同时保持零成本抽象。
 pub struct Database {
-    conn: Arc<RwLock<Connection>>,
+    backend: Arc<Backend>,
 }
 
 impl Database {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let conn = Connection::open(path)?;
-        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
-        Ok(Self {
-            conn: Arc::new(RwLock::new(conn)),
-        })
-    }
-
-    pub fn open_memory() -> Result<Self> {
-        let conn = Connection::open_in_memory()?;
-        Ok(Self {
-            conn: Arc::new(RwLock::new(conn)),
-        })
-    }
-
-    /// 执行写操作（获取独占锁）
-    pub fn execute(&self, sql: &str) -> Result<usize> {
-        let conn = self.conn.write();
-        Ok(conn.execute(sql, [])?)
-    }
-
-    /// 执行带参数的写操作（获取独占锁）
-    pub fn execute_with_params<T: rusqlite::Params>(&self, sql: &str, params: T) -> Result<usize> {
-        let conn = self.conn.write();
-        Ok(conn.execute(sql, params)?)
-    }
-
-    /// 执行查询（获取共享读锁，允许并发读）
-    pub fn query<T, P, F>(&self, sql: &str, params: P, mut f: F) -> Result<Vec<T>>
-    where
-        P: rusqlite::Params,
-        F: FnMut(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
-    {
-        let conn = self.conn.read();
-        let mut stmt = conn.prepare(sql)?;
-        let rows = stmt.query_map(params, |row| f(row))?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| e.into())
-    }
-
-    /// 查询单行（获取共享读锁）
-    pub fn query_row<T, P, F>(&self, sql: &str, params: P, f: F) -> Result<T>
-    where
-        P: rusqlite::Params,
-        F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
-    {
-        let conn = self.conn.read();
-        let mut stmt = conn.prepare(sql)?;
-        stmt.query_row(params, f).map_err(|e| e.into())
-    }
-
-    /// 查询可选单行（获取共享读锁）
-    pub fn query_row_optional<T, P, F>(&self, sql: &str, params: P, f: F) -> Result<Option<T>>
-    where
-        P: rusqlite::Params,
-        F: FnOnce(&Row<'_>) -> std::result::Result<T, rusqlite::Error>,
-    {
-        let conn = self.conn.read();
-        let mut stmt = conn.prepare(sql)?;
-        stmt.query_row(params, f).optional().map_err(|e| e.into())
-    }
-
-    /// 获取最后插入的行 ID（获取共享读锁）
-    pub fn last_insert_rowid(&self) -> Result<u64> {
-        let conn = self.conn.read();
-        Ok(conn.last_insert_rowid() as u64)
-    }
-
-    /// 在事务中执行一组操作，成功时自动提交，失败时自动回滚
-    pub fn with_transaction<F, R>(&self, f: F) -> Result<R>
-    where
-        F: FnOnce(&Connection) -> Result<R>,
-    {
-        let conn = self.conn.write();
-        conn.execute_batch("BEGIN IMMEDIATE")?;
-        match f(&conn) {
-            Ok(result) => {
-                conn.execute_batch("COMMIT")?;
-                Ok(result)
-            }
-            Err(e) => {
-                conn.execute_batch("ROLLBACK").ok();
-                Err(e)
-            }
+    /// 通过指定后端创建数据库实例
+    pub fn new(backend: Backend) -> Self {
+        Self {
+            backend: Arc::new(backend),
         }
+    }
+
+    /// 获取后端引用
+    pub fn backend(&self) -> &Backend {
+        self.backend.as_ref()
+    }
+
+    /// 打开 SQLite 数据库文件
+    pub fn open<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        let config = SqliteConfig {
+            path: path.as_ref().to_string_lossy().to_string(),
+            ..Default::default()
+        };
+        let backend = SqliteBackend::new(&config)?;
+        Ok(Self::new(Backend::Sqlite(backend)))
+    }
+
+    /// 打开内存数据库（测试用）
+    pub fn open_memory() -> Result<Self> {
+        let backend = SqliteBackend::open_memory()?;
+        Ok(Self::new(Backend::Sqlite(backend)))
+    }
+
+    /// 执行无参数 SQL
+    pub fn execute(&self, sql: &str) -> Result<usize> {
+        self.backend.execute(sql)
+    }
+
+    /// 带参数执行 SQL，返回影响行数
+    pub fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize> {
+        self.backend.execute_params(sql, params)
+    }
+
+    /// 查询多行
+    pub fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>> {
+        self.backend.query_rows(sql, params)
+    }
+
+    /// 查询单行
+    pub fn query_row<F, T>(&self, sql: &str, params: &[&dyn IntoValue], f: F) -> Result<T>
+    where
+        F: FnOnce(&Row) -> Result<T>,
+    {
+        let rows = self.backend.query_rows(sql, params)?;
+        let row = rows.into_iter().next().ok_or_else(|| {
+            crate::error::Error::DatabaseBackend("query returned no rows".into())
+        })?;
+        f(&row)
+    }
+
+    /// 查询可选单行
+    pub fn query_row_optional<F, T>(
+        &self,
+        sql: &str,
+        params: &[&dyn IntoValue],
+        f: F,
+    ) -> Result<Option<T>>
+    where
+        F: FnOnce(&Row) -> Result<T>,
+    {
+        let rows = self.backend.query_rows(sql, params)?;
+        match rows.into_iter().next() {
+            Some(row) => Ok(Some(f(&row)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// 在事务中执行操作，成功提交，失败回滚
+    pub fn with_transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(&dyn TransactionOps) -> Result<T>,
+    {
+        self.backend.with_transaction(f)
+    }
+
+    /// 最后插入的行 ID
+    pub fn last_insert_rowid(&self) -> i64 {
+        self.backend.last_insert_rowid()
+    }
+
+    /// 批量执行（用于迁移、schema 初始化等）
+    pub fn execute_batch(&self, sql: &str) -> Result<()> {
+        self.backend.execute_batch(sql)
+    }
+
+    /// UPSERT 便捷方法
+    pub fn upsert(
+        &self,
+        table: &str,
+        columns: &[&str],
+        params: &[&dyn IntoValue],
+        conflict_cols: &[&str],
+    ) -> Result<usize> {
+        self.backend.upsert(table, columns, params, conflict_cols)
     }
 }
 
 impl Clone for Database {
     fn clone(&self) -> Self {
         Self {
-            conn: self.conn.clone(),
+            backend: self.backend.clone(),
         }
     }
 }
-
-unsafe impl Send for Database {}
-unsafe impl Sync for Database {}
 
 pub fn chrono_now() -> i64 {
     std::time::SystemTime::now()
