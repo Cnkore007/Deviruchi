@@ -11,7 +11,7 @@ use std::fs;
 
 /// 物品名称到 ID 的映射（rAthena 常用物品）
 /// 完整映射应从 item_db.yml 动态加载，此处为最小集保证掉落表可用
-fn item_name_to_id(name: &str) -> u32 {
+pub fn item_name_to_id(name: &str) -> u32 {
     match name {
         // 消耗品
         "Red_Potion" | "Red_Potion_" => 501,
