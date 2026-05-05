@@ -1,13 +1,42 @@
 use crate::game::battle::{BattleHandler, ExpDistributor};
 use crate::game::map::data::MapDatabase;
 use crate::game::map::{ChannelBus, DropManager, GameEvent, MapState};
+use crate::game::mob::data::{MobSkill, MobSkillCondition, MobSkillTarget};
 use crate::game::mob::droptable::{DropResolver, MVPResolver, MobDropTable};
 use crate::game::mob::{Mob, MobAIState, MobBehavior, MobSpawnManager};
 use crate::game::party::PartyManager;
 use crate::game::rand::GameRng;
+use crate::game::skill::data::{SkillDatabase, SkillType};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
+
+/// 检查技能触发条件是否满足
+///
+/// 根据技能的 condition 类型和当前战斗状态判断：
+/// - Any: 无条件满足
+/// - HpCertain: 当 HP 百分比低于 condition_value 时满足
+/// - RudeAttacked: 被围攻时满足（当前简化为 always true）
+/// - LongRange: 远程目标时满足（当前简化为 always true）
+fn check_skill_condition(skill: &MobSkill, hp_percent: u32) -> bool {
+    match skill.condition {
+        MobSkillCondition::Any => true,
+        MobSkillCondition::HpCertain => {
+            // HP 百分比低于阈值时触发
+            hp_percent <= skill.condition_value
+        }
+        MobSkillCondition::RudeAttacked => {
+            // 被围攻条件：当前简化实现，始终满足
+            // TODO: 后续可检查是否有多个敌人围攻
+            true
+        }
+        MobSkillCondition::LongRange => {
+            // 远程目标条件：当前简化实现，始终满足
+            // TODO: 后续可检查目标距离
+            true
+        }
+    }
+}
 
 /// 怪物AI处理器
 #[allow(dead_code)]
@@ -197,6 +226,12 @@ impl MobAI {
         let target_id = *mob.target_id.read();
 
         if let Some(target_id) = target_id {
+            // 优先尝试使用怪物技能
+            // 如果技能触发成功，本 tick 不执行普通攻击
+            if self.try_use_skill(mob, target_id, map_state) {
+                return;
+            }
+
             if let Some(target) = map_state.get_player(&target_id) {
                 let result = self.battle_handler.mob_attack(mob, &target);
 
@@ -228,6 +263,192 @@ impl MobAI {
             } else {
                 *mob.ai_state.write() = MobAIState::Return;
                 *mob.target_id.write() = None;
+            }
+        }
+    }
+
+    /// 尝试使用怪物技能
+    ///
+    /// 遍历 mob 的技能列表，检查条件（概率、HP、冷却），
+    /// 如果触发了技能则执行效果并返回 true，否则返回 false。
+    fn try_use_skill(&self, mob: &Arc<Mob>, target_id: Uuid, map_state: &MapState) -> bool {
+        if mob.skills.is_empty() {
+            return false;
+        }
+
+        let hp_percent = mob.hp_percent();
+
+        for skill in &mob.skills {
+            // 检查冷却时间
+            if !self.is_skill_ready(mob, skill) {
+                continue;
+            }
+
+            // 检查触发条件
+            if !check_skill_condition(skill, hp_percent) {
+                continue;
+            }
+
+            // 概率判定（万分比）
+            let roll = self.rng.rand_range(0, 9999);
+            if roll >= skill.chance {
+                continue;
+            }
+
+            // 技能触发！执行效果
+            self.execute_mob_skill(mob, skill, target_id, map_state);
+
+            // 设置冷却
+            if skill.cooldown_ms > 0 {
+                mob.skill_cooldowns
+                    .write()
+                    .insert(skill.skill_id, Instant::now());
+            }
+
+            return true;
+        }
+
+        false
+    }
+
+    /// 检查技能是否冷却完成
+    fn is_skill_ready(&self, mob: &Arc<Mob>, skill: &MobSkill) -> bool {
+        let cooldowns = mob.skill_cooldowns.read();
+        match cooldowns.get(&skill.skill_id) {
+            Some(last_used) => {
+                let elapsed = Instant::now().duration_since(*last_used);
+                elapsed.as_millis() as u64 >= skill.cooldown_ms
+            }
+            None => true, // 从未使用过，可以使用
+        }
+    }
+
+    /// 执行怪物技能效果
+    ///
+    /// 根据技能的目标类型和技能数据库中的类型来决定效果：
+    /// - 攻击类技能：对目标造成基于 mob ATK 的额外伤害
+    /// - 治疗类技能：恢复自身 HP
+    /// - 辅助类技能：暂时简化为自我治疗
+    fn execute_mob_skill(
+        &self,
+        mob: &Arc<Mob>,
+        skill: &MobSkill,
+        target_id: Uuid,
+        map_state: &MapState,
+    ) {
+        let skill_db = SkillDatabase::default_instance();
+
+        // 从技能数据库获取技能信息，用于确定效果类型
+        let skill_type = skill_db.get(skill.skill_id).map(|s| s.type_);
+
+        match skill.target {
+            MobSkillTarget::Self_ => {
+                // 对自身使用：治疗或增益
+                self.execute_self_skill(mob, skill, skill_type);
+            }
+            MobSkillTarget::Target => {
+                // 对目标使用：攻击或减益
+                self.execute_target_skill(mob, skill, skill_type, target_id, map_state);
+            }
+        }
+    }
+
+    /// 执行对自身使用的技能（治疗/增益）
+    fn execute_self_skill(
+        &self,
+        mob: &Arc<Mob>,
+        skill: &MobSkill,
+        skill_type: Option<SkillType>,
+    ) {
+        let is_heal = matches!(skill_type, Some(SkillType::Healing))
+            || matches!(skill_type, None); // 未知技能默认当治疗处理
+
+        if is_heal {
+            // 治疗效果：恢复 max_hp 的 (level * 5)% ，至少恢复 1 点
+            let heal_percent = (skill.level as u32).saturating_mul(5).max(1);
+            let heal_amount = (mob.max_hp as u64 * heal_percent as u64 / 100) as u32;
+            let heal_amount = heal_amount.max(1);
+            mob.heal(heal_amount);
+
+            tracing::debug!(
+                "怪物 {}({}) 使用技能 ID={} Lv={} 恢复了 {} HP (当前 HP: {}/{})",
+                mob.name,
+                mob.mob_id,
+                skill.skill_id,
+                skill.level,
+                heal_amount,
+                mob.hp.read(),
+                mob.max_hp
+            );
+        } else {
+            // 辅助/增益类技能：当前简化处理，记录日志
+            tracing::debug!(
+                "怪物 {}({}) 使用辅助技能 ID={} Lv={}（效果暂未实现）",
+                mob.name,
+                mob.mob_id,
+                skill.skill_id,
+                skill.level
+            );
+        }
+    }
+
+    /// 执行对目标使用的技能（攻击/减益）
+    fn execute_target_skill(
+        &self,
+        mob: &Arc<Mob>,
+        skill: &MobSkill,
+        skill_type: Option<SkillType>,
+        target_id: Uuid,
+        map_state: &MapState,
+    ) {
+        if let Some(target) = map_state.get_player(&target_id) {
+            let is_attack = matches!(skill_type, Some(SkillType::Attack))
+                || matches!(skill_type, Some(SkillType::Debuff))
+                || matches!(skill_type, None); // 未知技能默认当攻击处理
+
+            if is_attack {
+                // 攻击技能：基于 mob ATK 计算额外伤害
+                // 伤害公式: ATK * (100 + level * 20) / 100
+                let multiplier = 100i32 + (skill.level as i32) * 20;
+                let damage = ((mob.atk as i64) * multiplier as i64 / 100).max(1) as i32;
+                let killed = target.take_damage(damage.max(0) as u32);
+
+                // 记录伤害
+                if damage > 0 {
+                    let mut damage_log = mob.damage_log.write();
+                    let entry = damage_log.entry(target_id).or_insert(0);
+                    *entry += damage.max(0) as u64;
+                }
+
+                tracing::debug!(
+                    "怪物 {}({}) 使用攻击技能 ID={} Lv={} 对 {} 造成 {} 伤害",
+                    mob.name,
+                    mob.mob_id,
+                    skill.skill_id,
+                    skill.level,
+                    target.name,
+                    damage
+                );
+
+                if killed {
+                    let channel_name = format!("map:{}", target.map_name);
+                    let event = GameEvent::PlayerDeath {
+                        player_id: target_id,
+                    };
+                    self.channel_bus.publish(&channel_name, &event, vec![]);
+
+                    *mob.ai_state.write() = MobAIState::Idle;
+                    *mob.target_id.write() = None;
+                }
+            } else {
+                // 其他类型暂不实现
+                tracing::debug!(
+                    "怪物 {}({}) 使用技能 ID={} Lv={}（效果暂未实现）",
+                    mob.name,
+                    mob.mob_id,
+                    skill.skill_id,
+                    skill.level
+                );
             }
         }
     }
@@ -418,7 +639,7 @@ mod tests {
     use super::*;
     use crate::game::constants;
     use crate::game::map::{MapState, Player};
-    use crate::game::mob::data::{MobPathManager, MobPosition};
+    use crate::game::mob::data::{MobPathManager, MobPosition, MobSkill, MobSkillCondition, MobSkillTarget};
     use crate::game::rand::{GameRng, MockRng};
 
     fn create_test_mob_ai(values: Vec<u32>) -> MobAI {
@@ -484,6 +705,7 @@ mod tests {
             target_id: parking_lot::RwLock::new(None),
             behavior: crate::game::mob::MobBehavior::Aggressive,
             skills: Vec::new(),
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
             sight_range: 10,
             chase_range: 20,
             aggro_rate: 0,
@@ -634,6 +856,7 @@ mod tests {
             target_id: parking_lot::RwLock::new(None),
             behavior: crate::game::mob::MobBehavior::Passive,
             skills: Vec::new(),
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
             sight_range: 10,
             chase_range: 20,
             aggro_rate: 0,
@@ -938,5 +1161,310 @@ mod tests {
 
         // Should stay Idle (player on different map)
         assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+    }
+
+    // ============================================
+    // 怪物技能系统测试
+    // ============================================
+
+    /// 创建带有技能的测试怪物
+    fn create_test_mob_with_skills(
+        position: (u16, u16),
+        level: u16,
+        skills: Vec<MobSkill>,
+    ) -> Arc<Mob> {
+        Arc::new(Mob {
+            id: Uuid::new_v4(),
+            mob_id: 1002,
+            name: "SkilledMob".to_string(),
+            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            map_name: "test_map".to_string(),
+            level,
+            hp: parking_lot::RwLock::new(500),
+            max_hp: 500,
+            sp: parking_lot::RwLock::new(0),
+            max_sp: 0,
+            atk: 30,
+            matk: 0,
+            defense: 0,
+            magic_defense: 0,
+            hit: 10,
+            flee: 5,
+            crit: 0,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
+            atk_range: 1,
+            element: crate::game::battle::element::Element::Neutral,
+            element_level: crate::game::battle::element::ElementLevel::Level1,
+            size: crate::game::battle::element::MobSize::Medium,
+            race: crate::game::mob::MobRace::Formless,
+            mob_type: crate::game::mob::MobType::Normal,
+            ai_state: parking_lot::RwLock::new(MobAIState::Attack),
+            target_id: parking_lot::RwLock::new(None),
+            behavior: crate::game::mob::MobBehavior::Aggressive,
+            skills,
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            sight_range: 10,
+            chase_range: 20,
+            aggro_rate: 0,
+            spawn_delay: 0,
+            respawn_time: 60000,
+            spawn_x: position.0,
+            spawn_y: position.1,
+            spawn_map: "test_map".to_string(),
+            death_time: parking_lot::RwLock::new(None),
+            drops: vec![],
+            base_exp: 10,
+            job_exp: 5,
+            zeny: Some(100),
+            drops_processed: parking_lot::RwLock::new(false),
+            path_manager: parking_lot::RwLock::new(MobPathManager::new()),
+            damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+        })
+    }
+
+    #[test]
+    fn test_check_skill_condition_any() {
+        let skill = MobSkill {
+            skill_id: 5,
+            level: 1,
+            chance: 1000,
+            target: MobSkillTarget::Target,
+            condition: MobSkillCondition::Any,
+            condition_value: 0,
+            cooldown_ms: 0,
+        };
+        // Any 条件始终满足
+        assert!(check_skill_condition(&skill, 100));
+        assert!(check_skill_condition(&skill, 50));
+        assert!(check_skill_condition(&skill, 0));
+    }
+
+    #[test]
+    fn test_check_skill_condition_hp_certain() {
+        let skill = MobSkill {
+            skill_id: 28,
+            level: 3,
+            chance: 1000,
+            target: MobSkillTarget::Self_,
+            condition: MobSkillCondition::HpCertain,
+            condition_value: 50,
+            cooldown_ms: 10000,
+        };
+        // HP 低于 50% 时满足
+        assert!(!check_skill_condition(&skill, 100));
+        assert!(!check_skill_condition(&skill, 51));
+        assert!(check_skill_condition(&skill, 50));
+        assert!(check_skill_condition(&skill, 25));
+        assert!(check_skill_condition(&skill, 1));
+    }
+
+    #[test]
+    fn test_is_skill_ready_no_cooldown() {
+        let ai = create_test_mob_ai(vec![]);
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,
+                level: 1,
+                chance: 1000,
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 5000,
+            },
+        ]);
+
+        // 从未使用过，应该可用
+        assert!(ai.is_skill_ready(&mob, &mob.skills[0]));
+    }
+
+    #[test]
+    fn test_is_skill_ready_on_cooldown() {
+        let ai = create_test_mob_ai(vec![]);
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,
+                level: 1,
+                chance: 1000,
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 60000, // 60秒冷却
+            },
+        ]);
+
+        // 刚刚使用过
+        mob.skill_cooldowns.write().insert(5, Instant::now());
+        assert!(!ai.is_skill_ready(&mob, &mob.skills[0]));
+    }
+
+    #[test]
+    fn test_try_use_skill_no_skills() {
+        let ai = create_test_mob_ai(vec![]);
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![]);
+        let player = create_test_player((100, 101), 10);
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 没有技能时应该返回 false
+        assert!(!ai.try_use_skill(&mob, player.id, &map_state));
+    }
+
+    #[test]
+    fn test_try_use_skill_triggers_on_high_chance() {
+        // 使用 MockRng 返回 0（在 0-9999 范围内，0 < 10000 概率）
+        let ai = MobAI::new(
+            Arc::new(MobSpawnManager::new()),
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![0])), // roll = 0 < 10000
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+        );
+
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,
+                level: 3,
+                chance: 10000, // 100% 概率
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 0, // 无冷却
+            },
+        ]);
+
+        let player = create_test_player((100, 101), 10);
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 100% 概率 + 无冷却 + Any 条件 = 一定触发
+        assert!(ai.try_use_skill(&mob, player.id, &map_state));
+    }
+
+    #[test]
+    fn test_try_use_skill_does_not_trigger_on_zero_chance() {
+        let ai = create_test_mob_ai(vec![5000]); // roll = 5000 > 0 概率
+
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,
+                level: 3,
+                chance: 0, // 0% 概率
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 0,
+            },
+        ]);
+
+        let player = create_test_player((100, 101), 10);
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 0% 概率 = 永远不触发
+        assert!(!ai.try_use_skill(&mob, player.id, &map_state));
+    }
+
+    #[test]
+    fn test_try_use_skill_hp_condition_blocks() {
+        let ai = create_test_mob_ai(vec![0]);
+
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 28,
+                level: 3,
+                chance: 10000, // 100%
+                target: MobSkillTarget::Self_,
+                condition: MobSkillCondition::HpCertain,
+                condition_value: 50, // HP 低于 50% 才触发
+                cooldown_ms: 0,
+            },
+        ]);
+
+        let player = create_test_player((100, 101), 10);
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // HP 100% (500/500) > 50%，不应触发
+        assert!(!ai.try_use_skill(&mob, player.id, &map_state));
+
+        // 降低 HP 到 50% 以下
+        *mob.hp.write() = 200; // 40%
+        assert!(ai.try_use_skill(&mob, player.id, &map_state));
+    }
+
+    #[test]
+    fn test_try_use_skill_cooldown_blocks() {
+        let ai = create_test_mob_ai(vec![0]);
+
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,
+                level: 3,
+                chance: 10000, // 100%
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 60000, // 60 秒冷却
+            },
+        ]);
+
+        let player = create_test_player((100, 101), 10);
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 首次使用应该成功
+        assert!(ai.try_use_skill(&mob, player.id, &map_state));
+
+        // 冷却中，不应再次触发
+        assert!(!ai.try_use_skill(&mob, player.id, &map_state));
+    }
+
+    #[test]
+    fn test_update_attack_uses_skill_before_normal_attack() {
+        // 创建一个 100% 触发攻击技能的 mob（技能有冷却，普通攻击无冷却）
+        let ai = MobAI::new(
+            Arc::new(MobSpawnManager::new()),
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![0])), // roll = 0 < 10000
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+        );
+
+        let mob = create_test_mob_with_skills((100, 100), 5, vec![
+            MobSkill {
+                skill_id: 5,    // Bash
+                level: 3,
+                chance: 10000,  // 100%
+                target: MobSkillTarget::Target,
+                condition: MobSkillCondition::Any,
+                condition_value: 0,
+                cooldown_ms: 5000, // 有冷却
+            },
+        ]);
+
+        let player = create_test_player((100, 101), 10);
+        *mob.target_id.write() = Some(player.id);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 执行攻击 - 应该先用技能（冷却=5000ms）
+        ai.update_attack(&mob, &map_state);
+
+        // 验证技能被使用：冷却应该被设置
+        let cooldowns = mob.skill_cooldowns.read();
+        assert!(cooldowns.contains_key(&5), "技能 ID=5 的冷却应该被设置，说明技能被触发了");
+        drop(cooldowns);
+
+        // 验证伤害记录被更新（技能执行时会记录伤害）
+        let damage_log = mob.damage_log.read();
+        assert!(damage_log.contains_key(&player.id),
+            "伤害记录应该包含对玩家的伤害");
+        assert!(*damage_log.get(&player.id).unwrap() > 0,
+            "技能应该造成正数伤害");
     }
 }
