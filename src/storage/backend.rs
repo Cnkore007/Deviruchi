@@ -4,6 +4,8 @@
 //! 使上层代码与具体数据库引擎（SQLite、MySQL）解耦。
 
 use crate::error::Result;
+#[cfg(feature = "mysql-backend")]
+use crate::storage::mysql_backend::MySqlBackend;
 use crate::storage::sqlite_backend::SqliteBackend;
 
 /// 数据库值类型
@@ -206,7 +208,9 @@ impl<T: IntoValue> IntoValue for Option<T> {
 /// 每个变体对应一种数据库引擎实现。
 pub enum Backend {
     Sqlite(SqliteBackend),
-    // 未来扩展：MySql(MySqlBackend),
+    /// MySQL 后端，仅在启用 `mysql-backend` feature 时可用
+    #[cfg(feature = "mysql-backend")]
+    MySql(MySqlBackend),
 }
 
 impl Backend {
@@ -214,6 +218,8 @@ impl Backend {
     pub fn execute(&self, sql: &str) -> Result<usize> {
         match self {
             Backend::Sqlite(b) => b.execute(sql),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.execute(sql),
         }
     }
 
@@ -221,6 +227,8 @@ impl Backend {
     pub fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize> {
         match self {
             Backend::Sqlite(b) => b.execute_params(sql, params),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.execute_params(sql, params),
         }
     }
 
@@ -228,6 +236,8 @@ impl Backend {
     pub fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>> {
         match self {
             Backend::Sqlite(b) => b.query_rows(sql, params),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.query_rows(sql, params),
         }
     }
 
@@ -235,6 +245,8 @@ impl Backend {
     pub fn last_insert_rowid(&self) -> i64 {
         match self {
             Backend::Sqlite(b) => b.last_insert_rowid(),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.last_insert_rowid(),
         }
     }
 
@@ -242,6 +254,8 @@ impl Backend {
     pub fn execute_batch(&self, sql: &str) -> Result<()> {
         match self {
             Backend::Sqlite(b) => b.execute_batch(sql),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.execute_batch(sql),
         }
     }
 
@@ -255,6 +269,8 @@ impl Backend {
     ) -> Result<usize> {
         match self {
             Backend::Sqlite(b) => b.upsert(table, columns, params, conflict_cols),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.upsert(table, columns, params, conflict_cols),
         }
     }
 
@@ -265,6 +281,8 @@ impl Backend {
     {
         match self {
             Backend::Sqlite(b) => b.with_transaction(f),
+            #[cfg(feature = "mysql-backend")]
+            Backend::MySql(b) => b.with_transaction(f),
         }
     }
 }
