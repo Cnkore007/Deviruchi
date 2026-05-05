@@ -8,6 +8,9 @@ pub enum Error {
     #[error("数据库错误: {0}")]
     Database(#[from] rusqlite::Error),
 
+    #[error("数据库后端错误: {0}")]
+    DatabaseBackend(String),
+
     #[error("IO错误: {0}")]
     Io(#[from] std::io::Error),
 
