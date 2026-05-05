@@ -1,9 +1,10 @@
 //! 数据库后端抽象层
 //!
-//! 提供 DatabaseBackend trait 及其关联类型（Value、Row、TransactionOps），
+//! 提供 Backend enum 和相关类型（Value、Row、TransactionOps），
 //! 使上层代码与具体数据库引擎（SQLite、MySQL）解耦。
 
 use crate::error::Result;
+use crate::storage::sqlite_backend::SqliteBackend;
 
 /// 数据库值类型
 #[derive(Debug, Clone)]
@@ -127,7 +128,7 @@ impl Row {
 /// 事务内操作 trait
 ///
 /// 在 with_transaction 闭包中使用，提供 execute/execute_params/execute_batch/last_insert_rowid。
-/// 线程安全由 DatabaseBackend 的 with_transaction 方法保证（事务期间持有锁）。
+/// 线程安全由 Backend 的 with_transaction 方法保证（事务期间持有锁）。
 pub trait TransactionOps {
     fn execute(&self, sql: &str) -> Result<usize>;
     fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize>;
@@ -199,48 +200,71 @@ impl<T: IntoValue> IntoValue for Option<T> {
     }
 }
 
-/// 数据库后端 trait
+/// 数据库后端枚举
 ///
-/// 统一的数据库操作接口，支持 SQLite、MySQL 等多种后端。
-pub trait DatabaseBackend: Send + Sync + 'static {
-    /// 执行 SQL（无参数），返回影响行数
-    fn execute(&self, sql: &str) -> Result<usize>;
+/// 使用 enum dispatch 代替 dyn trait，避免 dyn 兼容性问题。
+/// 每个变体对应一种数据库引擎实现。
+pub enum Backend {
+    Sqlite(SqliteBackend),
+    // 未来扩展：MySql(MySqlBackend),
+}
+
+impl Backend {
+    /// 执行无参数 SQL
+    pub fn execute(&self, sql: &str) -> Result<usize> {
+        match self {
+            Backend::Sqlite(b) => b.execute(sql),
+        }
+    }
 
     /// 带参数执行 SQL，返回影响行数
-    fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize>;
+    pub fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize> {
+        match self {
+            Backend::Sqlite(b) => b.execute_params(sql, params),
+        }
+    }
 
     /// 查询多行
-    fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>>;
-
-    /// 查询单行（无结果返回错误）
-    fn query_row<F, T>(&self, sql: &str, params: &[&dyn IntoValue], f: F) -> Result<T>
-    where
-        F: FnOnce(&Row) -> Result<T>;
-
-    /// 查询可选单行（无结果返回 None）
-    fn query_row_optional<F, T>(&self, sql: &str, params: &[&dyn IntoValue], f: F) -> Result<Option<T>>
-    where
-        F: FnOnce(&Row) -> Result<T>;
-
-    /// 在事务中执行操作，成功提交，失败回滚
-    fn with_transaction<F, T>(&self, f: F) -> Result<T>
-    where
-        F: FnOnce(&dyn TransactionOps) -> Result<T>;
+    pub fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>> {
+        match self {
+            Backend::Sqlite(b) => b.query_rows(sql, params),
+        }
+    }
 
     /// 最后插入的行 ID
-    fn last_insert_rowid(&self) -> i64;
+    pub fn last_insert_rowid(&self) -> i64 {
+        match self {
+            Backend::Sqlite(b) => b.last_insert_rowid(),
+        }
+    }
 
     /// 批量执行（用于迁移、schema 初始化等）
-    fn execute_batch(&self, sql: &str) -> Result<()>;
+    pub fn execute_batch(&self, sql: &str) -> Result<()> {
+        match self {
+            Backend::Sqlite(b) => b.execute_batch(sql),
+        }
+    }
 
     /// UPSERT 便捷方法
-    ///
-    /// SQLite 使用 INSERT OR REPLACE，MySQL 使用 ON DUPLICATE KEY UPDATE。
-    fn upsert(
+    pub fn upsert(
         &self,
         table: &str,
         columns: &[&str],
         params: &[&dyn IntoValue],
         conflict_cols: &[&str],
-    ) -> Result<usize>;
+    ) -> Result<usize> {
+        match self {
+            Backend::Sqlite(b) => b.upsert(table, columns, params, conflict_cols),
+        }
+    }
+
+    /// 在事务中执行操作，成功提交，失败回滚
+    pub fn with_transaction<F, T>(&self, f: F) -> Result<T>
+    where
+        F: FnOnce(&dyn TransactionOps) -> Result<T>,
+    {
+        match self {
+            Backend::Sqlite(b) => b.with_transaction(f),
+        }
+    }
 }

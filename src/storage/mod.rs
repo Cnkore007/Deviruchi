@@ -9,7 +9,7 @@ pub mod sqlite;
 pub mod sqlite_backend;
 
 pub use account::Account;
-pub use backend::{DatabaseBackend, IntoValue, Row, TransactionOps, Value};
+pub use backend::{Backend, IntoValue, Row, TransactionOps, Value};
 pub use character::Character;
 pub use guild::GuildStorage;
 pub use migration::{Migration, MigrationManager};

@@ -3,7 +3,7 @@
 //! 封装 rusqlite::Connection，通过 parking_lot::Mutex 实现线程安全。
 //! 事务期间持有锁，通过 ScopedTx 传递操作。
 
-use super::backend::{DatabaseBackend, IntoValue, Row, TransactionOps, Value};
+use super::backend::{IntoValue, Row, TransactionOps, Value};
 use crate::error::Result;
 use rusqlite::Connection;
 use std::path::Path;
@@ -127,47 +127,59 @@ impl SqliteBackend {
 
         Ok(rows_result)
     }
-}
 
-impl DatabaseBackend for SqliteBackend {
-    fn execute(&self, sql: &str) -> Result<usize> {
+    // ==================== 数据库操作方法 ====================
+
+    /// 执行无参数 SQL
+    pub fn execute(&self, sql: &str) -> Result<usize> {
         let conn = self.conn.lock();
         Ok(conn.execute(sql, [])?)
     }
 
-    fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize> {
+    /// 带参数执行 SQL，返回影响行数
+    pub fn execute_params(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<usize> {
         let conn = self.conn.lock();
         Self::execute_with_rusqlite_params(&conn, sql, params)
     }
 
-    fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>> {
+    /// 查询多行
+    pub fn query_rows(&self, sql: &str, params: &[&dyn IntoValue]) -> Result<Vec<Row>> {
         let conn = self.conn.lock();
         Self::query_rows_with_rusqlite_params(&conn, sql, params)
     }
 
-    fn query_row<F, T>(&self, sql: &str, params: &[&dyn IntoValue], f: F) -> Result<T>
-    where
-        F: FnOnce(&Row) -> Result<T>,
-    {
-        let rows = self.query_rows(sql, params)?;
-        let row = rows.into_iter().next().ok_or_else(|| {
-            crate::error::Error::DatabaseBackend("query returned no rows".into())
-        })?;
-        f(&row)
+    /// 最后插入的行 ID
+    pub fn last_insert_rowid(&self) -> i64 {
+        let conn = self.conn.lock();
+        conn.last_insert_rowid()
     }
 
-    fn query_row_optional<F, T>(&self, sql: &str, params: &[&dyn IntoValue], f: F) -> Result<Option<T>>
-    where
-        F: FnOnce(&Row) -> Result<T>,
-    {
-        let rows = self.query_rows(sql, params)?;
-        match rows.into_iter().next() {
-            Some(row) => Ok(Some(f(&row)?)),
-            None => Ok(None),
-        }
+    /// 批量执行（用于迁移、schema 初始化等）
+    pub fn execute_batch(&self, sql: &str) -> Result<()> {
+        let conn = self.conn.lock();
+        conn.execute_batch(sql)?;
+        Ok(())
     }
 
-    fn with_transaction<F, T>(&self, f: F) -> Result<T>
+    /// UPSERT 便捷方法（SQLite 使用 INSERT OR REPLACE）
+    pub fn upsert(
+        &self,
+        table: &str,
+        columns: &[&str],
+        params: &[&dyn IntoValue],
+        _conflict_cols: &[&str],
+    ) -> Result<usize> {
+        let sql = format!(
+            "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
+            table,
+            columns.join(", "),
+            columns.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+        );
+        self.execute_params(&sql, params)
+    }
+
+    /// 在事务中执行操作，成功提交，失败回滚
+    pub fn with_transaction<F, T>(&self, f: F) -> Result<T>
     where
         F: FnOnce(&dyn TransactionOps) -> Result<T>,
     {
@@ -210,33 +222,5 @@ impl DatabaseBackend for SqliteBackend {
                 Err(e)
             }
         }
-    }
-
-    fn last_insert_rowid(&self) -> i64 {
-        let conn = self.conn.lock();
-        conn.last_insert_rowid()
-    }
-
-    fn execute_batch(&self, sql: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        conn.execute_batch(sql)?;
-        Ok(())
-    }
-
-    fn upsert(
-        &self,
-        table: &str,
-        columns: &[&str],
-        params: &[&dyn IntoValue],
-        _conflict_cols: &[&str],
-    ) -> Result<usize> {
-        // SQLite 使用 INSERT OR REPLACE
-        let sql = format!(
-            "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
-            table,
-            columns.join(", "),
-            columns.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
-        );
-        self.execute_params(&sql, params)
     }
 }
