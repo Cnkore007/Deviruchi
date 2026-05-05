@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::error::Result;
 use crate::game::guild::{Guild, GuildMember, GuildPosition};
 use crate::storage::Database;
+use crate::storage::backend::IntoValue;
 use crate::storage::chrono_now;
 
 /// 公会数据库持久化
@@ -21,95 +22,97 @@ impl GuildStorage {
     pub fn save_guild(&self, guild: &Guild) -> Result<()> {
         let existing_id: Option<i64> = self.db.query_row_optional(
             "SELECT guild_id FROM guilds WHERE guild_uuid = ?1",
-            [&guild.id.to_string()],
-            |row| row.get(0),
+            &[&guild.id.to_string() as &dyn IntoValue],
+            |row| row.get_i64(0),
         )?;
 
         let guild_db_id: i64 = if let Some(id) = existing_id {
-            self.db.execute_with_params(
+            self.db.execute_params(
                 "UPDATE guilds SET name=?1, master_name=?2, guild_lv=?3, exp=?4, max_exp=?5,
                  member_count=?6, max_members=?7, average_level=?8, notice=?9, emblem_id=?10
                  WHERE guild_id=?11",
-                rusqlite::params![
-                    guild.name,
-                    guild.master_name,
-                    guild.level,
-                    guild.exp,
-                    guild.max_exp,
-                    guild.member_count,
-                    guild.max_members,
-                    guild.average_level,
-                    guild.notice,
-                    guild.emblem_id,
-                    id,
+                &[
+                    &guild.name as &dyn IntoValue,
+                    &guild.master_name as &dyn IntoValue,
+                    &(guild.level as i32) as &dyn IntoValue,
+                    &(guild.exp as i64) as &dyn IntoValue,
+                    &(guild.max_exp as i64) as &dyn IntoValue,
+                    &(guild.member_count as i32) as &dyn IntoValue,
+                    &(guild.max_members as i32) as &dyn IntoValue,
+                    &(guild.average_level as i32) as &dyn IntoValue,
+                    &guild.notice as &dyn IntoValue,
+                    &(guild.emblem_id as i32) as &dyn IntoValue,
+                    &id as &dyn IntoValue,
                 ],
             )?;
             id
         } else {
-            self.db.execute_with_params(
+            self.db.execute_params(
                 "INSERT INTO guilds (guild_uuid, name, master_name, guild_lv, exp, max_exp,
                  member_count, max_members, average_level, notice, emblem_id, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                rusqlite::params![
-                    guild.id.to_string(),
-                    guild.name,
-                    guild.master_name,
-                    guild.level,
-                    guild.exp,
-                    guild.max_exp,
-                    guild.member_count,
-                    guild.max_members,
-                    guild.average_level,
-                    guild.notice,
-                    guild.emblem_id,
-                    chrono_now(),
+                &[
+                    &guild.id.to_string() as &dyn IntoValue,
+                    &guild.name as &dyn IntoValue,
+                    &guild.master_name as &dyn IntoValue,
+                    &(guild.level as i32) as &dyn IntoValue,
+                    &(guild.exp as i64) as &dyn IntoValue,
+                    &(guild.max_exp as i64) as &dyn IntoValue,
+                    &(guild.member_count as i32) as &dyn IntoValue,
+                    &(guild.max_members as i32) as &dyn IntoValue,
+                    &(guild.average_level as i32) as &dyn IntoValue,
+                    &guild.notice as &dyn IntoValue,
+                    &(guild.emblem_id as i32) as &dyn IntoValue,
+                    &chrono_now() as &dyn IntoValue,
                 ],
             )?;
-            self.db.last_insert_rowid()? as i64
+            self.db.last_insert_rowid()
         };
 
         // 删除旧数据并重新插入职位和成员
-        self.db.execute_with_params(
+        self.db.execute_params(
             "DELETE FROM guild_positions WHERE guild_id=?1",
-            [guild_db_id],
+            &[&guild_db_id as &dyn IntoValue],
         )?;
-        self.db
-            .execute_with_params("DELETE FROM guild_members WHERE guild_id=?1", [guild_db_id])?;
+        self.db.execute_params(
+            "DELETE FROM guild_members WHERE guild_id=?1",
+            &[&guild_db_id as &dyn IntoValue],
+        )?;
 
         // 保存职位
         for pos in &guild.positions {
-            self.db.execute_with_params(
+            self.db.execute_params(
                 "INSERT INTO guild_positions (guild_id, position_id, name, can_invite, can_expel, can_use_storage, can_use_skill)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                rusqlite::params![
-                    guild_db_id,
-                    pos.id,
-                    pos.name,
-                    pos.can_invite as i32,
-                    pos.can_expel as i32,
-                    pos.can_use_storage as i32,
-                    pos.can_use_skill as i32,
+                &[
+                    &guild_db_id as &dyn IntoValue,
+                    &(pos.id as i32) as &dyn IntoValue,
+                    &pos.name as &dyn IntoValue,
+                    &(pos.can_invite as i32) as &dyn IntoValue,
+                    &(pos.can_expel as i32) as &dyn IntoValue,
+                    &(pos.can_use_storage as i32) as &dyn IntoValue,
+                    &(pos.can_use_skill as i32) as &dyn IntoValue,
                 ],
             )?;
         }
 
         // 保存成员
         for member in guild.members.values() {
-            self.db.execute_with_params(
+            self.db.execute_params(
                 "INSERT INTO guild_members (guild_id, player_uuid, char_id, name, position, level, job, contribution, online, map_name, joined_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                rusqlite::params![
-                    guild_db_id,
-                    member.player_id.to_string(),
-                    member.char_id,
-                    member.name,
-                    member.position_id,
-                    member.level,
-                    member.job,
-                    member.contribution,
-                    member.online as i32,
-                    member.map_name,
-                    chrono_now(),
+                &[
+                    &guild_db_id as &dyn IntoValue,
+                    &member.player_id.to_string() as &dyn IntoValue,
+                    &(member.char_id as i32) as &dyn IntoValue,
+                    &member.name as &dyn IntoValue,
+                    &(member.position_id as i32) as &dyn IntoValue,
+                    &(member.level as i32) as &dyn IntoValue,
+                    &(member.job as i32) as &dyn IntoValue,
+                    &(member.contribution as i32) as &dyn IntoValue,
+                    &(member.online as i32) as &dyn IntoValue,
+                    &member.map_name as &dyn IntoValue,
+                    &chrono_now() as &dyn IntoValue,
                 ],
             )?;
         }
@@ -123,20 +126,20 @@ impl GuildStorage {
             "SELECT guild_id, name, master_name, guild_lv, exp, max_exp, member_count,
                         max_members, average_level, notice, emblem_id
                  FROM guilds WHERE guild_uuid = ?1",
-            [guild_uuid.to_string()],
+            &[&guild_uuid.to_string() as &dyn IntoValue],
             |row| {
                 Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                    row.get::<_, i64>(3)? as u8,
-                    row.get::<_, i64>(4)? as u64,
-                    row.get::<_, i64>(5)? as u64,
-                    row.get::<_, i64>(6)? as u32,
-                    row.get::<_, i64>(7)? as u32,
-                    row.get::<_, i64>(8)? as u16,
-                    row.get::<_, String>(9)?,
-                    row.get::<_, i64>(10)? as u32,
+                    row.get_i64(0)?,
+                    row.get_string(1)?,
+                    row.get_string(2)?,
+                    row.get_i64(3)? as u8,
+                    row.get_i64(4)? as u64,
+                    row.get_i64(5)? as u64,
+                    row.get_i64(6)? as u32,
+                    row.get_i64(7)? as u32,
+                    row.get_i64(8)? as u16,
+                    row.get_string(9)?,
+                    row.get_i64(10)? as u32,
                 ))
             },
         )?;
@@ -159,45 +162,45 @@ impl GuildStorage {
         };
 
         // 加载职位
-        let positions = self.db.query(
+        let position_rows = self.db.query_rows(
             "SELECT position_id, name, can_invite, can_expel, can_use_storage, can_use_skill
              FROM guild_positions WHERE guild_id = ?1 ORDER BY position_id",
-            [guild_db_id],
-            |row| {
-                Ok(GuildPosition {
-                    id: row.get::<_, i64>(0)? as u8,
-                    name: row.get::<_, String>(1)?,
-                    can_invite: row.get::<_, i64>(2)? != 0,
-                    can_expel: row.get::<_, i64>(3)? != 0,
-                    can_use_storage: row.get::<_, i64>(4)? != 0,
-                    can_use_skill: row.get::<_, i64>(5)? != 0,
-                })
-            },
+            &[&guild_db_id as &dyn IntoValue],
         )?;
 
+        let mut positions = Vec::new();
+        for row in &position_rows {
+            positions.push(GuildPosition {
+                id: row.get_i64(0)? as u8,
+                name: row.get_string(1)?,
+                can_invite: row.get_i64(2)? != 0,
+                can_expel: row.get_i64(3)? != 0,
+                can_use_storage: row.get_i64(4)? != 0,
+                can_use_skill: row.get_i64(5)? != 0,
+            });
+        }
+
         // 加载成员
-        let members: Vec<GuildMember> = self.db.query(
+        let member_rows = self.db.query_rows(
             "SELECT player_uuid, char_id, name, position, level, job, contribution, online, map_name
              FROM guild_members WHERE guild_id = ?1",
-            [guild_db_id],
-            |row| {
-                Ok(GuildMember {
-                    player_id: Uuid::parse_str(&row.get::<_, String>(0)?).unwrap_or_default(),
-                    char_id: row.get::<_, i64>(1)? as u32,
-                    name: row.get::<_, String>(2)?,
-                    position_id: row.get::<_, i64>(3)? as u8,
-                    level: row.get::<_, i64>(4)? as u16,
-                    job: row.get::<_, i64>(5)? as u16,
-                    contribution: row.get::<_, i64>(6)? as u32,
-                    online: row.get::<_, i64>(7)? != 0,
-                    map_name: row.get::<_, String>(8)?,
-                })
-            },
+            &[&guild_db_id as &dyn IntoValue],
         )?;
 
         let mut member_map = HashMap::new();
-        for m in members {
-            member_map.insert(m.player_id, m);
+        for row in &member_rows {
+            let member = GuildMember {
+                player_id: Uuid::parse_str(&row.get_string(0)?).unwrap_or_default(),
+                char_id: row.get_i64(1)? as u32,
+                name: row.get_string(2)?,
+                position_id: row.get_i64(3)? as u8,
+                level: row.get_i64(4)? as u16,
+                job: row.get_i64(5)? as u16,
+                contribution: row.get_i64(6)? as u32,
+                online: row.get_i64(7)? != 0,
+                map_name: row.get_string(8)?,
+            };
+            member_map.insert(member.player_id, member);
         }
 
         Ok(Some(Guild {
@@ -219,13 +222,14 @@ impl GuildStorage {
 
     /// 加载所有公会
     pub fn load_all_guilds(&self) -> Result<Vec<Guild>> {
-        let guild_uuids: Vec<String> =
-            self.db.query("SELECT guild_uuid FROM guilds", [], |row| {
-                row.get::<_, String>(0)
-            })?;
+        let rows = self.db.query_rows(
+            "SELECT guild_uuid FROM guilds",
+            &[],
+        )?;
 
         let mut guilds = Vec::new();
-        for uuid_str in guild_uuids {
+        for row in &rows {
+            let uuid_str = row.get_string(0)?;
             if let Ok(uuid) = Uuid::parse_str(&uuid_str)
                 && let Some(guild) = self.load_guild(&uuid)?
             {
@@ -237,9 +241,9 @@ impl GuildStorage {
 
     /// 删除公会
     pub fn delete_guild(&self, guild_uuid: &Uuid) -> Result<bool> {
-        let affected = self.db.execute_with_params(
+        let affected = self.db.execute_params(
             "DELETE FROM guilds WHERE guild_uuid = ?1",
-            [guild_uuid.to_string()],
+            &[&guild_uuid.to_string() as &dyn IntoValue],
         )?;
         Ok(affected > 0)
     }

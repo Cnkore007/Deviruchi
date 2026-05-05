@@ -5,8 +5,8 @@ use crate::game::status::types::StatusChange;
 use crate::game::storage::data::Storage;
 use crate::protocol::map_packets::CharInfo;
 use crate::storage::Database;
+use crate::storage::backend::IntoValue;
 use crate::storage::chrono_now;
-use rusqlite::params;
 
 /// 角色状态效果数据（用于数据库存储）
 #[derive(Debug, Clone)]
@@ -41,6 +41,11 @@ pub struct CharacterHotkeyData {
     pub item_or_skill_id: u32,
 }
 
+/// 辅助函数：构建 Character 结构体的参数数组
+fn character_row_params() -> Vec<&'static dyn IntoValue> {
+    vec![]
+}
+
 impl Database {
     pub fn create_character(
         &self,
@@ -57,7 +62,7 @@ impl Database {
         hair_color: u16,
     ) -> Result<u32> {
         let now = chrono_now();
-        self.execute_with_params(
+        self.execute_params(
             "INSERT INTO characters
              (account_id, char_num, name, str, agi, vit, int, dex, luk,
               hair, hair_color, base_level, job_level, hp, max_hp, sp, max_sp,
@@ -67,119 +72,96 @@ impl Database {
                      1, 1, 40, 40, 11, 11,
                      'new_1-1.gat', 53, 111, 'new_1-1.gat', 53, 111,
                      ?12, ?12)",
-            params![
-                account_id, slot, name, str, agi, vit, int, dex, luk, hair, hair_color, now
+            &[
+                &(account_id as i32) as &dyn IntoValue,
+                &(slot as i32) as &dyn IntoValue,
+                &name as &dyn IntoValue,
+                &(str as i32) as &dyn IntoValue,
+                &(agi as i32) as &dyn IntoValue,
+                &(vit as i32) as &dyn IntoValue,
+                &(int as i32) as &dyn IntoValue,
+                &(dex as i32) as &dyn IntoValue,
+                &(luk as i32) as &dyn IntoValue,
+                &(hair as i32) as &dyn IntoValue,
+                &(hair_color as i32) as &dyn IntoValue,
+                &now as &dyn IntoValue,
             ],
         )?;
-        Ok(self.last_insert_rowid()? as u32)
+        Ok(self.last_insert_rowid() as u32)
     }
 
+    /// 从 Row 构建 Character 结构体（减少重复代码）
+    fn character_from_row(row: &crate::storage::backend::Row) -> Result<Character> {
+        Ok(Character {
+            char_id: row.get_i32(0)? as u32,
+            char_num: row.get_i32(1)? as u8,
+            name: row.get_string(2)?,
+            class: row.get_i32(3)? as u16,
+            base_level: row.get_i32(4)? as u16,
+            job_level: row.get_i32(5)? as u16,
+            base_exp: row.get_i32(6)? as u32,
+            job_exp: row.get_i32(7)? as u32,
+            zeny: row.get_i32(8)? as u32,
+            str: row.get_i32(9)? as u16,
+            agi: row.get_i32(10)? as u16,
+            vit: row.get_i32(11)? as u16,
+            int: row.get_i32(12)? as u16,
+            dex: row.get_i32(13)? as u16,
+            luk: row.get_i32(14)? as u16,
+            hp: row.get_i32(15)? as u32,
+            max_hp: row.get_i32(16)? as u32,
+            sp: row.get_i32(17)? as u32,
+            max_sp: row.get_i32(18)? as u32,
+            hair: row.get_i32(19)? as u16,
+            hair_color: row.get_i32(20)? as u16,
+            clothes_color: row.get_i32(21)? as u16,
+            weapon: row.get_i32(22)? as u16,
+            shield: row.get_i32(23)? as u16,
+            head_top: row.get_i32(24)? as u16,
+            head_mid: row.get_i32(25)? as u16,
+            head_bottom: row.get_i32(26)? as u16,
+            last_map: row.get_string(27)?,
+            last_x: row.get_i32(28)?,
+            last_y: row.get_i32(29)?,
+            save_map: row.get_string(30)?,
+            save_x: row.get_i32(31)?,
+            save_y: row.get_i32(32)?,
+            delete_timer: row.get_i32(33)? as u32,
+            created_at: row.get_i64(34)?,
+            updated_at: row.get_i64(35)?,
+        })
+    }
+
+    /// 角色列表查询 SQL（复用）
+    const CHARACTER_SELECT_SQL: &'static str =
+        "SELECT char_id, char_num, name, class, base_level, job_level,
+                base_exp, job_exp, zeny, str, agi, vit, int, dex, luk,
+                hp, max_hp, sp, max_sp,
+                hair, hair_color, clothes_color,
+                weapon, shield, head_top, head_mid, head_bottom,
+                last_map, last_x, last_y, save_map, save_x, save_y,
+                delete_timer, created_at, updated_at
+         FROM characters";
+
     pub fn get_characters_by_account(&self, account_id: u32) -> Result<Vec<Character>> {
-        self.query(
-            "SELECT char_id, char_num, name, class, base_level, job_level,
-                    base_exp, job_exp, zeny, str, agi, vit, int, dex, luk,
-                    hp, max_hp, sp, max_sp,
-                    hair, hair_color, clothes_color,
-                    weapon, shield, head_top, head_mid, head_bottom,
-                    last_map, last_x, last_y, save_map, save_x, save_y,
-                    delete_timer, created_at, updated_at
-             FROM characters WHERE account_id = ?1
-             ORDER BY char_num",
-            params![account_id],
-            |row| {
-                Ok(Character {
-                    char_id: row.get(0)?,
-                    char_num: row.get(1)?,
-                    name: row.get(2)?,
-                    class: row.get(3)?,
-                    base_level: row.get(4)?,
-                    job_level: row.get(5)?,
-                    base_exp: row.get(6)?,
-                    job_exp: row.get(7)?,
-                    zeny: row.get(8)?,
-                    str: row.get(9)?,
-                    agi: row.get(10)?,
-                    vit: row.get(11)?,
-                    int: row.get(12)?,
-                    dex: row.get(13)?,
-                    luk: row.get(14)?,
-                    hp: row.get(15)?,
-                    max_hp: row.get(16)?,
-                    sp: row.get(17)?,
-                    max_sp: row.get(18)?,
-                    hair: row.get(19)?,
-                    hair_color: row.get(20)?,
-                    clothes_color: row.get(21)?,
-                    weapon: row.get(22)?,
-                    shield: row.get(23)?,
-                    head_top: row.get(24)?,
-                    head_mid: row.get(25)?,
-                    head_bottom: row.get(26)?,
-                    last_map: row.get(27)?,
-                    last_x: row.get(28)?,
-                    last_y: row.get(29)?,
-                    save_map: row.get(30)?,
-                    save_x: row.get(31)?,
-                    save_y: row.get(32)?,
-                    delete_timer: row.get(33)?,
-                    created_at: row.get(34)?,
-                    updated_at: row.get(35)?,
-                })
-            },
-        )
+        let sql = format!("{} WHERE account_id = ?1 ORDER BY char_num", Self::CHARACTER_SELECT_SQL);
+        let rows = self.query_rows(
+            &sql,
+            &[&(account_id as i32) as &dyn IntoValue],
+        )?;
+        let mut characters = Vec::new();
+        for row in &rows {
+            characters.push(Self::character_from_row(row)?);
+        }
+        Ok(characters)
     }
 
     pub fn get_character_by_id(&self, char_id: u32) -> Result<Option<Character>> {
+        let sql = format!("{} WHERE char_id = ?1", Self::CHARACTER_SELECT_SQL);
         self.query_row_optional(
-            "SELECT char_id, char_num, name, class, base_level, job_level,
-                    base_exp, job_exp, zeny, str, agi, vit, int, dex, luk,
-                    hp, max_hp, sp, max_sp,
-                    hair, hair_color, clothes_color,
-                    weapon, shield, head_top, head_mid, head_bottom,
-                    last_map, last_x, last_y, save_map, save_x, save_y,
-                    delete_timer, created_at, updated_at
-             FROM characters WHERE char_id = ?1",
-            params![char_id],
-            |row| {
-                Ok(Character {
-                    char_id: row.get(0)?,
-                    char_num: row.get(1)?,
-                    name: row.get(2)?,
-                    class: row.get(3)?,
-                    base_level: row.get(4)?,
-                    job_level: row.get(5)?,
-                    base_exp: row.get(6)?,
-                    job_exp: row.get(7)?,
-                    zeny: row.get(8)?,
-                    str: row.get(9)?,
-                    agi: row.get(10)?,
-                    vit: row.get(11)?,
-                    int: row.get(12)?,
-                    dex: row.get(13)?,
-                    luk: row.get(14)?,
-                    hp: row.get(15)?,
-                    max_hp: row.get(16)?,
-                    sp: row.get(17)?,
-                    max_sp: row.get(18)?,
-                    hair: row.get(19)?,
-                    hair_color: row.get(20)?,
-                    clothes_color: row.get(21)?,
-                    weapon: row.get(22)?,
-                    shield: row.get(23)?,
-                    head_top: row.get(24)?,
-                    head_mid: row.get(25)?,
-                    head_bottom: row.get(26)?,
-                    last_map: row.get(27)?,
-                    last_x: row.get(28)?,
-                    last_y: row.get(29)?,
-                    save_map: row.get(30)?,
-                    save_x: row.get(31)?,
-                    save_y: row.get(32)?,
-                    delete_timer: row.get(33)?,
-                    created_at: row.get(34)?,
-                    updated_at: row.get(35)?,
-                })
-            },
+            &sql,
+            &[&(char_id as i32) as &dyn IntoValue],
+            |row| Self::character_from_row(row),
         )
     }
 
@@ -224,27 +206,29 @@ impl Database {
 
     /// 加载角色仓库
     pub fn load_storage(&self, char_id: u32, max_size: u16) -> Result<Storage> {
-        let items: Vec<(u16, u16, u16, bool, u8, [u16; 4])> = self.query(
+        let rows = self.query_rows(
             "SELECT slot_index, item_id, amount, identified, refine,
                     card0, card1, card2, card3
              FROM storage WHERE char_id = ?1 ORDER BY slot_index",
-            params![char_id],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)? as u16,
-                    row.get::<_, i64>(1)? as u16,
-                    row.get::<_, i64>(2)? as u16,
-                    row.get::<_, i64>(3)? != 0,
-                    row.get::<_, i64>(4)? as u8,
-                    [
-                        row.get::<_, i64>(5)? as u16,
-                        row.get::<_, i64>(6)? as u16,
-                        row.get::<_, i64>(7)? as u16,
-                        row.get::<_, i64>(8)? as u16,
-                    ],
-                ))
-            },
+            &[&(char_id as i64) as &dyn IntoValue],
         )?;
+
+        let mut items = Vec::new();
+        for row in &rows {
+            items.push((
+                row.get_i64(0)? as u16,
+                row.get_i64(1)? as u16,
+                row.get_i64(2)? as u16,
+                row.get_i64(3)? != 0,
+                row.get_i64(4)? as u8,
+                [
+                    row.get_i64(5)? as u16,
+                    row.get_i64(6)? as u16,
+                    row.get_i64(7)? as u16,
+                    row.get_i64(8)? as u16,
+                ],
+            ));
+        }
 
         Ok(Storage::from_db_format(char_id, max_size, items))
     }
@@ -254,28 +238,28 @@ impl Database {
         let char_id = storage.char_id();
         let slots: Vec<_> = storage.slots().iter().filter(|s| !s.is_empty()).cloned().collect();
 
-        self.with_transaction(|conn| {
-            conn.execute(
+        self.with_transaction(|tx| {
+            tx.execute_params(
                 "DELETE FROM storage WHERE char_id = ?1",
-                params![char_id],
+                &[&(char_id as i64) as &dyn IntoValue],
             )?;
 
             for slot in &slots {
-                conn.execute(
+                tx.execute_params(
                     "INSERT INTO storage (char_id, slot_index, item_id, amount, identified, refine,
                                          card0, card1, card2, card3)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                    params![
-                        char_id as i64,
-                        slot.index as i64,
-                        slot.item_id as i64,
-                        slot.amount as i64,
-                        slot.identified as i64,
-                        slot.refine as i64,
-                        slot.cards[0] as i64,
-                        slot.cards[1] as i64,
-                        slot.cards[2] as i64,
-                        slot.cards[3] as i64,
+                    &[
+                        &(char_id as i64) as &dyn IntoValue,
+                        &(slot.index as i64) as &dyn IntoValue,
+                        &(slot.item_id as i64) as &dyn IntoValue,
+                        &(slot.amount as i64) as &dyn IntoValue,
+                        &(slot.identified as i64) as &dyn IntoValue,
+                        &(slot.refine as i64) as &dyn IntoValue,
+                        &(slot.cards[0] as i64) as &dyn IntoValue,
+                        &(slot.cards[1] as i64) as &dyn IntoValue,
+                        &(slot.cards[2] as i64) as &dyn IntoValue,
+                        &(slot.cards[3] as i64) as &dyn IntoValue,
                     ],
                 )?;
             }
@@ -314,9 +298,9 @@ impl Database {
     ) -> Result<()> {
         let now = chrono_now();
 
-        self.with_transaction(|conn| {
+        self.with_transaction(|tx| {
             // 1. 更新 characters 表基础数据
-            conn.execute(
+            tx.execute_params(
                 "UPDATE characters SET
                     last_map = ?1, last_x = ?2, last_y = ?3,
                     hp = ?4, max_hp = ?5, sp = ?6, max_sp = ?7,
@@ -326,17 +310,34 @@ impl Database {
                     str = ?13, agi = ?14, vit = ?15, int = ?16, dex = ?17, luk = ?18,
                     updated_at = ?19
                  WHERE char_id = ?20",
-                params![
-                    last_map, last_x, last_y, hp, max_hp, sp, max_sp,
-                    base_exp as i64, job_exp as i64, base_level, job_level, zeny,
-                    str, agi, vit, int, dex, luk, now, char_id
+                &[
+                    &last_map as &dyn IntoValue,
+                    &last_x as &dyn IntoValue,
+                    &last_y as &dyn IntoValue,
+                    &(hp as i32) as &dyn IntoValue,
+                    &(max_hp as i32) as &dyn IntoValue,
+                    &(sp as i32) as &dyn IntoValue,
+                    &(max_sp as i32) as &dyn IntoValue,
+                    &(base_exp as i64) as &dyn IntoValue,
+                    &(job_exp as i64) as &dyn IntoValue,
+                    &(base_level as i32) as &dyn IntoValue,
+                    &(job_level as i32) as &dyn IntoValue,
+                    &(zeny as i32) as &dyn IntoValue,
+                    &(str as i32) as &dyn IntoValue,
+                    &(agi as i32) as &dyn IntoValue,
+                    &(vit as i32) as &dyn IntoValue,
+                    &(int as i32) as &dyn IntoValue,
+                    &(dex as i32) as &dyn IntoValue,
+                    &(luk as i32) as &dyn IntoValue,
+                    &now as &dyn IntoValue,
+                    &(char_id as i32) as &dyn IntoValue,
                 ],
             )?;
 
             // 2. 保存状态效果
-            conn.execute(
+            tx.execute_params(
                 "DELETE FROM character_status WHERE char_id = ?1",
-                params![char_id],
+                &[&(char_id as i32) as &dyn IntoValue],
             )?;
             for effect in status_effects {
                 let source_type = match effect.source {
@@ -351,47 +352,65 @@ impl Database {
                     StatusSource::Item(id) => id,
                     _ => 0,
                 };
-                conn.execute(
+                tx.execute_params(
                     "INSERT INTO character_status
                         (char_id, status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                    params![
-                        char_id, effect.id as u32, effect.val1, effect.val2, effect.val3,
-                        effect.stack, effect.duration_ms as i64,
-                        effect.started_at.elapsed().as_millis() as i64,
-                        source_type, source_id
+                    &[
+                        &(char_id as i32) as &dyn IntoValue,
+                        &(effect.id as u32) as &dyn IntoValue,
+                        &effect.val1 as &dyn IntoValue,
+                        &effect.val2 as &dyn IntoValue,
+                        &effect.val3 as &dyn IntoValue,
+                        &(effect.stack as i32) as &dyn IntoValue,
+                        &(effect.duration_ms as i64) as &dyn IntoValue,
+                        &(effect.started_at.elapsed().as_millis() as i64) as &dyn IntoValue,
+                        &(source_type as i32) as &dyn IntoValue,
+                        &(source_id as i32) as &dyn IntoValue,
                     ],
                 )?;
             }
 
             // 3. 保存物品栏
-            conn.execute(
+            tx.execute_params(
                 "DELETE FROM character_inventory WHERE char_id = ?1",
-                params![char_id],
+                &[&(char_id as i32) as &dyn IntoValue],
             )?;
             for item in inventory {
-                conn.execute(
+                tx.execute_params(
                     "INSERT INTO character_inventory
                         (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                    params![
-                        char_id, item.index, item.item_id, item.amount,
-                        item.identified as i32, item.refine,
-                        item.cards[0], item.cards[1], item.cards[2], item.cards[3]
+                    &[
+                        &(char_id as i32) as &dyn IntoValue,
+                        &(item.index as i32) as &dyn IntoValue,
+                        &(item.item_id as i32) as &dyn IntoValue,
+                        &(item.amount as i32) as &dyn IntoValue,
+                        &(item.identified as i32) as &dyn IntoValue,
+                        &(item.refine as i32) as &dyn IntoValue,
+                        &(item.cards[0] as i32) as &dyn IntoValue,
+                        &(item.cards[1] as i32) as &dyn IntoValue,
+                        &(item.cards[2] as i32) as &dyn IntoValue,
+                        &(item.cards[3] as i32) as &dyn IntoValue,
                     ],
                 )?;
             }
 
             // 4. 保存快捷键
-            conn.execute(
+            tx.execute_params(
                 "DELETE FROM character_hotkeys WHERE char_id = ?1",
-                params![char_id],
+                &[&(char_id as i32) as &dyn IntoValue],
             )?;
             for hotkey in hotkeys {
-                conn.execute(
+                tx.execute_params(
                     "INSERT INTO character_hotkeys (char_id, hotkey_id, type, item_or_skill_id)
                      VALUES (?1, ?2, ?3, ?4)",
-                    params![char_id, hotkey.hotkey_id, hotkey.type_, hotkey.item_or_skill_id],
+                    &[
+                        &(char_id as i32) as &dyn IntoValue,
+                        &(hotkey.hotkey_id as i32) as &dyn IntoValue,
+                        &(hotkey.type_ as i32) as &dyn IntoValue,
+                        &(hotkey.item_or_skill_id as i32) as &dyn IntoValue,
+                    ],
                 )?;
             }
 
@@ -405,9 +424,9 @@ impl Database {
     /// 保存角色状态效果
     pub fn save_character_status(&self, char_id: u32, statuses: &[StatusEffect]) -> Result<()> {
         // 先删除该角色的所有状态效果
-        self.execute_with_params(
+        self.execute_params(
             "DELETE FROM character_status WHERE char_id = ?1",
-            params![char_id],
+            &[&(char_id as i32) as &dyn IntoValue],
         )?;
 
         // 插入当前状态效果
@@ -426,21 +445,21 @@ impl Database {
                 _ => 0,
             };
 
-            self.execute_with_params(
+            self.execute_params(
                 "INSERT INTO character_status
                     (char_id, status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![
-                    char_id,
-                    effect.id as u32,
-                    effect.val1,
-                    effect.val2,
-                    effect.val3,
-                    effect.stack,
-                    effect.duration_ms as i64,
-                    effect.started_at.elapsed().as_millis() as i64,
-                    source_type,
-                    source_id
+                &[
+                    &(char_id as i32) as &dyn IntoValue,
+                    &(effect.id as u32) as &dyn IntoValue,
+                    &effect.val1 as &dyn IntoValue,
+                    &effect.val2 as &dyn IntoValue,
+                    &effect.val3 as &dyn IntoValue,
+                    &(effect.stack as i32) as &dyn IntoValue,
+                    &(effect.duration_ms as i64) as &dyn IntoValue,
+                    &(effect.started_at.elapsed().as_millis() as i64) as &dyn IntoValue,
+                    &(source_type as i32) as &dyn IntoValue,
+                    &(source_id as i32) as &dyn IntoValue,
                 ],
             )?;
         }
@@ -455,61 +474,66 @@ impl Database {
             .expect("Time went backwards")
             .as_millis() as u64;
 
-        self.query(
+        let rows = self.query_rows(
             "SELECT status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id
              FROM character_status WHERE char_id = ?1",
-            params![char_id],
-            |row| {
-                let status_type: u32 = row.get(0)?;
-                let val1: i32 = row.get(1)?;
-                let val2: i32 = row.get(2)?;
-                let val3: i32 = row.get(3)?;
-                let stack: u8 = row.get(4)?;
-                let duration_ms: u64 = row.get::<_, i64>(5)? as u64;
-                let started_at_ms: u64 = row.get::<_, i64>(6)? as u64;
-                let source_type: u8 = row.get(7)?;
-                let source_id: u16 = row.get(8)?;
+            &[&(char_id as i32) as &dyn IntoValue],
+        )?;
 
-                let source = match source_type {
-                    0 => StatusSource::Skill(source_id),
-                    1 => StatusSource::Item(source_id),
-                    2 => StatusSource::Passive,
-                    3 => StatusSource::Quest,
-                    4 => StatusSource::Environment,
-                    _ => StatusSource::Environment,
-                };
+        let mut results = Vec::new();
+        for row in &rows {
+            let status_type: u32 = row.get_i32(0)? as u32;
+            let val1: i32 = row.get_i32(1)?;
+            let val2: i32 = row.get_i32(2)?;
+            let val3: i32 = row.get_i32(3)?;
+            let stack: u8 = row.get_i32(4)? as u8;
+            let duration_ms: u64 = row.get_i64(5)? as u64;
+            let started_at_ms: u64 = row.get_i64(6)? as u64;
+            let source_type: u8 = row.get_i32(7)? as u8;
+            let source_id: u16 = row.get_i32(8)? as u16;
 
-                // 计算剩余时间：started_at_ms + duration_ms - now_ms
-                let end_time_ms = started_at_ms.saturating_add(duration_ms);
-                let remaining_ms = end_time_ms.saturating_sub(now_ms);
+            let source = match source_type {
+                0 => StatusSource::Skill(source_id),
+                1 => StatusSource::Item(source_id),
+                2 => StatusSource::Passive,
+                3 => StatusSource::Quest,
+                4 => StatusSource::Environment,
+                _ => StatusSource::Environment,
+            };
 
-                // 如果状态已过期则跳过
-                if remaining_ms == 0 {
-                    return Ok(StatusEffect {
-                        id: StatusChange::from_u32(status_type),
-                        duration_ms: 0,
-                        started_at: std::time::Instant::now(),
-                        source,
-                        val1,
-                        val2,
-                        val3,
-                        stack,
-                    });
-                }
+            // 计算剩余时间：started_at_ms + duration_ms - now_ms
+            let end_time_ms = started_at_ms.saturating_add(duration_ms);
+            let remaining_ms = end_time_ms.saturating_sub(now_ms);
 
-                // 使用剩余时间作为新的 duration，started_at 为当前时间
-                Ok(StatusEffect {
+            // 如果状态已过期则跳过
+            if remaining_ms == 0 {
+                results.push(StatusEffect {
                     id: StatusChange::from_u32(status_type),
-                    duration_ms: remaining_ms,
+                    duration_ms: 0,
                     started_at: std::time::Instant::now(),
                     source,
                     val1,
                     val2,
                     val3,
                     stack,
-                })
-            },
-        )
+                });
+                continue;
+            }
+
+            // 使用剩余时间作为新的 duration，started_at 为当前时间
+            results.push(StatusEffect {
+                id: StatusChange::from_u32(status_type),
+                duration_ms: remaining_ms,
+                started_at: std::time::Instant::now(),
+                source,
+                val1,
+                val2,
+                val3,
+                stack,
+            });
+        }
+
+        Ok(results)
     }
 
     /// 保存角色物品栏
@@ -519,28 +543,28 @@ impl Database {
         items: &[CharacterInventoryData],
     ) -> Result<()> {
         // 先删除该角色的所有物品栏数据
-        self.execute_with_params(
+        self.execute_params(
             "DELETE FROM character_inventory WHERE char_id = ?1",
-            params![char_id],
+            &[&(char_id as i32) as &dyn IntoValue],
         )?;
 
         // 插入当前物品
         for item in items {
-            self.execute_with_params(
+            self.execute_params(
                 "INSERT INTO character_inventory
                     (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![
-                    char_id,
-                    item.index,
-                    item.item_id,
-                    item.amount,
-                    item.identified as i32,
-                    item.refine,
-                    item.cards[0],
-                    item.cards[1],
-                    item.cards[2],
-                    item.cards[3]
+                &[
+                    &(char_id as i32) as &dyn IntoValue,
+                    &(item.index as i32) as &dyn IntoValue,
+                    &(item.item_id as i32) as &dyn IntoValue,
+                    &(item.amount as i32) as &dyn IntoValue,
+                    &(item.identified as i32) as &dyn IntoValue,
+                    &(item.refine as i32) as &dyn IntoValue,
+                    &(item.cards[0] as i32) as &dyn IntoValue,
+                    &(item.cards[1] as i32) as &dyn IntoValue,
+                    &(item.cards[2] as i32) as &dyn IntoValue,
+                    &(item.cards[3] as i32) as &dyn IntoValue,
                 ],
             )?;
         }
@@ -550,21 +574,30 @@ impl Database {
 
     /// 加载角色物品栏
     pub fn load_character_inventory(&self, char_id: u32) -> Result<Vec<CharacterInventoryData>> {
-        self.query(
+        let rows = self.query_rows(
             "SELECT slot_index, item_id, amount, identified, refine, card0, card1, card2, card3
              FROM character_inventory WHERE char_id = ?1 ORDER BY slot_index",
-            params![char_id],
-            |row| {
-                Ok(CharacterInventoryData {
-                    index: row.get(0)?,
-                    item_id: row.get(1)?,
-                    amount: row.get(2)?,
-                    identified: row.get::<_, i32>(3)? != 0,
-                    refine: row.get(4)?,
-                    cards: [row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?],
-                })
-            },
-        )
+            &[&(char_id as i32) as &dyn IntoValue],
+        )?;
+
+        let mut items = Vec::new();
+        for row in &rows {
+            items.push(CharacterInventoryData {
+                index: row.get_i32(0)? as u8,
+                item_id: row.get_i32(1)? as u16,
+                amount: row.get_i32(2)? as u16,
+                identified: row.get_i32(3)? != 0,
+                refine: row.get_i32(4)? as u8,
+                cards: [
+                    row.get_i32(5)? as u16,
+                    row.get_i32(6)? as u16,
+                    row.get_i32(7)? as u16,
+                    row.get_i32(8)? as u16,
+                ],
+            });
+        }
+
+        Ok(items)
     }
 
     /// 保存角色快捷键
@@ -574,21 +607,21 @@ impl Database {
         hotkeys: &[CharacterHotkeyData],
     ) -> Result<()> {
         // 先删除该角色的所有快捷键
-        self.execute_with_params(
+        self.execute_params(
             "DELETE FROM character_hotkeys WHERE char_id = ?1",
-            params![char_id],
+            &[&(char_id as i32) as &dyn IntoValue],
         )?;
 
         // 插入当前快捷键
         for hotkey in hotkeys {
-            self.execute_with_params(
+            self.execute_params(
                 "INSERT INTO character_hotkeys (char_id, hotkey_id, type, item_or_skill_id)
                  VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    char_id,
-                    hotkey.hotkey_id,
-                    hotkey.type_,
-                    hotkey.item_or_skill_id
+                &[
+                    &(char_id as i32) as &dyn IntoValue,
+                    &(hotkey.hotkey_id as i32) as &dyn IntoValue,
+                    &(hotkey.type_ as i32) as &dyn IntoValue,
+                    &(hotkey.item_or_skill_id as i32) as &dyn IntoValue,
                 ],
             )?;
         }
@@ -599,9 +632,9 @@ impl Database {
     /// 清理已过期的删除定时器角色（delete_timer > 0 且已过期）
     pub fn cleanup_deleted_characters(&self) -> Result<usize> {
         let now = chrono_now() as u32;
-        let deleted = self.execute_with_params(
+        let deleted = self.execute_params(
             "DELETE FROM characters WHERE delete_timer > 0 AND delete_timer <= ?1",
-            params![now],
+            &[&(now as i32) as &dyn IntoValue],
         )?;
         if deleted > 0 {
             tracing::info!("Cleaned up {} expired deleted characters", deleted);
@@ -621,10 +654,14 @@ impl Database {
         let delete_timer = (now + delete_after_secs) as u32;
 
         // 验证角色属于该账户
-        let affected = self.execute_with_params(
+        let affected = self.execute_params(
             "UPDATE characters SET delete_timer = ?1
              WHERE char_id = ?2 AND account_id = ?3 AND (delete_timer = 0 OR delete_timer IS NULL)",
-            params![delete_timer, char_id, account_id],
+            &[
+                &(delete_timer as i32) as &dyn IntoValue,
+                &(char_id as i32) as &dyn IntoValue,
+                &(account_id as i32) as &dyn IntoValue,
+            ],
         )?;
 
         if affected > 0 {
@@ -648,10 +685,13 @@ impl Database {
         char_id: u32,
         account_id: u32,
     ) -> Result<bool> {
-        let affected = self.execute_with_params(
+        let affected = self.execute_params(
             "UPDATE characters SET delete_timer = 0
              WHERE char_id = ?1 AND account_id = ?2 AND delete_timer > 0",
-            params![char_id, account_id],
+            &[
+                &(char_id as i32) as &dyn IntoValue,
+                &(account_id as i32) as &dyn IntoValue,
+            ],
         )?;
 
         if affected > 0 {
@@ -668,73 +708,32 @@ impl Database {
 
     /// 按名称查找角色（用于名称重复检查）
     pub fn get_character_by_name(&self, name: &str) -> Result<Option<Character>> {
+        let sql = format!("{} WHERE name = ?1", Self::CHARACTER_SELECT_SQL);
         self.query_row_optional(
-            "SELECT char_id, char_num, name, class, base_level, job_level,
-                    base_exp, job_exp, zeny, str, agi, vit, int, dex, luk,
-                    hp, max_hp, sp, max_sp,
-                    hair, hair_color, clothes_color,
-                    weapon, shield, head_top, head_mid, head_bottom,
-                    last_map, last_x, last_y, save_map, save_x, save_y,
-                    delete_timer, created_at, updated_at
-             FROM characters WHERE name = ?1",
-            params![name],
-            |row| {
-                Ok(Character {
-                    char_id: row.get(0)?,
-                    char_num: row.get(1)?,
-                    name: row.get(2)?,
-                    class: row.get(3)?,
-                    base_level: row.get(4)?,
-                    job_level: row.get(5)?,
-                    base_exp: row.get(6)?,
-                    job_exp: row.get(7)?,
-                    zeny: row.get(8)?,
-                    str: row.get(9)?,
-                    agi: row.get(10)?,
-                    vit: row.get(11)?,
-                    int: row.get(12)?,
-                    dex: row.get(13)?,
-                    luk: row.get(14)?,
-                    hp: row.get(15)?,
-                    max_hp: row.get(16)?,
-                    sp: row.get(17)?,
-                    max_sp: row.get(18)?,
-                    hair: row.get(19)?,
-                    hair_color: row.get(20)?,
-                    clothes_color: row.get(21)?,
-                    weapon: row.get(22)?,
-                    shield: row.get(23)?,
-                    head_top: row.get(24)?,
-                    head_mid: row.get(25)?,
-                    head_bottom: row.get(26)?,
-                    last_map: row.get(27)?,
-                    last_x: row.get(28)?,
-                    last_y: row.get(29)?,
-                    save_map: row.get(30)?,
-                    save_x: row.get(31)?,
-                    save_y: row.get(32)?,
-                    delete_timer: row.get(33)?,
-                    created_at: row.get(34)?,
-                    updated_at: row.get(35)?,
-                })
-            },
+            &sql,
+            &[&name as &dyn IntoValue],
+            |row| Self::character_from_row(row),
         )
     }
 
     /// 加载角色快捷键
     pub fn load_character_hotkeys(&self, char_id: u32) -> Result<Vec<CharacterHotkeyData>> {
-        self.query(
+        let rows = self.query_rows(
             "SELECT hotkey_id, type, item_or_skill_id
              FROM character_hotkeys WHERE char_id = ?1 ORDER BY hotkey_id",
-            params![char_id],
-            |row| {
-                Ok(CharacterHotkeyData {
-                    hotkey_id: row.get(0)?,
-                    type_: row.get(1)?,
-                    item_or_skill_id: row.get(2)?,
-                })
-            },
-        )
+            &[&(char_id as i32) as &dyn IntoValue],
+        )?;
+
+        let mut hotkeys = Vec::new();
+        for row in &rows {
+            hotkeys.push(CharacterHotkeyData {
+                hotkey_id: row.get_i32(0)? as u8,
+                type_: row.get_i32(1)? as u8,
+                item_or_skill_id: row.get_i32(2)? as u32,
+            });
+        }
+
+        Ok(hotkeys)
     }
 }
 
@@ -784,10 +783,10 @@ mod tests {
 
     fn setup_test_account(db: &crate::storage::Database) -> u32 {
         // 创建测试账户
-        db.execute_with_params(
+        db.execute_params(
             "INSERT INTO accounts (account_id, user_id, password_hash, sex, created_at)
              VALUES (1, 'test_user', 'hash', 0, 1000)",
-            [],
+            &[],
         )
         .expect("Failed to create test account");
         1
@@ -1024,7 +1023,7 @@ mod tests {
         let account_id = setup_test_account(&db);
 
         // 创建一个正常角色
-        let char1_id = db
+        let _char1_id = db
             .create_character(account_id, 0, "Normal", 10, 10, 10, 10, 10, 10, 1, 0)
             .expect("Failed to create character");
 
@@ -1033,20 +1032,26 @@ mod tests {
             .create_character(account_id, 1, "Expired", 10, 10, 10, 10, 10, 10, 1, 0)
             .expect("Failed to create character");
         let past_time = (chrono_now() - 3600) as u32; // 1 小时前
-        db.execute_with_params(
+        db.execute_params(
             "UPDATE characters SET delete_timer = ?1 WHERE char_id = ?2",
-            params![past_time, char2_id],
+            &[
+                &(past_time as i32) as &dyn IntoValue,
+                &(char2_id as i32) as &dyn IntoValue,
+            ],
         )
         .expect("Failed to set delete_timer");
 
         // 创建一个已标记删除但定时器未过期的角色
-        let char3_id = db
+        let _char3_id = db
             .create_character(account_id, 2, "Pending", 10, 10, 10, 10, 10, 10, 1, 0)
             .expect("Failed to create character");
         let future_time = (chrono_now() + 3600) as u32; // 1 小时后
-        db.execute_with_params(
+        db.execute_params(
             "UPDATE characters SET delete_timer = ?1 WHERE char_id = ?2",
-            params![future_time, char3_id],
+            &[
+                &(future_time as i32) as &dyn IntoValue,
+                &(_char3_id as i32) as &dyn IntoValue,
+            ],
         )
         .expect("Failed to set delete_timer");
 
@@ -1058,7 +1063,7 @@ mod tests {
 
         // 验证：正常角色仍在
         assert!(db
-            .get_character_by_id(char1_id)
+            .get_character_by_id(_char1_id)
             .expect("query failed")
             .is_some());
         // 验证：已过期角色被删除
@@ -1068,7 +1073,7 @@ mod tests {
             .is_none());
         // 验证：待删除但未过期角色仍在
         assert!(db
-            .get_character_by_id(char3_id)
+            .get_character_by_id(_char3_id)
             .expect("query failed")
             .is_some());
     }
