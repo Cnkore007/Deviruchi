@@ -6,6 +6,7 @@
 
 use crate::error::Result;
 use crate::storage::Database;
+use crate::storage::backend::IntoValue;
 use std::collections::BTreeMap;
 
 /// 迁移定义
@@ -53,13 +54,13 @@ impl MigrationManager {
     pub fn current_version(&self, db: &Database) -> Result<u32> {
         self.ensure_version_table(db)?;
 
-        let version = db.query_row(
+        let version: i64 = db.query_row(
             "SELECT COALESCE(MAX(version), 0) FROM schema_version",
-            [],
-            |row| row.get::<_, u32>(0),
+            &[],
+            |row| row.get_i64(0),
         )?;
 
-        Ok(version)
+        Ok(version as u32)
     }
 
     /// 执行所有待执行的升级迁移
@@ -79,10 +80,9 @@ impl MigrationManager {
                 // 将迁移 SQL 和版本记录写入同一个事务，保证原子性
                 let up_sql = migration.up;
                 let desc = migration.description;
-                db.with_transaction(|conn| {
+                db.with_transaction(|tx| {
                     // 执行迁移 SQL（可能包含多条语句，用 execute_batch）
-                    conn.execute_batch(up_sql)
-                        .map_err(|e| crate::error::Error::Database(e))?;
+                    tx.execute_batch(up_sql)?;
 
                     // 获取当前时间戳（秒）
                     let now = std::time::SystemTime::now()
@@ -91,9 +91,13 @@ impl MigrationManager {
                         .as_secs() as i64;
 
                     // 记录迁移版本
-                    conn.execute(
+                    tx.execute_params(
                         "INSERT INTO schema_version (version, description, applied_at) VALUES (?1, ?2, ?3)",
-                        rusqlite::params![version, desc, now],
+                        &[
+                            &(*version as i64) as &dyn IntoValue,
+                            &desc as &dyn IntoValue,
+                            &now as &dyn IntoValue,
+                        ],
                     )?;
 
                     Ok(())
@@ -128,9 +132,9 @@ impl MigrationManager {
 
                     db.execute(down_sql)?;
 
-                    db.execute_with_params(
+                    db.execute_params(
                         "DELETE FROM schema_version WHERE version = ?1",
-                        rusqlite::params![version],
+                        &[&(*version as i64) as &dyn IntoValue],
                     )?;
 
                     reverted += 1;
