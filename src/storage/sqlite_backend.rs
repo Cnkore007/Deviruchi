@@ -224,3 +224,173 @@ impl SqliteBackend {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_backend() -> SqliteBackend {
+        SqliteBackend::open_memory().unwrap()
+    }
+
+    #[test]
+    fn test_execute_and_query() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+            .unwrap();
+
+        backend
+            .execute_params(
+                "INSERT INTO test (id, name) VALUES (?, ?)",
+                &[&1i32, &"Alice"],
+            )
+            .unwrap();
+
+        let rows = backend.query_rows("SELECT * FROM test", &[]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get_i32(0).unwrap(), 1);
+        assert_eq!(rows[0].get_string(1).unwrap(), "Alice");
+    }
+
+    #[test]
+    fn test_query_row() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER, val REAL)")
+            .unwrap();
+        backend
+            .execute_params(
+                "INSERT INTO test VALUES (?, ?)",
+                &[&42i32, &3.14f64],
+            )
+            .unwrap();
+
+        let rows = backend
+            .query_rows("SELECT val FROM test WHERE id = ?", &[&42i32])
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let val = rows[0].get_f64(0).unwrap();
+        assert!((val - 3.14).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_query_row_optional_none() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER)")
+            .unwrap();
+
+        let rows = backend
+            .query_rows("SELECT id FROM test WHERE id = 999", &[])
+            .unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_transaction_commit() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER)")
+            .unwrap();
+
+        backend
+            .with_transaction(|tx| {
+                tx.execute_params("INSERT INTO test VALUES (?)", &[&1i32])?;
+                tx.execute_params("INSERT INTO test VALUES (?)", &[&2i32])?;
+                Ok(())
+            })
+            .unwrap();
+
+        let rows = backend.query_rows("SELECT * FROM test", &[]).unwrap();
+        assert_eq!(rows.len(), 2);
+    }
+
+    #[test]
+    fn test_transaction_rollback() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER)")
+            .unwrap();
+
+        let result: crate::error::Result<()> = backend.with_transaction(|tx| {
+            tx.execute_params("INSERT INTO test VALUES (?)", &[&1i32])?;
+            Err(crate::error::Error::Game("intentional error".into()))
+        });
+        assert!(result.is_err());
+
+        let rows = backend.query_rows("SELECT * FROM test", &[]).unwrap();
+        assert_eq!(rows.len(), 0); // 回滚了
+    }
+
+    #[test]
+    fn test_last_insert_rowid() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)")
+            .unwrap();
+
+        backend
+            .execute_params("INSERT INTO test (name) VALUES (?)", &[&"a"])
+            .unwrap();
+        let id1 = backend.last_insert_rowid();
+
+        backend
+            .execute_params("INSERT INTO test (name) VALUES (?)", &[&"b"])
+            .unwrap();
+        let id2 = backend.last_insert_rowid();
+
+        assert_eq!(id1, 1);
+        assert_eq!(id2, 2);
+    }
+
+    #[test]
+    fn test_upsert() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+            .unwrap();
+
+        backend
+            .upsert("test", &["id", "name"], &[&1i32, &"Alice"], &["id"])
+            .unwrap();
+
+        backend
+            .upsert("test", &["id", "name"], &[&1i32, &"Bob"], &["id"])
+            .unwrap();
+
+        let rows = backend.query_rows("SELECT name FROM test WHERE id = 1", &[]).unwrap();
+        assert_eq!(rows.len(), 1);
+        // INSERT OR REPLACE 模式下，第二条会替换第一条
+        assert_eq!(rows[0].get_string(0).unwrap(), "Bob");
+    }
+
+    #[test]
+    fn test_row_null_handling() {
+        let backend = create_test_backend();
+        backend
+            .execute("CREATE TABLE test (id INTEGER, name TEXT)")
+            .unwrap();
+        backend
+            .execute_params("INSERT INTO test (id) VALUES (?)", &[&1i32])
+            .unwrap();
+
+        let rows = backend.query_rows("SELECT id, name FROM test", &[]).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].get_optional_string(1).unwrap(), None);
+    }
+
+    #[test]
+    fn test_execute_batch() {
+        let backend = create_test_backend();
+        backend
+            .execute_batch(
+                "CREATE TABLE t1 (id INTEGER); CREATE TABLE t2 (id INTEGER);",
+            )
+            .unwrap();
+
+        // 验证两张表都创建了
+        backend.execute_params("INSERT INTO t1 VALUES (?)", &[&1i32]).unwrap();
+        backend.execute_params("INSERT INTO t2 VALUES (?)", &[&2i32]).unwrap();
+    }
+}
