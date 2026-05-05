@@ -53,24 +53,43 @@ pub enum ServerMode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct DatabaseConfig {
+    /// 后端类型: "sqlite" 或 "mysql"
+    pub backend: String,
     pub path: String,
     pub backup_path: Option<String>,
     pub auto_vacuum: bool,
     pub wal_mode: bool,
     pub busy_timeout_ms: u32,
     pub auto_backup_interval_hours: u32,
+    /// MySQL 主机地址
+    pub mysql_host: String,
+    /// MySQL 端口
+    pub mysql_port: u16,
+    /// MySQL 用户名
+    pub mysql_user: String,
+    /// MySQL 密码
+    pub mysql_password: String,
+    /// MySQL 数据库名称
+    pub mysql_database: String,
 }
 
 impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
+            backend: "sqlite".to_string(),
             path: "deviruchi.db".to_string(),
             backup_path: None,
             auto_vacuum: true,
             wal_mode: true,
             busy_timeout_ms: 5000,
             auto_backup_interval_hours: 24,
+            mysql_host: "127.0.0.1".to_string(),
+            mysql_port: 3306,
+            mysql_user: "deviruchi".to_string(),
+            mysql_password: String::new(),
+            mysql_database: "deviruchi".to_string(),
         }
     }
 }
