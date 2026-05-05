@@ -242,6 +242,58 @@ pub fn create_default_migrations() -> MigrationManager {
         down: Some("DROP TABLE IF EXISTS pets"),
     });
 
+    // 迁移 v4: 扩展 homunculus 表 + 添加 homunculus_skills 表
+    manager.register(Migration {
+        version: 4,
+        description: "扩展 homunculus 表（combat stats, race, element, evolution）+ skills 表",
+        up: "ALTER TABLE homunculus ADD COLUMN race TEXT DEFAULT 'Formless';
+ALTER TABLE homunculus ADD COLUMN element TEXT DEFAULT 'Neutral';
+ALTER TABLE homunculus ADD COLUMN element_level INTEGER DEFAULT 1;
+ALTER TABLE homunculus ADD COLUMN evolution_stage TEXT DEFAULT 'Base';
+ALTER TABLE homunculus ADD COLUMN skill_points INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN atk INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN matk INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN defense INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN magic_defense INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN hit INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN flee INTEGER DEFAULT 0;
+ALTER TABLE homunculus ADD COLUMN walk_speed INTEGER DEFAULT 200;
+ALTER TABLE homunculus ADD COLUMN attack_delay INTEGER DEFAULT 1000;
+CREATE TABLE IF NOT EXISTS homunculus_skills (
+    homun_id INTEGER NOT NULL,
+    skill_name TEXT NOT NULL,
+    skill_level INTEGER DEFAULT 1,
+    PRIMARY KEY (homun_id, skill_name)
+);",
+        down: Some("DROP TABLE IF EXISTS homunculus_skills;"),
+    });
+
+    // 迁移 v5: 扩展 mercenaries 表 + 添加 mercenary_skills 表
+    manager.register(Migration {
+        version: 5,
+        description: "扩展 mercenaries 表（六属性, combat stats）+ skills 表",
+        up: "ALTER TABLE mercenaries ADD COLUMN defense INTEGER DEFAULT 0;
+ALTER TABLE mercenaries ADD COLUMN magic_defense INTEGER DEFAULT 0;
+ALTER TABLE mercenaries ADD COLUMN str INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN agi INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN vit INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN int INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN dex INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN luk INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN hit INTEGER DEFAULT 0;
+ALTER TABLE mercenaries ADD COLUMN flee INTEGER DEFAULT 0;
+ALTER TABLE mercenaries ADD COLUMN walk_speed INTEGER DEFAULT 200;
+ALTER TABLE mercenaries ADD COLUMN attack_range INTEGER DEFAULT 1;
+ALTER TABLE mercenaries ADD COLUMN contract_cost INTEGER DEFAULT 0;
+CREATE TABLE IF NOT EXISTS mercenary_skills (
+    mercenary_id INTEGER NOT NULL,
+    skill_name TEXT NOT NULL,
+    skill_level INTEGER DEFAULT 1,
+    PRIMARY KEY (mercenary_id, skill_name)
+);",
+        down: Some("DROP TABLE IF EXISTS mercenary_skills;"),
+    });
+
     manager
 }
 

@@ -20,6 +20,24 @@ pub enum HomunculusType {
     Eleanor,
 }
 
+impl HomunculusType {
+    /// 从字符串解析（用于数据库加载）
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Lif" => HomunculusType::Lif,
+            "Amistr" => HomunculusType::Amistr,
+            "Filir" => HomunculusType::Filir,
+            "Vanilmirth" => HomunculusType::Vanilmirth,
+            "Eira" => HomunculusType::Eira,
+            "Bayeri" => HomunculusType::Bayeri,
+            "Sera" => HomunculusType::Sera,
+            "Dieter" => HomunculusType::Dieter,
+            "Eleanor" => HomunculusType::Eleanor,
+            _ => HomunculusType::Lif,
+        }
+    }
+}
+
 /// 生命体种族
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HomunculusRace {
@@ -28,6 +46,31 @@ pub enum HomunculusRace {
     Formless,
     Angel,
     Insect,
+}
+
+impl HomunculusRace {
+    /// 转换为字符串（用于数据库存储）
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HomunculusRace::Demihuman => "Demihuman",
+            HomunculusRace::Brute => "Brute",
+            HomunculusRace::Formless => "Formless",
+            HomunculusRace::Angel => "Angel",
+            HomunculusRace::Insect => "Insect",
+        }
+    }
+
+    /// 从字符串解析（用于数据库加载）
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Demihuman" => HomunculusRace::Demihuman,
+            "Brute" => HomunculusRace::Brute,
+            "Formless" => HomunculusRace::Formless,
+            "Angel" => HomunculusRace::Angel,
+            "Insect" => HomunculusRace::Insect,
+            _ => HomunculusRace::Formless,
+        }
+    }
 }
 
 /// 生命体进化阶段
@@ -39,6 +82,26 @@ pub enum EvolutionStage {
     Evolved,
     /// S 级进化形态 (H2)
     SuperEvolved,
+}
+
+impl EvolutionStage {
+    /// 转换为字符串（用于数据库存储）
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            EvolutionStage::Base => "Base",
+            EvolutionStage::Evolved => "Evolved",
+            EvolutionStage::SuperEvolved => "SuperEvolved",
+        }
+    }
+
+    /// 从字符串解析（用于数据库加载）
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Evolved" => EvolutionStage::Evolved,
+            "SuperEvolved" => EvolutionStage::SuperEvolved,
+            _ => EvolutionStage::Base,
+        }
+    }
 }
 
 /// 生命体技能
