@@ -1,4 +1,5 @@
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 use crate::game::battle::element::{Element, ElementLevel, MobSize};
@@ -180,6 +181,40 @@ pub enum MobBehavior {
     Immobile,
 }
 
+/// 怪物技能目标类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MobSkillTarget {
+    /// 对攻击目标（敌人）使用
+    Target,
+    /// 对自身使用（如治疗、增益）
+    Self_,
+}
+
+impl Default for MobSkillTarget {
+    fn default() -> Self {
+        MobSkillTarget::Target
+    }
+}
+
+/// 怪物技能触发条件类型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MobSkillCondition {
+    /// 无特殊条件（任何时候都可触发）
+    Any,
+    /// 被围攻时（rAthena: rudeattacked）
+    RudeAttacked,
+    /// 远程目标时（rAthena: longrange）
+    LongRange,
+    /// HP 低于阈值时（rAthena: hpcertain）
+    HpCertain,
+}
+
+impl Default for MobSkillCondition {
+    fn default() -> Self {
+        MobSkillCondition::Any
+    }
+}
+
 /// 怪物技能数据
 #[derive(Debug, Clone)]
 pub struct MobSkill {
@@ -187,8 +222,12 @@ pub struct MobSkill {
     pub level: u8,
     /// 使用概率（万分比）
     pub chance: u32,
-    /// 施放条件：HP百分比低于此值时使用
-    pub hp_condition: Option<u32>,
+    /// 技能目标类型（对敌人/对自身）
+    pub target: MobSkillTarget,
+    /// 触发条件类型
+    pub condition: MobSkillCondition,
+    /// 条件值（如 HP 百分比阈值）
+    pub condition_value: u32,
     /// 冷却时间（毫秒）
     pub cooldown_ms: u64,
 }
@@ -252,6 +291,8 @@ pub struct Mob {
     pub target_id: RwLock<Option<Uuid>>,
     pub behavior: MobBehavior,
     pub skills: Vec<MobSkill>,
+    /// 技能冷却记录：skill_id -> 上次使用时间
+    pub skill_cooldowns: RwLock<HashMap<u16, Instant>>,
 
     // AI参数
     pub sight_range: u16,
@@ -315,6 +356,7 @@ impl Mob {
             target_id: RwLock::new(None),
             behavior: MobBehavior::Passive,
             skills: Vec::new(),
+            skill_cooldowns: RwLock::new(HashMap::new()),
             sight_range: 12,
             chase_range: 20,
             aggro_rate: 0,
@@ -365,6 +407,7 @@ impl Mob {
             target_id: RwLock::new(None),
             behavior: template.behavior,
             skills: template.skills.clone(),
+            skill_cooldowns: RwLock::new(HashMap::new()),
             sight_range: template.sight_range,
             chase_range: template.chase_range,
             aggro_rate: template.aggro_rate,
@@ -412,6 +455,15 @@ impl Mob {
         *self.hp.read() == 0
     }
 
+    /// 获取当前 HP 百分比（0-100）
+    pub fn hp_percent(&self) -> u32 {
+        let hp = *self.hp.read();
+        if self.max_hp == 0 {
+            return 0;
+        }
+        (hp as u64 * 100 / self.max_hp as u64) as u32
+    }
+
     /// 重生：回到出生点并恢复满血
     pub fn respawn(&self) {
         *self.hp.write() = self.max_hp;
@@ -422,6 +474,14 @@ impl Mob {
         *self.death_time.write() = None;
         *self.drops_processed.write() = false;
         *self.path_manager.write() = MobPathManager::new();
+        // 清空技能冷却，重生后所有技能可用
+        self.skill_cooldowns.write().clear();
+    }
+
+    /// 恢复自身 HP（用于怪物自愈技能）
+    pub fn heal(&self, amount: u32) {
+        let mut hp = self.hp.write();
+        *hp = (*hp + amount).min(self.max_hp);
     }
 }
 
@@ -438,7 +498,7 @@ impl MobDatabase {
         };
 
         // 尝试从 YAML 加载
-        let yaml_paths = ["rathena/db/re/mob_db.yml", "db/mob_db.yml"];
+        let yaml_paths = ["db/mob_db.yml"];
 
         for path in &yaml_paths {
             if std::path::Path::new(path).exists() {
@@ -526,7 +586,17 @@ impl MobDatabase {
                 spawn_delay: 1000,
                 respawn_time: 60000,
                 behavior: MobBehavior::Passive,
-                skills: Vec::new(),
+                skills: vec![
+                    MobSkill {
+                        skill_id: 28,   // Heal
+                        level: 3,
+                        chance: 1000,   // 10% 概率
+                        target: MobSkillTarget::Self_,
+                        condition: MobSkillCondition::HpCertain,
+                        condition_value: 50, // HP 低于 50% 时使用
+                        cooldown_ms: 10000,  // 10 秒冷却
+                    },
+                ],
                 drops: vec![
                     MobDrop::new(910, 6000), // Fluff 60%
                     MobDrop::new(938, 200),  // Sticky Mucus 2%
@@ -604,7 +674,17 @@ impl MobDatabase {
                 spawn_delay: 1000,
                 respawn_time: 60000,
                 behavior: MobBehavior::Passive,
-                skills: Vec::new(),
+                skills: vec![
+                    MobSkill {
+                        skill_id: 5,    // Bash (SM_BASH)
+                        level: 3,
+                        chance: 500,    // 5% 概率
+                        target: MobSkillTarget::Target,
+                        condition: MobSkillCondition::Any,
+                        condition_value: 0,
+                        cooldown_ms: 5000, // 5 秒冷却
+                    },
+                ],
                 drops: vec![
                     MobDrop::new(914, 5500), // Fluff 55%
                     MobDrop::new(949, 400),  // Feather 4%
@@ -802,5 +882,111 @@ mod tests {
         assert!(!manager.is_chasing);
         assert_eq!(manager.target_pos, None);
         assert!(manager.cached_path.is_empty());
+    }
+
+    // ============================================
+    // 怪物技能系统测试
+    // ============================================
+
+    #[test]
+    fn test_mob_hp_percent_full() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        // 默认 hp=100, max_hp=100
+        assert_eq!(mob.hp_percent(), 100);
+    }
+
+    #[test]
+    fn test_mob_hp_percent_half() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        *mob.hp.write() = 50;
+        assert_eq!(mob.hp_percent(), 50);
+    }
+
+    #[test]
+    fn test_mob_hp_percent_zero() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        *mob.hp.write() = 0;
+        assert_eq!(mob.hp_percent(), 0);
+    }
+
+    #[test]
+    fn test_mob_hp_percent_one_hp() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        *mob.hp.write() = 1;
+        assert_eq!(mob.hp_percent(), 1);
+    }
+
+    #[test]
+    fn test_mob_heal_basic() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        *mob.hp.write() = 50;
+        mob.heal(20);
+        assert_eq!(*mob.hp.read(), 70);
+    }
+
+    #[test]
+    fn test_mob_heal_cap_at_max() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        *mob.hp.write() = 90;
+        mob.heal(50);
+        // 不应超过 max_hp (100)
+        assert_eq!(*mob.hp.read(), 100);
+    }
+
+    #[test]
+    fn test_mob_heal_at_full_hp() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        // HP 已满
+        mob.heal(100);
+        assert_eq!(*mob.hp.read(), 100);
+    }
+
+    #[test]
+    fn test_mob_skill_cooldowns_initialized_empty() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+        assert!(mob.skill_cooldowns.read().is_empty());
+    }
+
+    #[test]
+    fn test_mob_respawn_clears_cooldowns() {
+        let mob = Mob::new(1001, 100, 100, "test_map");
+
+        // 模拟设置冷却
+        mob.skill_cooldowns.write().insert(5, Instant::now());
+        mob.skill_cooldowns.write().insert(28, Instant::now());
+        assert_eq!(mob.skill_cooldowns.read().len(), 2);
+
+        // 设置死亡状态
+        *mob.hp.write() = 0;
+        *mob.ai_state.write() = MobAIState::Dead;
+        *mob.death_time.write() = Some(Instant::now());
+
+        // 重生
+        mob.respawn();
+
+        // 冷却应被清空
+        assert!(mob.skill_cooldowns.read().is_empty());
+        assert_eq!(*mob.hp.read(), 100);
+    }
+
+    #[test]
+    fn test_mob_from_template_has_empty_cooldowns() {
+        // from_template 应该初始化空的 skill_cooldowns
+        let mob = Mob::from_template(1001, 50, 50, "test_map");
+        assert!(mob.skill_cooldowns.read().is_empty());
+    }
+
+    #[test]
+    fn test_mob_skill_target_equality() {
+        assert_eq!(MobSkillTarget::Target, MobSkillTarget::Target);
+        assert_eq!(MobSkillTarget::Self_, MobSkillTarget::Self_);
+        assert_ne!(MobSkillTarget::Target, MobSkillTarget::Self_);
+    }
+
+    #[test]
+    fn test_mob_skill_condition_equality() {
+        assert_eq!(MobSkillCondition::Any, MobSkillCondition::Any);
+        assert_eq!(MobSkillCondition::HpCertain, MobSkillCondition::HpCertain);
+        assert_ne!(MobSkillCondition::Any, MobSkillCondition::HpCertain);
     }
 }

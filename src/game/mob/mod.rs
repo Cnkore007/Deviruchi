@@ -8,6 +8,6 @@ pub mod spawn;
 pub mod yaml_loader;
 
 pub use ai::MobAI;
-pub use data::{Mob, MobAIState, MobBehavior, MobBehaviorFlags, MobDatabase, MobPosition, MobRace, MobSkill, MobType};
+pub use data::{Mob, MobAIState, MobBehavior, MobBehaviorFlags, MobDatabase, MobPosition, MobRace, MobSkill, MobSkillCondition, MobSkillTarget, MobType};
 pub use droptable::{DropResolver, DropTableEntry, DropTableLoader, MVPResolver, MobDropTable};
 pub use spawn::MobSpawnManager;
