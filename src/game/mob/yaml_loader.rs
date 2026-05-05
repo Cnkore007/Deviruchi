@@ -3,50 +3,102 @@
 //! 从 rAthena mob_db.yml 格式加载怪物模板数据。
 //! rAthena 格式: Header (Type + Version) -> Body (条目列表) -> Footer (Imports)
 
-use super::data::{MobBehavior, MobBehaviorFlags, MobDrop, MobRace, MobSkill, MobTemplate, MobType};
+use super::data::{
+    MobBehavior, MobBehaviorFlags, MobDrop, MobRace, MobSkill, MobSkillCondition, MobSkillTarget,
+    MobTemplate, MobType,
+};
 use crate::game::battle::element::{Element, ElementLevel, MobSize};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 
-/// 物品名称到 ID 的映射（rAthena 常用物品）
-/// 完整映射应从 item_db.yml 动态加载，此处为最小集保证掉落表可用
+/// 全局物品名称到 ID 映射（从 item_db YAML 动态加载）
+static ITEM_NAME_TO_ID: once_cell::sync::Lazy<std::collections::HashMap<String, u16>> =
+    once_cell::sync::Lazy::new(|| {
+        crate::game::item::yaml_loader::load_item_name_to_id_map()
+    });
+
+/// 物品名称到 ID 的映射
+///
+/// 优先从全局映射（从 item_db YAML 加载）查找，
+/// 未找到时返回 0 并输出警告。
 pub fn item_name_to_id(name: &str) -> u32 {
-    match name {
-        // 消耗品
-        "Red_Potion" | "Red_Potion_" => 501,
-        "Orange_Potion" => 502,
-        "Yellow_Potion" => 503,
-        "White_Potion" => 504,
-        "Blue_Potion" => 505,
-        "Green_Potion" => 506,
-        // 材料
-        "Jellopy" => 909,
-        "Fluff" => 914,
-        "Feather" => 949,
-        "Sticky_Mucus" => 938,
-        "Scale_Shell" => 947,
-        "Boody_Red" => 990,
-        "Scorpion_Tail" => 904,
-        "Shell" => 935,
-        "Worm_Peelings" => 955,
-        "Mushroom_Spore" => 921,
-        "Tree_Root" => 902,
-        "Resin" => 907,
-        "Clover" => 705,
-        "Four_Leaf_Clover" => 706,
-        // 装备
-        "Knife" => 1202,
-        "Dagger" => 1201,
-        "Main_Gauche" => 1207,
-        "Sword" => 1101,
-        "Falchion" => 1104,
-        // 其他
-        _ => {
+    ITEM_NAME_TO_ID
+        .get(name)
+        .map(|&id| id as u32)
+        .unwrap_or_else(|| {
             tracing::warn!("未知物品名称: {}，item_id 设为 0", name);
             0
+        })
+}
+
+/// 全局技能名称到 ID 映射（从 skill_db.yml 动态加载）
+///
+/// rAthena 的 mob_db.yml 中 Skills 使用技能名称（如 "SM_BASH"），
+/// 而系统内部使用数字 ID，此映射用于转换。
+static SKILL_NAME_TO_ID: once_cell::sync::Lazy<std::collections::HashMap<String, u16>> =
+    once_cell::sync::Lazy::new(|| load_skill_name_to_id_map());
+
+/// 从 skill_db.yml 加载技能名称到 ID 的映射表
+fn load_skill_name_to_id_map() -> std::collections::HashMap<String, u16> {
+    let skill_db_paths = ["db/skill_db.yml"];
+    for path in &skill_db_paths {
+        if std::path::Path::new(path).exists() {
+            match fs::read_to_string(path) {
+                Ok(content) => {
+                    match serde_yaml::from_str::<SkillDbForMapping>(&content) {
+                        Ok(yaml) => {
+                            let mut map = std::collections::HashMap::new();
+                            if let Some(body) = yaml.Body {
+                                for entry in body {
+                                    // Name 字段就是 rAthena 的 Aegis 技能名（如 "SM_BASH"）
+                                    map.insert(entry.Name, entry.Id);
+                                }
+                            }
+                            tracing::info!("加载了 {} 个技能名称映射", map.len());
+                            return map;
+                        }
+                        Err(e) => {
+                            tracing::warn!("解析 {} 失败: {}", path, e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("读取 {} 失败: {}", path, e);
+                }
+            }
         }
     }
+    tracing::warn!("未找到 skill_db.yml，技能名称映射为空");
+    std::collections::HashMap::new()
+}
+
+/// 用于从 skill_db.yml 中提取 Id 和 Name 的简化结构
+#[derive(Deserialize, Debug)]
+struct SkillDbForMapping {
+    #[allow(dead_code)]
+    Header: serde_yaml::Value,
+    Body: Option<Vec<SkillDbMappingEntry>>,
+}
+
+#[derive(Deserialize, Debug)]
+struct SkillDbMappingEntry {
+    Id: u16,
+    Name: String,
+}
+
+/// 技能名称到 ID 的映射
+///
+/// 从 skill_db.yml 的 Name 字段查找对应的技能 ID。
+/// 未找到时返回 0 并输出警告。
+pub fn skill_name_to_id(name: &str) -> u16 {
+    SKILL_NAME_TO_ID
+        .get(name)
+        .copied()
+        .unwrap_or_else(|| {
+            tracing::warn!("未知技能名称: {}，skill_id 设为 0", name);
+            0
+        })
 }
 
 /// rAthena mob_db.yml 文件结构
@@ -154,6 +206,9 @@ struct MobYamlEntry {
     #[serde(default)]
     #[allow(dead_code)]
     MvpDrops: Option<Vec<MobYamlDrop>>,
+    /// 怪物技能列表
+    #[serde(default)]
+    Skills: Option<Vec<MobSkillEntry>>,
 }
 
 /// rAthena 掉落条目
@@ -165,6 +220,62 @@ struct MobYamlDrop {
     #[serde(default)]
     #[allow(dead_code)]
     StealProtected: Option<bool>,
+}
+
+/// rAthena mob_db.yml 中的技能条目
+///
+/// 对应 rAthena 格式:
+///   - Id: SM_BASH
+///     Lv: 5
+///     Rate: 500
+///     CastTime: 0
+///     Delay: 5000
+///     Emotion: 0
+///     Target: target
+///     Condition: any
+///     ConditionValue: 0
+#[derive(Deserialize, Debug)]
+struct MobSkillEntry {
+    /// 技能名称（rAthena Aegis 名称，如 "SM_BASH"）
+    Id: String,
+    /// 技能等级
+    #[serde(default = "default_skill_level")]
+    Lv: u8,
+    /// 使用概率（万分比，10000 = 100%）
+    #[serde(default)]
+    Rate: u32,
+    /// 吟唱时间（毫秒）
+    #[serde(default)]
+    #[allow(dead_code)]
+    CastTime: u32,
+    /// 冷却/延迟时间（毫秒）
+    #[serde(default)]
+    Delay: u32,
+    /// 触发时的表情
+    #[serde(default)]
+    #[allow(dead_code)]
+    Emotion: u32,
+    /// 技能目标："target"（敌人）或 "self"（自身）
+    #[serde(default = "default_skill_target")]
+    Target: String,
+    /// 触发条件："any"、"rudeattacked"、"longrange"、"hpcertain"
+    #[serde(default = "default_skill_condition")]
+    Condition: String,
+    /// 条件值（如 HP 百分比阈值）
+    #[serde(default)]
+    ConditionValue: u32,
+}
+
+fn default_skill_level() -> u8 {
+    1
+}
+
+fn default_skill_target() -> String {
+    "target".to_string()
+}
+
+fn default_skill_condition() -> String {
+    "any".to_string()
 }
 
 fn default_hp() -> u32 {
@@ -290,6 +401,38 @@ fn parse_modes(modes: &Option<HashMap<String, bool>>) -> MobBehaviorFlags {
     flags
 }
 
+/// 解析技能目标类型字符串
+fn parse_skill_target(s: &str) -> MobSkillTarget {
+    match s.to_lowercase().as_str() {
+        "self" => MobSkillTarget::Self_,
+        _ => MobSkillTarget::Target,
+    }
+}
+
+/// 解析技能触发条件字符串
+fn parse_skill_condition(s: &str) -> MobSkillCondition {
+    match s.to_lowercase().as_str() {
+        "rudeattacked" => MobSkillCondition::RudeAttacked,
+        "longrange" => MobSkillCondition::LongRange,
+        "hpcertain" => MobSkillCondition::HpCertain,
+        _ => MobSkillCondition::Any,
+    }
+}
+
+/// 将 rAthena MobSkillEntry 转换为内部 MobSkill 结构
+fn convert_mob_skill(entry: &MobSkillEntry) -> MobSkill {
+    let skill_id = skill_name_to_id(&entry.Id);
+    MobSkill {
+        skill_id,
+        level: entry.Lv,
+        chance: entry.Rate,
+        target: parse_skill_target(&entry.Target),
+        condition: parse_skill_condition(&entry.Condition),
+        condition_value: entry.ConditionValue,
+        cooldown_ms: entry.Delay as u64,
+    }
+}
+
 /// 从 rAthena mob_db.yml 加载怪物模板
 ///
 /// 返回 (mob_id -> MobTemplate) 映射
@@ -333,7 +476,11 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                 spawn_delay: entry.AttackDelay,
                 respawn_time: 60000, // 默认重生时间（后续可从 Spawn 数据读取）
                 behavior: parse_behavior(&entry.Ai, &entry.Modes),
-                skills: Vec::new(), // TODO: 从 Skills 字段加载
+                skills: entry
+                    .Skills
+                    .as_ref()
+                    .map(|skills| skills.iter().map(convert_mob_skill).collect())
+                    .unwrap_or_default(),
                 drops: entry
                     .Drops
                     .as_ref()
@@ -606,6 +753,138 @@ Body:
         assert_eq!(scorpion.drops[0].chance, 35);
 
         // 清理
+        std::fs::remove_file(tmp_path).ok();
+    }
+
+    #[test]
+    fn test_parse_skill_target() {
+        assert_eq!(parse_skill_target("target"), MobSkillTarget::Target);
+        assert_eq!(parse_skill_target("self"), MobSkillTarget::Self_);
+        assert_eq!(parse_skill_target("TARGET"), MobSkillTarget::Target);
+        assert_eq!(parse_skill_target("SELF"), MobSkillTarget::Self_);
+        assert_eq!(parse_skill_target("unknown"), MobSkillTarget::Target);
+    }
+
+    #[test]
+    fn test_parse_skill_condition() {
+        assert_eq!(parse_skill_condition("any"), MobSkillCondition::Any);
+        assert_eq!(parse_skill_condition("hpcertain"), MobSkillCondition::HpCertain);
+        assert_eq!(parse_skill_condition("rudeattacked"), MobSkillCondition::RudeAttacked);
+        assert_eq!(parse_skill_condition("longrange"), MobSkillCondition::LongRange);
+        assert_eq!(parse_skill_condition("ANY"), MobSkillCondition::Any);
+        assert_eq!(parse_skill_condition("unknown"), MobSkillCondition::Any);
+    }
+
+    #[test]
+    fn test_mob_skill_entry_defaults() {
+        // 验证默认值
+        assert_eq!(default_skill_level(), 1);
+        assert_eq!(default_skill_target(), "target");
+        assert_eq!(default_skill_condition(), "any");
+    }
+
+    #[test]
+    fn test_load_mob_db_with_skills() {
+        let yaml_str = r#"
+Header:
+  Type: MOB_DB
+  Version: 5
+Body:
+  - Id: 1002
+    AegisName: LUNATIC
+    Name: Lunatic
+    Level: 3
+    Hp: 80
+    BaseExp: 6
+    JobExp: 4
+    Attack: 12
+    Defense: 0
+    Agi: 10
+    Dex: 12
+    Luk: 5
+    AttackRange: 1
+    Size: Small
+    Race: Brute
+    Element: Neutral
+    ElementLevel: 1
+    WalkSpeed: 200
+    Ai: "03"
+    Skills:
+      - Id: AL_HEAL
+        Lv: 3
+        Rate: 1000
+        Delay: 10000
+        Target: self
+        Condition: hpcertain
+        ConditionValue: 50
+      - Id: SM_BASH
+        Lv: 5
+        Rate: 500
+        Delay: 5000
+        Target: target
+        Condition: any
+"#;
+
+        let tmp_path = "/tmp/test_mob_db_skills.yml";
+        std::fs::write(tmp_path, yaml_str).unwrap();
+
+        let mobs = load_mob_db(tmp_path).unwrap();
+        assert_eq!(mobs.len(), 1);
+
+        let lunatic = mobs.get(&1002).unwrap();
+        assert_eq!(lunatic.name, "Lunatic");
+        assert_eq!(lunatic.skills.len(), 2);
+
+        // 验证第一个技能（Heal）
+        let heal_skill = &lunatic.skills[0];
+        // AL_HEAL 的 ID 从 skill_db.yml 查找（如果加载成功），否则为 0
+        // 由于测试环境可能没有 skill_db.yml，这里主要验证解析逻辑
+        assert_eq!(heal_skill.level, 3);
+        assert_eq!(heal_skill.chance, 1000);
+        assert_eq!(heal_skill.target, MobSkillTarget::Self_);
+        assert_eq!(heal_skill.condition, MobSkillCondition::HpCertain);
+        assert_eq!(heal_skill.condition_value, 50);
+        assert_eq!(heal_skill.cooldown_ms, 10000);
+
+        // 验证第二个技能（Bash）
+        let bash_skill = &lunatic.skills[1];
+        assert_eq!(bash_skill.level, 5);
+        assert_eq!(bash_skill.chance, 500);
+        assert_eq!(bash_skill.target, MobSkillTarget::Target);
+        assert_eq!(bash_skill.condition, MobSkillCondition::Any);
+        assert_eq!(bash_skill.condition_value, 0);
+        assert_eq!(bash_skill.cooldown_ms, 5000);
+
+        // 清理
+        std::fs::remove_file(tmp_path).ok();
+    }
+
+    #[test]
+    fn test_load_mob_db_without_skills() {
+        // 没有 Skills 字段的条目应该正常加载，skills 为空
+        let yaml_str = r#"
+Header:
+  Type: MOB_DB
+  Version: 5
+Body:
+  - Id: 1001
+    AegisName: PORING
+    Name: Poring
+    Level: 1
+    Hp: 50
+    Attack: 7
+    Defense: 0
+    WalkSpeed: 400
+    Ai: "06"
+"#;
+
+        let tmp_path = "/tmp/test_mob_db_no_skills.yml";
+        std::fs::write(tmp_path, yaml_str).unwrap();
+
+        let mobs = load_mob_db(tmp_path).unwrap();
+        let poring = mobs.get(&1001).unwrap();
+        assert!(poring.skills.is_empty());
+
         std::fs::remove_file(tmp_path).ok();
     }
 }
