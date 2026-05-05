@@ -389,9 +389,14 @@ impl WarpService {
         x: i32,
         y: i32,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.db.execute_with_params(
+        self.db.execute_params(
             "UPDATE characters SET last_map = ?1, last_x = ?2, last_y = ?3 WHERE char_id = ?4",
-            rusqlite::params![map_name, x, y, char_id],
+            &[
+                &map_name as &dyn crate::storage::backend::IntoValue,
+                &x as &dyn crate::storage::backend::IntoValue,
+                &y as &dyn crate::storage::backend::IntoValue,
+                &(char_id as i32) as &dyn crate::storage::backend::IntoValue,
+            ],
         )?;
         Ok(())
     }

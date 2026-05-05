@@ -2,6 +2,7 @@
 use super::data::{Storage, StorageSlot};
 use crate::error::Result;
 use crate::storage::Database;
+use crate::storage::backend::IntoValue;
 use std::sync::Arc;
 
 /// 仓库仓库 - 处理数据库持久化
@@ -25,51 +26,41 @@ impl StorageRepository {
             let max_size: u16 = db
                 .query_row_optional(
                     "SELECT max_size FROM storage_meta WHERE char_id = ?",
-                    [char_id as i64],
-                    |row| row.get::<_, i32>(0),
+                    &[&(char_id as i64) as &dyn IntoValue],
+                    |row| row.get_i32(0),
                 )?
                 .map(|v| v as u16)
                 .unwrap_or(100); // 默认 100 格
 
             // 2. 加载物品数据
-            let slots: Vec<(i32, i32, i32, i32, i32, i32, i32, i32, i32)> = db.query(
+            let rows = db.query_rows(
                 "SELECT slot_index, item_id, amount, identified, refine, card0, card1, card2, card3
                  FROM storage WHERE char_id = ? ORDER BY slot_index",
-                [char_id as i64],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                        row.get(6)?,
-                        row.get(7)?,
-                        row.get(8)?,
-                    ))
-                },
+                &[&(char_id as i64) as &dyn IntoValue],
             )?;
 
-            if slots.is_empty() {
+            if rows.is_empty() {
                 return Ok(None);
             }
 
-            let storage_slots: Vec<StorageSlot> = slots
-                .into_iter()
-                .map(
-                    |(slot_index, item_id, amount, identified, refine, c0, c1, c2, c3)| {
-                        StorageSlot {
-                            index: slot_index as u16,
-                            item_id: item_id as u16,
-                            amount: amount as u16,
-                            identified: identified != 0,
-                            refine: refine as u8,
-                            cards: [c0 as u16, c1 as u16, c2 as u16, c3 as u16],
-                        }
-                    },
-                )
-                .collect();
+            let storage_slots: Vec<StorageSlot> = rows
+                .iter()
+                .map(|row| {
+                    Ok(StorageSlot {
+                        index: row.get_i32(0)? as u16,
+                        item_id: row.get_i32(1)? as u16,
+                        amount: row.get_i32(2)? as u16,
+                        identified: row.get_i32(3)? != 0,
+                        refine: row.get_i32(4)? as u8,
+                        cards: [
+                            row.get_i32(5)? as u16,
+                            row.get_i32(6)? as u16,
+                            row.get_i32(7)? as u16,
+                            row.get_i32(8)? as u16,
+                        ],
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
 
             let storage = Storage::from_slots(char_id, max_size, storage_slots);
 
@@ -96,39 +87,42 @@ impl StorageRepository {
         let db = self.db.clone();
 
         tokio::task::spawn_blocking(move || {
-            db.with_transaction(|conn| {
+            db.with_transaction(|tx| {
                 // 先清理该角色的旧记录，再插入新记录（事务保证原子性）
-                conn.execute(
+                tx.execute_params(
                     "DELETE FROM storage WHERE char_id = ?",
-                    rusqlite::params![char_id as i64],
+                    &[&(char_id as i64) as &dyn IntoValue],
                 )?;
 
                 // 使用 INSERT OR REPLACE 防止 slot_index 冲突
                 for slot in &slots {
-                    conn.execute(
+                    tx.execute_params(
                         "INSERT OR REPLACE INTO storage (char_id, slot_index, item_id, amount, identified, refine, card0, card1, card2, card3)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        rusqlite::params![
-                            char_id as i64,
-                            slot.index as i32,
-                            slot.item_id as i32,
-                            slot.amount as i32,
-                            slot.identified as i32,
-                            slot.refine as i32,
-                            slot.cards[0] as i32,
-                            slot.cards[1] as i32,
-                            slot.cards[2] as i32,
-                            slot.cards[3] as i32,
+                        &[
+                            &(char_id as i64) as &dyn IntoValue,
+                            &(slot.index as i32) as &dyn IntoValue,
+                            &(slot.item_id as i32) as &dyn IntoValue,
+                            &(slot.amount as i32) as &dyn IntoValue,
+                            &(slot.identified as i32) as &dyn IntoValue,
+                            &(slot.refine as i32) as &dyn IntoValue,
+                            &(slot.cards[0] as i32) as &dyn IntoValue,
+                            &(slot.cards[1] as i32) as &dyn IntoValue,
+                            &(slot.cards[2] as i32) as &dyn IntoValue,
+                            &(slot.cards[3] as i32) as &dyn IntoValue,
                         ],
                     )?;
                 }
 
                 // 保存仓库元数据（max_size）—— 使用 UPSERT
-                conn.execute(
+                tx.execute_params(
                     "INSERT INTO storage_meta (char_id, max_size)
                      VALUES (?, ?)
                      ON CONFLICT(char_id) DO UPDATE SET max_size = excluded.max_size",
-                    rusqlite::params![char_id as i64, max_size as i32],
+                    &[
+                        &(char_id as i64) as &dyn IntoValue,
+                        &(max_size as i32) as &dyn IntoValue,
+                    ],
                 )?;
 
                 Ok(())
@@ -141,10 +135,12 @@ impl StorageRepository {
     /// 删除仓库数据
     pub async fn delete(&self, char_id: u32) -> Result<()> {
         let db = self.db.clone();
-        let char_id = char_id as i64;
 
         tokio::task::spawn_blocking(move || {
-            db.execute_with_params("DELETE FROM storage WHERE char_id = ?", [char_id])?;
+            db.execute_params(
+                "DELETE FROM storage WHERE char_id = ?",
+                &[&(char_id as i64) as &dyn IntoValue],
+            )?;
             Ok(())
         })
         .await
@@ -154,13 +150,12 @@ impl StorageRepository {
     /// 检查仓库是否存在
     pub async fn exists(&self, char_id: u32) -> Result<bool> {
         let db = self.db.clone();
-        let char_id = char_id as i64;
 
         tokio::task::spawn_blocking(move || {
-            let count: i32 = db.query_row(
+            let count: i64 = db.query_row(
                 "SELECT COUNT(*) FROM storage WHERE char_id = ?",
-                [char_id],
-                |row| row.get(0),
+                &[&(char_id as i64) as &dyn IntoValue],
+                |row| row.get_i64(0),
             )?;
             Ok(count > 0)
         })

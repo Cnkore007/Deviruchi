@@ -223,9 +223,9 @@ mod tests {
         // 创建账户
         let account_id = db.create_account("banned_user", "password", 1).unwrap();
         // 将账户状态设为封禁 (state != 0)
-        db.execute_with_params(
+        db.execute_params(
             "UPDATE accounts SET state = 5 WHERE account_id = ?1",
-            rusqlite::params![account_id],
+            &[&(account_id as i32) as &dyn crate::storage::backend::IntoValue],
         ).unwrap();
 
         let packet = make_login_packet("banned_user", "password", 20);
@@ -296,9 +296,12 @@ mod tests {
 
         // 设置封禁状态，但 unban_time 为过去的时间
         let past_time = crate::storage::chrono_now() - 3600; // 1 小时前
-        db.execute_with_params(
+        db.execute_params(
             "UPDATE accounts SET state = 5, unban_time = ?1 WHERE account_id = ?2",
-            rusqlite::params![past_time, account_id],
+            &[
+                &past_time as &dyn crate::storage::backend::IntoValue,
+                &(account_id as i32) as &dyn crate::storage::backend::IntoValue,
+            ],
         ).unwrap();
 
         let packet = make_login_packet("tempban", "pass", 20);
@@ -320,9 +323,12 @@ mod tests {
 
         // 设置账号过期时间为过去
         let past_time = crate::storage::chrono_now() - 3600;
-        db.execute_with_params(
+        db.execute_params(
             "UPDATE accounts SET state = 5, expiration_time = ?1 WHERE account_id = ?2",
-            rusqlite::params![past_time, account_id],
+            &[
+                &past_time as &dyn crate::storage::backend::IntoValue,
+                &(account_id as i32) as &dyn crate::storage::backend::IntoValue,
+            ],
         ).unwrap();
 
         let packet = make_login_packet("expired", "pass", 20);

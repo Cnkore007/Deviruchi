@@ -319,9 +319,16 @@ impl MapServer {
             .publish(&new_channel, &revive_event, vec![]);
 
         // 更新数据库位置（best effort）
-        if let Err(e) = self.db.execute_with_params(
+        if let Err(e) = self.db.execute_params(
             "UPDATE characters SET last_map = ?1, last_x = ?2, last_y = ?3, hp = ?4, sp = ?5 WHERE char_id = ?6",
-            rusqlite::params![save_point.map_name, save_point.x as i32, save_point.y as i32, player.max_hp(), player.max_sp(), char_id],
+            &[
+                &save_point.map_name as &dyn crate::storage::backend::IntoValue,
+                &(save_point.x as i32) as &dyn crate::storage::backend::IntoValue,
+                &(save_point.y as i32) as &dyn crate::storage::backend::IntoValue,
+                &(player.max_hp() as i32) as &dyn crate::storage::backend::IntoValue,
+                &(player.max_sp() as i32) as &dyn crate::storage::backend::IntoValue,
+                &(char_id as i32) as &dyn crate::storage::backend::IntoValue,
+            ],
         ) {
             tracing::warn!("Failed to update character position in DB: {}", e);
         }
