@@ -78,6 +78,9 @@ impl RefineSystem {
     ///
     /// 使用注入的 `GameRng` 进行随机判定。如果当前等级已达上限则返回 `MaxLevel`。
     /// 随机值 < 成功率时精炼成功，否则失败。失败时（危险精炼模式）有概率损坏装备。
+    ///
+    /// 注意：当前实现对武器和防具使用相同的失败逻辑（50% 损坏率）。
+    /// rAthena 中武器失败降低精炼等级，防具失败有损坏概率，后续可扩展差异化处理。
     pub fn refine(item: &mut InventorySlot, _is_weapon: bool, rng: &Arc<dyn GameRng>) -> RefineResult {
         let current = item.refine;
 

@@ -6,8 +6,12 @@ pub mod panic;
 pub mod timer;
 pub mod version;
 
+use crate::game::battle::{BattleHandler, ExpDistributor};
 use crate::game::heal;
+use crate::game::map::data::MapDatabase;
+use crate::game::mob::{MobAI, MobSpawnManager};
 use crate::game::status::{StatusTickConfig, StatusTickService};
+use crate::game::GameLoop;
 
 pub use crate::game::AtCommandHandler;
 pub use config::{Config, HotReloadConfig};
@@ -104,18 +108,62 @@ impl Core {
         let drop_manager = self.drop_manager.clone();
         let party_manager = self.party_manager.clone();
 
+        // 创建共享的游戏系统组件
+        let battle_handler = Arc::new(BattleHandler::default());
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+
         // 创建 PacketHandler
         let packet_handler = Arc::new(PacketHandler::new(
-            db,
+            db.clone(),
             session_manager.clone(),
-            token_store,
-            map_state,
-            channel_bus,
-            drop_manager,
-            party_manager,
+            token_store.clone(),
+            map_state.clone(),
+            channel_bus.clone(),
+            drop_manager.clone(),
+            party_manager.clone(),
+            battle_handler.clone(),
+            spawn_manager.clone(),
+            self.config.game.death_drop_items,
         ));
 
         tracing::info!("服务器初始化完成");
+
+        // 启动 Timer 驱动循环（处理 HealService 等定时回调）
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
+            loop {
+                interval.tick().await;
+                crate::core::timer::Timer::process();
+            }
+        });
+
+        // 创建并启动 GameLoop
+        let rng = crate::game::rand::thread_rng();
+        let mob_ai = Arc::new(MobAI::new(
+            spawn_manager.clone(),
+            channel_bus.clone(),
+            drop_manager.clone(),
+            party_manager.clone(),
+            Arc::new(MapDatabase::new()),
+            rng,
+            battle_handler.clone(),
+            Arc::new(crate::game::skill::SkillDatabase::new()),
+        ));
+        let game_loop = Arc::new(GameLoop::new(
+            map_state.clone(),
+            drop_manager.clone(),
+            token_store.clone(),
+            mob_ai,
+            spawn_manager.clone(),
+            Arc::new(crate::game::mob::droptable::DropResolver),
+            channel_bus.clone(),
+            Arc::new(ExpDistributor),
+            self.heal_service.clone(),
+            Arc::new(crate::game::heal::FoodManager::new()),
+        ));
+        game_loop.clone().start();
+        tracing::info!("GameLoop 已启动");
+
         tracing::info!("运行模式: {}", self.cli.mode);
 
         // 根据模式启动服务器 (并发运行)
@@ -132,11 +180,6 @@ impl Core {
         let mut handles = Vec::new();
 
         if run_login || run_char || run_map {
-            if !run_login && !run_char && !run_map {
-                tracing::error!("未知运行模式: {}", mode);
-                return Ok(());
-            }
-
             // Login Server
             if run_login {
                 let addr = format!("0.0.0.0:{}", self.config.network.login_port);

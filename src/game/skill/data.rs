@@ -197,12 +197,6 @@ impl SkillDatabase {
     pub fn all(&self) -> impl Iterator<Item = &Skill> {
         self.skills.values()
     }
-
-    /// 获取全局默认技能数据库实例
-    pub fn default_instance() -> &'static SkillDatabase {
-        static INSTANCE: std::sync::OnceLock<SkillDatabase> = std::sync::OnceLock::new();
-        INSTANCE.get_or_init(|| SkillDatabase::new())
-    }
 }
 
 impl Default for SkillDatabase {

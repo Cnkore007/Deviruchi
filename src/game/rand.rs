@@ -18,7 +18,7 @@ pub trait GameRng: Send + Sync {
     fn rand_bool(&self, probability: f32) -> bool;
 
     /// 基础点判定 (basis points)
-    /// 生成 [0, 10000] 范围内的随机数，返回随机值
+    /// 生成 [0, 10000) 范围内的随机数，返回随机值
     /// 调用者通过比较 rand_bp(chance) < chance 来判定是否成功
     fn rand_bp(&self, chance: u32) -> u32;
 }
@@ -54,8 +54,9 @@ impl GameRng for ThreadRng {
     }
 
     fn rand_bp(&self, _chance: u32) -> u32 {
-        // Generate random value in [0, 10000] range for basis points
-        self.0.lock().gen_range(0..=10000)
+        // Generate random value in [0, 10000) range for basis points
+        // 调用者通过 rand_bp(chance) < chance 判定成功
+        self.0.lock().gen_range(0..10000)
     }
 }
 

@@ -165,6 +165,7 @@ mod tests {
             Arc::new(crate::game::battle::BattleHandler::new(
                 crate::game::rand::thread_rng(),
             )),
+            Arc::new(crate::game::skill::SkillDatabase::new()),
         ));
         (ai, spawn_manager)
     }

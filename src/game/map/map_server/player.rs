@@ -416,12 +416,12 @@ impl MapServer {
                 available = available_points,
                 "状态点不足，分配请求被拒绝"
             );
-            return Some(build_status_change_ack(status_id, &player, false));
+            return Some(build_status_change_ack(status_id, &player));
         }
 
         // 通过 MapState 直接修改存储的玩家属性（内部可变性）
         if !self.map_state.allocate_player_stat(&player_id, status_id, amount as u16) {
-            return Some(build_status_change_ack(status_id, &player, false));
+            return Some(build_status_change_ack(status_id, &player));
         }
 
         // 重新获取修改后的玩家数据用于构建 ACK
@@ -435,16 +435,15 @@ impl MapServer {
         );
 
         // 返回 ZC_STATUS_CHANGE_ACK
-        Some(build_status_change_ack(status_id, &updated_player, true))
+        Some(build_status_change_ack(status_id, &updated_player))
     }
 }
 
 /// 构建 ZC_STATUS_CHANGE_ACK (0x00BC) 包
 ///
 /// rAthena 格式：length(2) + packet_id(2) + status_id(2) + value(2) + status_point(2)
-/// 实际 rAthena 字段更复杂，这里简化为基础确认格式
-fn build_status_change_ack(status_id: u16, player: &crate::game::map::Player, success: bool) -> Vec<u8> {
-    // 获取分配后的属性值
+/// 成功时 value 为新属性值，失败时 value 为当前值（未变化），客户端通过比较判断结果
+fn build_status_change_ack(status_id: u16, player: &crate::game::map::Player) -> Vec<u8> {
     let value = match status_id {
         13 => player.str(),
         14 => player.agi(),
@@ -457,19 +456,11 @@ fn build_status_change_ack(status_id: u16, player: &crate::game::map::Player, su
 
     let status_point = player.status_point();
 
-    // ZC_STATUS_CHANGE_ACK 格式：
-    // length(2) + packet_id(2) + status_id(2) + value(2) + status_point(2) = 10 bytes
-    // 成功时 value 为新的属性值，失败时 value 为当前值
     let mut pkt = Vec::with_capacity(10);
     pkt.extend_from_slice(&10u16.to_le_bytes());
     pkt.extend_from_slice(&ZC_STATUS_CHANGE_ACK.to_le_bytes());
     pkt.extend_from_slice(&status_id.to_le_bytes());
-    if success {
-        pkt.extend_from_slice(&value.to_le_bytes());
-    } else {
-        // 失败时返回当前值（客户端可据此判断是否成功）
-        pkt.extend_from_slice(&value.to_le_bytes());
-    }
+    pkt.extend_from_slice(&value.to_le_bytes());
     pkt.extend_from_slice(&status_point.to_le_bytes());
     pkt
 }

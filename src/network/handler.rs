@@ -29,10 +29,13 @@ impl PacketHandler {
         channel_bus: Arc<ChannelBus>,
         drop_manager: Arc<DropManager>,
         party_manager: Arc<PartyManager>,
+        battle_handler: Arc<BattleHandler>,
+        spawn_manager: Arc<MobSpawnManager>,
+        death_drop_items: bool,
     ) -> Self {
         let storage_manager = Arc::new(StorageManager::new());
         let trade_manager = Arc::new(TradeManager::new());
-        let guild_manager = Arc::new(GuildManager::new());
+        let guild_manager = Arc::new(GuildManager::with_db(db.clone()));
 
         // Create teleport manager, save point manager and warp service
         let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
@@ -42,9 +45,6 @@ impl PacketHandler {
             save_point_manager.clone(),
             db.clone(),
         ));
-
-        let battle_handler = Arc::new(BattleHandler::default());
-        let spawn_manager = Arc::new(MobSpawnManager::new());
 
         let map_server = Arc::new(MapServer::new(
             db.clone(),
@@ -58,7 +58,7 @@ impl PacketHandler {
             trade_manager,
             teleport_manager,
             warp_service,
-            false, // death_drop_items
+            death_drop_items,
             battle_handler,
             spawn_manager,
         ));
@@ -111,6 +111,23 @@ impl PacketHandler {
                 }
             }
             SessionStage::Map => self.map_server.handle_packet(packet_id, data, session),
+        }
+    }
+
+    /// 处理玩家断开连接：保存数据并从地图移除
+    pub fn handle_disconnect(&self, session: &Session) {
+        if let Some(player_id) = session.player_id {
+            // 保存玩家数据
+            if let Err(e) = self.map_server.save_player(&player_id) {
+                tracing::error!("断连保存玩家数据失败: {}", e);
+            }
+            // 从地图移除
+            if let Some(player) = self.map_server.map_state.get_player(&player_id) {
+                let map_name = player.map_name.clone();
+                let channel_name = format!("map:{}", map_name);
+                self.map_server.channel_bus.unsubscribe(&channel_name, &player_id);
+                self.map_server.map_state.remove_player(&player_id);
+            }
         }
     }
 }

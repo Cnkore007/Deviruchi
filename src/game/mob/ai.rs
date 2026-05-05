@@ -48,6 +48,7 @@ pub struct MobAI {
     map_database: Arc<MapDatabase>,
     rng: Arc<dyn GameRng>,
     battle_handler: Arc<BattleHandler>,
+    skill_db: Arc<SkillDatabase>,
     drop_resolver: DropResolver,
     drop_tables: std::collections::HashMap<u16, MobDropTable>,
 }
@@ -61,6 +62,7 @@ impl MobAI {
         map_database: Arc<MapDatabase>,
         rng: Arc<dyn GameRng>,
         battle_handler: Arc<BattleHandler>,
+        skill_db: Arc<SkillDatabase>,
     ) -> Self {
         Self {
             spawn_manager,
@@ -70,6 +72,7 @@ impl MobAI {
             map_database,
             rng,
             battle_handler,
+            skill_db,
             drop_resolver: DropResolver,
             drop_tables: std::collections::HashMap::new(),
         }
@@ -336,10 +339,7 @@ impl MobAI {
         target_id: Uuid,
         map_state: &MapState,
     ) {
-        let skill_db = SkillDatabase::default_instance();
-
-        // 从技能数据库获取技能信息，用于确定效果类型
-        let skill_type = skill_db.get(skill.skill_id).map(|s| s.type_);
+        let skill_type = self.skill_db.get(skill.skill_id).map(|s| s.type_);
 
         match skill.target {
             MobSkillTarget::Self_ => {
@@ -360,8 +360,16 @@ impl MobAI {
         skill: &MobSkill,
         skill_type: Option<SkillType>,
     ) {
-        let is_heal = matches!(skill_type, Some(SkillType::Healing))
-            || matches!(skill_type, None); // 未知技能默认当治疗处理
+        // 未知技能跳过执行，避免误判类型
+        if skill_type.is_none() {
+            tracing::warn!(
+                "怪物 {}({}) 使用未知技能 ID={}，跳过执行",
+                mob.name, mob.mob_id, skill.skill_id
+            );
+            return;
+        }
+
+        let is_heal = matches!(skill_type, Some(SkillType::Healing));
 
         if is_heal {
             // 治疗效果：恢复 max_hp 的 (level * 5)% ，至少恢复 1 点
@@ -401,10 +409,18 @@ impl MobAI {
         target_id: Uuid,
         map_state: &MapState,
     ) {
+        // 未知技能跳过执行，避免误判类型
+        if skill_type.is_none() {
+            tracing::warn!(
+                "怪物 {}({}) 对目标使用未知技能 ID={}，跳过执行",
+                mob.name, mob.mob_id, skill.skill_id
+            );
+            return;
+        }
+
         if let Some(target) = map_state.get_player(&target_id) {
             let is_attack = matches!(skill_type, Some(SkillType::Attack))
-                || matches!(skill_type, Some(SkillType::Debuff))
-                || matches!(skill_type, None); // 未知技能默认当攻击处理
+                || matches!(skill_type, Some(SkillType::Debuff));
 
             if is_attack {
                 // 攻击技能：基于 mob ATK 计算额外伤害
@@ -630,6 +646,7 @@ impl Default for MobAI {
             Arc::new(MapDatabase::new()),
             crate::game::rand::thread_rng(),
             Arc::new(BattleHandler::default()),
+            Arc::new(SkillDatabase::new()),
         )
     }
 }
@@ -651,6 +668,7 @@ mod tests {
             Arc::new(MapDatabase::new()),
             Arc::new(MockRng::new(values)),
             Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
         )
     }
 
@@ -796,6 +814,7 @@ mod tests {
                 Arc::new(MapDatabase::new()),
                 Arc::new(MockRng::new(values)),
                 Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+                Arc::new(SkillDatabase::new()),
             ),
             map_state,
         )
@@ -1320,6 +1339,7 @@ mod tests {
             Arc::new(MapDatabase::new()),
             Arc::new(MockRng::new(vec![0])), // roll = 0 < 10000
             Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
         );
 
         let mob = create_test_mob_with_skills((100, 100), 5, vec![
@@ -1432,11 +1452,12 @@ mod tests {
             Arc::new(MapDatabase::new()),
             Arc::new(MockRng::new(vec![0])), // roll = 0 < 10000
             Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
         );
 
         let mob = create_test_mob_with_skills((100, 100), 5, vec![
             MobSkill {
-                skill_id: 5,    // Bash
+                skill_id: 1,    // Bash (硬编码 id=1)
                 level: 3,
                 chance: 10000,  // 100%
                 target: MobSkillTarget::Target,
@@ -1457,7 +1478,7 @@ mod tests {
 
         // 验证技能被使用：冷却应该被设置
         let cooldowns = mob.skill_cooldowns.read();
-        assert!(cooldowns.contains_key(&5), "技能 ID=5 的冷却应该被设置，说明技能被触发了");
+        assert!(cooldowns.contains_key(&1), "技能 ID=1 的冷却应该被设置，说明技能被触发了");
         drop(cooldowns);
 
         // 验证伤害记录被更新（技能执行时会记录伤害）
