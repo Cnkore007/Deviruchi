@@ -103,6 +103,36 @@ impl Default for MobPathManager {
     }
 }
 
+/// 怪物行为标记（从 Modes 解析）
+#[derive(Debug, Clone)]
+pub struct MobBehaviorFlags {
+    /// 是否可以移动（false 表示固定不动）
+    pub can_move: bool,
+    /// 是否可以攻击（false 表示不会攻击）
+    pub can_attack: bool,
+    /// 是否为探测型（可以看见隐身目标）
+    pub detector: bool,
+    /// 是否为 Boss 级别
+    pub boss: bool,
+    /// 是否为植物型（不受物理/魔法伤害加成影响）
+    pub plant: bool,
+    /// 是否可以追击（false 表示不追击超出视野的目标）
+    pub can_chase: bool,
+}
+
+impl Default for MobBehaviorFlags {
+    fn default() -> Self {
+        Self {
+            can_move: true,
+            can_attack: true,
+            detector: false,
+            boss: false,
+            plant: false,
+            can_chase: true,
+        }
+    }
+}
+
 /// 怪物种族
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MobRace {
@@ -471,6 +501,7 @@ impl MobDatabase {
                 race: MobRace::Plant,
                 mob_type: MobType::Normal,
                 mvp_drops: Vec::new(),
+                behavior_flags: MobBehaviorFlags::default(),
             },
         );
         self.templates.insert(
@@ -509,6 +540,7 @@ impl MobDatabase {
                 race: MobRace::Brute,
                 mob_type: MobType::Normal,
                 mvp_drops: Vec::new(),
+                behavior_flags: MobBehaviorFlags::default(),
             },
         );
         self.templates.insert(
@@ -547,6 +579,7 @@ impl MobDatabase {
                 race: MobRace::Plant,
                 mob_type: MobType::Normal,
                 mvp_drops: Vec::new(),
+                behavior_flags: MobBehaviorFlags::default(),
             },
         );
         self.templates.insert(
@@ -585,6 +618,7 @@ impl MobDatabase {
                 race: MobRace::Insect,
                 mob_type: MobType::Normal,
                 mvp_drops: Vec::new(),
+                behavior_flags: MobBehaviorFlags::default(),
             },
         );
     }
@@ -664,6 +698,8 @@ pub struct MobTemplate {
     pub mob_type: MobType,
     /// MVP 掉落列表
     pub mvp_drops: Vec<MobDrop>,
+    /// 行为标记（从 Modes 字段解析）
+    pub behavior_flags: MobBehaviorFlags,
 }
 
 impl MobTemplate {
@@ -699,6 +735,7 @@ impl MobTemplate {
             race: MobRace::Formless,
             mob_type: MobType::Normal,
             mvp_drops: Vec::new(),
+            behavior_flags: MobBehaviorFlags::default(),
         }
     }
 }

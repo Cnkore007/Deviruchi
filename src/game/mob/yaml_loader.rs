@@ -3,7 +3,7 @@
 //! 从 rAthena mob_db.yml 格式加载怪物模板数据。
 //! rAthena 格式: Header (Type + Version) -> Body (条目列表) -> Footer (Imports)
 
-use super::data::{MobBehavior, MobDrop, MobRace, MobSkill, MobTemplate, MobType};
+use super::data::{MobBehavior, MobBehaviorFlags, MobDrop, MobRace, MobSkill, MobTemplate, MobType};
 use crate::game::battle::element::{Element, ElementLevel, MobSize};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -264,6 +264,32 @@ fn parse_behavior(ai: &str, modes: &Option<HashMap<String, bool>>) -> MobBehavio
     }
 }
 
+/// 解析怪物行为标记（Modes 字段）
+fn parse_modes(modes: &Option<HashMap<String, bool>>) -> MobBehaviorFlags {
+    let mut flags = MobBehaviorFlags::default();
+    if let Some(m) = modes {
+        if m.get("CanMove").copied() == Some(false) {
+            flags.can_move = false;
+        }
+        if m.get("CanAttack").copied() == Some(false) {
+            flags.can_attack = false;
+        }
+        if m.get("Detector").copied() == Some(true) {
+            flags.detector = true;
+        }
+        if m.get("Boss").copied() == Some(true) {
+            flags.boss = true;
+        }
+        if m.get("Plant").copied() == Some(true) {
+            flags.plant = true;
+        }
+        if m.get("CanChase").copied() == Some(false) {
+            flags.can_chase = false;
+        }
+    }
+    flags
+}
+
 /// 从 rAthena mob_db.yml 加载怪物模板
 ///
 /// 返回 (mob_id -> MobTemplate) 映射
@@ -289,15 +315,23 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                 crit: entry.Luk as i16 / 3, // 大约的 crit 值
                 walk_speed: entry.WalkSpeed,
                 atk_range: entry.AttackRange,
-                sight_range: 12, // 默认视野范围
+                sight_range: if entry.SkillRange > 0 {
+                    entry.SkillRange
+                } else {
+                    12
+                },
                 chase_range: if entry.ChaseRange > 0 {
                     entry.ChaseRange
                 } else {
                     12
                 },
-                aggro_rate: 0,
+                // Aggressive AI -> aggro_rate=100，其他默认 0
+                aggro_rate: match entry.Ai.as_str() {
+                    "01" => 100,
+                    _ => 0,
+                },
                 spawn_delay: entry.AttackDelay,
-                respawn_time: 60000, // 默认重生时间
+                respawn_time: 60000, // 默认重生时间（后续可从 Spawn 数据读取）
                 behavior: parse_behavior(&entry.Ai, &entry.Modes),
                 skills: Vec::new(), // TODO: 从 Skills 字段加载
                 drops: entry
@@ -344,6 +378,7 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                             .collect()
                     })
                     .unwrap_or_default(),
+                behavior_flags: parse_modes(&entry.Modes),
             };
 
             mobs.insert(entry.Id, template);
@@ -397,6 +432,33 @@ mod tests {
         assert_eq!(parse_behavior("04", &None), MobBehavior::Assist);
         assert_eq!(parse_behavior("05", &None), MobBehavior::PassiveAssist);
         assert_eq!(parse_behavior("06", &None), MobBehavior::Passive);
+    }
+
+    #[test]
+    fn test_parse_modes_default() {
+        let flags = parse_modes(&None);
+        assert!(flags.can_move);
+        assert!(flags.can_attack);
+        assert!(!flags.detector);
+        assert!(!flags.boss);
+        assert!(!flags.plant);
+        assert!(flags.can_chase);
+    }
+
+    #[test]
+    fn test_parse_modes_boss_detector() {
+        let mut modes = HashMap::new();
+        modes.insert("Boss".to_string(), true);
+        modes.insert("Detector".to_string(), true);
+        modes.insert("CanMove".to_string(), false);
+        modes.insert("CanChase".to_string(), false);
+        let flags = parse_modes(&Some(modes));
+        assert!(!flags.can_move);
+        assert!(flags.can_attack);
+        assert!(flags.detector);
+        assert!(flags.boss);
+        assert!(!flags.plant);
+        assert!(!flags.can_chase);
     }
 
     #[test]
