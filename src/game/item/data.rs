@@ -27,7 +27,7 @@ pub enum ItemFlag {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub id: u16,
-    pub name: &'static str,
+    pub name: String,
     pub type_: ItemType,
     pub buy_price: u32,
     pub sell_price: u32,
@@ -58,7 +58,7 @@ impl Item {
     pub fn new(id: u16) -> Self {
         Self {
             id,
-            name: "Unknown",
+            name: "Unknown".to_string(),
             type_: ItemType::Etc,
             buy_price: 0,
             sell_price: 0,
@@ -95,11 +95,17 @@ impl ItemDatabase {
         let mut db = Self {
             items: std::collections::HashMap::new(),
         };
-        // 尝试从YAML加载，失败则使用默认物品
-        if let Ok(yaml_items) = super::yaml_loader::ItemDbLoader::load_from_yaml("db/item_db.yml") {
-            db.items = yaml_items;
-        } else {
-            db.init_default_items();
+        // 尝试从YAML加载（优先 rAthena 格式），失败则使用默认物品
+        match super::yaml_loader::ItemDbLoader::load_from_yaml("db/item_db.yml") {
+            Ok(yaml_items) if !yaml_items.is_empty() => {
+                let count = yaml_items.len();
+                db.items = yaml_items;
+                tracing::info!("从 YAML 加载了 {} 个物品", count);
+            }
+            _ => {
+                tracing::info!("使用硬编码物品数据");
+                db.init_default_items();
+            }
         }
         db
     }
@@ -110,7 +116,7 @@ impl ItemDatabase {
             501,
             Item {
                 id: 501,
-                name: "Red Potion",
+                name: "Red Potion".to_string(),
                 type_: ItemType::Heal,
                 buy_price: 50,
                 sell_price: 25,
@@ -128,7 +134,7 @@ impl ItemDatabase {
             502,
             Item {
                 id: 502,
-                name: "Yellow Potion",
+                name: "Yellow Potion".to_string(),
                 type_: ItemType::Heal,
                 buy_price: 40,
                 sell_price: 20,
@@ -146,7 +152,7 @@ impl ItemDatabase {
             503,
             Item {
                 id: 503,
-                name: "Blue Potion",
+                name: "Blue Potion".to_string(),
                 type_: ItemType::Heal,
                 buy_price: 50,
                 sell_price: 25,
@@ -164,7 +170,7 @@ impl ItemDatabase {
             1201,
             Item {
                 id: 1201,
-                name: "Dagger",
+                name: "Dagger".to_string(),
                 type_: ItemType::Weapon,
                 buy_price: 1000,
                 sell_price: 500,
@@ -183,7 +189,7 @@ impl ItemDatabase {
             1202,
             Item {
                 id: 1202,
-                name: "Main Gauche",
+                name: "Main Gauche".to_string(),
                 type_: ItemType::Weapon,
                 buy_price: 2500,
                 sell_price: 1250,
@@ -202,7 +208,7 @@ impl ItemDatabase {
             1501,
             Item {
                 id: 1501,
-                name: "Clothes",
+                name: "Clothes".to_string(),
                 type_: ItemType::Armor,
                 buy_price: 500,
                 sell_price: 250,
@@ -219,6 +225,11 @@ impl ItemDatabase {
 
     pub fn get(&self, item_id: u16) -> Option<&Item> {
         self.items.get(&item_id)
+    }
+
+    /// 插入或覆盖物品数据（用于测试或动态加载）
+    pub fn insert(&mut self, item: Item) {
+        self.items.insert(item.id, item);
     }
 }
 
