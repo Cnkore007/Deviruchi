@@ -121,3 +121,18 @@ fn test_sprite_animation_advance() {
     anim.advance(100);
     assert_eq!(anim.current_frame, 0);
 }
+
+// HUD 布局测试
+
+use devi::render::ui::hud::HudLayout;
+
+/// 测试 HUD 布局默认值
+/// 验证屏幕尺寸和 UI 元素大小的默认配置
+#[test]
+fn test_hud_layout_default() {
+    let layout = HudLayout::default();
+    assert!((layout.screen_width - 1024.0).abs() < f32::EPSILON);
+    assert!((layout.screen_height - 768.0).abs() < f32::EPSILON);
+    assert!((layout.status_bar_height - 40.0).abs() < f32::EPSILON);
+    assert!((layout.chat_window_width - 300.0).abs() < f32::EPSILON);
+}
