@@ -1,2 +1,1 @@
-pub mod camera;
-pub mod tile;
+// 渲染管线模块（后续实现）
