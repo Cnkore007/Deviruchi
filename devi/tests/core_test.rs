@@ -1,7 +1,11 @@
-// 客户端配置系统集成测试
-// 验证 ClientConfig 的默认值和 YAML 反序列化功能
+// 核心模块集成测试
+// 覆盖配置系统、游戏状态机、Tick 配置三大核心模块
 
 use devi::core::config::ClientConfig;
+use devi::core::state::GameState;
+use devi::core::tick::TickConfig;
+
+// ===== 配置系统测试 =====
 
 /// 测试默认配置值是否正确
 #[test]
@@ -29,9 +33,7 @@ protocol: "legacy"
     assert_eq!(config.protocol, "legacy");
 }
 
-// ========== 游戏状态机测试 ==========
-
-use devi::core::state::GameState;
+// ===== 状态机测试 =====
 
 /// 测试初始状态默认为 Login
 #[test]
@@ -54,4 +56,22 @@ fn test_state_transitions() {
 
     state = GameState::Login;
     assert_eq!(state, GameState::Login);
+}
+
+// ===== Tick 配置测试 =====
+
+/// 测试默认 tick 配置：20ms/tick = 50Hz
+#[test]
+fn test_tick_config_default() {
+    let config = TickConfig::default();
+    assert_eq!(config.tick_rate_ms, 20);
+    assert!((config.tick_rate_hz - 50.0).abs() < f64::EPSILON);
+}
+
+/// 测试自定义 tick 配置：16ms/tick ≈ 62.5Hz
+#[test]
+fn test_tick_config_custom() {
+    let config = TickConfig::new(16);
+    assert_eq!(config.tick_rate_ms, 16);
+    assert!((config.tick_rate_hz - 62.5).abs() < f64::EPSILON);
 }
