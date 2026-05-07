@@ -1,11 +1,12 @@
 // 客户端配置模块
 // 支持 YAML 反序列化，提供合理的默认值
 
+use bevy::prelude::*;
 use serde::Deserialize;
 
 /// 客户端配置
 /// 用于从 YAML 配置文件加载客户端运行参数
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Resource)]
 pub struct ClientConfig {
     /// 窗口宽度（像素）
     pub window_width: u32,
