@@ -28,3 +28,30 @@ protocol: "legacy"
     assert_eq!(config.server_address, "192.168.1.100");
     assert_eq!(config.protocol, "legacy");
 }
+
+// ========== 游戏状态机测试 ==========
+
+use devi::core::state::GameState;
+
+/// 测试初始状态默认为 Login
+#[test]
+fn test_initial_state_is_login() {
+    let state = GameState::default();
+    assert_eq!(state, GameState::Login);
+}
+
+/// 测试状态之间的流转是否正确
+#[test]
+fn test_state_transitions() {
+    let mut state = GameState::default();
+    assert_eq!(state, GameState::Login);
+
+    state = GameState::CharSelect;
+    assert_eq!(state, GameState::CharSelect);
+
+    state = GameState::InGame;
+    assert_eq!(state, GameState::InGame);
+
+    state = GameState::Login;
+    assert_eq!(state, GameState::Login);
+}
