@@ -3,6 +3,7 @@ use devi::protocol::login::{LoginRequest, LoginResponse};
 use devi::protocol::char_mod::{CharSelectRequest, CharListResponse};
 use devi::net::transport::TransportState;
 use devi::net::codec::PacketCodec;
+use devi::net::handler::PacketHandler;
 
 #[test]
 fn test_login_request_packet_id() {
@@ -91,4 +92,21 @@ fn test_decode_invalid_packet() {
     let data = vec![0xFF, 0xFF, 0x00, 0x00];
     let result = PacketCodec::decode(&data);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_handler_register_and_dispatch() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    let mut handler = PacketHandler::new();
+    // 使用 Arc<AtomicBool> 以便在 Fn 回调中修改共享状态
+    let called = Arc::new(AtomicBool::new(false));
+    let called_clone = called.clone();
+    handler.on_login_response(move |_resp| {
+        called_clone.store(true, Ordering::Relaxed);
+    });
+    let packet = Packet::LoginResponse(LoginResponse::Failure { error_code: 1 });
+    handler.dispatch(&packet);
+    assert!(called.load(Ordering::Relaxed));
 }
