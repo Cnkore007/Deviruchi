@@ -1,4 +1,5 @@
 use crate::game::battle::ExpDistributor;
+use crate::game::guild::GuildManager;
 use crate::game::heal::{FoodManager, HealService};
 use crate::game::map::MapState;
 use crate::game::map::channel::ChannelBus;
@@ -8,6 +9,9 @@ use crate::game::mob::{MobAI, MobSpawnManager};
 use crate::game::token::TokenStore;
 use std::sync::Arc;
 use std::time::Duration;
+
+/// 定期保存间隔：每 3000 个 tick（100ms/tick = 5 分钟）保存一次
+const SAVE_INTERVAL_TICKS: u64 = 3000;
 
 #[allow(dead_code)]
 pub struct GameLoop {
@@ -21,7 +25,10 @@ pub struct GameLoop {
     exp_distributor: Arc<ExpDistributor>,
     heal_service: Arc<HealService>,
     food_manager: Arc<FoodManager>,
+    guild_manager: Arc<GuildManager>,
+    db: Option<Arc<crate::storage::Database>>,
     tick_interval: Duration,
+    tick_count: parking_lot::Mutex<u64>,
 }
 
 impl GameLoop {
@@ -36,6 +43,7 @@ impl GameLoop {
         exp_distributor: Arc<ExpDistributor>,
         heal_service: Arc<HealService>,
         food_manager: Arc<FoodManager>,
+        guild_manager: Arc<GuildManager>,
     ) -> Self {
         Self {
             map_state,
@@ -48,8 +56,17 @@ impl GameLoop {
             exp_distributor,
             heal_service,
             food_manager,
+            guild_manager,
+            db: None,
             tick_interval: Duration::from_millis(100),
+            tick_count: parking_lot::Mutex::new(0),
         }
+    }
+
+    /// 设置数据库引用（用于定期保存玩家数据）
+    pub fn with_db(mut self, db: Arc<crate::storage::Database>) -> Self {
+        self.db = Some(db);
+        self
     }
 
     pub fn with_tick_interval(mut self, interval: Duration) -> Self {
@@ -75,6 +92,39 @@ impl GameLoop {
 
         // 5. Update player states (HP/SP regeneration, food effects, status cleanup)
         self.process_player_regeneration();
+
+        // 6. 定期保存（每 5 分钟）
+        let mut count = self.tick_count.lock();
+        *count += 1;
+        if *count >= SAVE_INTERVAL_TICKS {
+            *count = 0;
+            drop(count); // 释放锁后再执行保存
+            self.periodic_save();
+        }
+    }
+
+    /// 定期保存：公会数据 + 在线玩家数据
+    fn periodic_save(&self) {
+        tracing::info!("执行定期保存...");
+
+        // 保存公会数据
+        self.guild_manager.save_all();
+
+        // 保存在线玩家数据
+        if let Some(db) = &self.db {
+            let player_ids = self.map_state.get_all_player_ids();
+            let mut saved = 0;
+            for player_id in &player_ids {
+                if let Some(player) = self.map_state.get_player(player_id) {
+                    if let Err(e) = player.save_to_db(db) {
+                        tracing::warn!("定期保存玩家 {} 失败: {}", player.name, e);
+                    } else {
+                        saved += 1;
+                    }
+                }
+            }
+            tracing::info!("定期保存完成：{} 个玩家，公会数据已保存", saved);
+        }
     }
 
     /// Process player HP/SP regeneration and related systems
@@ -181,6 +231,7 @@ mod tests {
         let config = Arc::new(crate::core::Config::default());
         let heal_service = Arc::new(HealService::new(config.clone()));
         let food_manager = Arc::new(FoodManager::new());
+        let guild_manager = Arc::new(crate::game::guild::GuildManager::new());
 
         GameLoop::new(
             map_state,
@@ -193,6 +244,7 @@ mod tests {
             exp_distributor,
             heal_service,
             food_manager,
+            guild_manager,
         )
     }
 
@@ -237,6 +289,7 @@ mod tests {
         // Create a test mob
         let mob = Arc::new(Mob {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "TestPoring".to_string(),
             pos: parking_lot::RwLock::new(MobPosition { x: 100, y: 100 }),
