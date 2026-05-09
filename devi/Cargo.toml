@@ -17,6 +17,7 @@ byteorder = "1"
 image = "0.25"
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 futures-util = "0.3"
+pollster = "0.4"
 
 [dev-dependencies]
 bevy = { version = "0.15", features = ["wayland"] }
