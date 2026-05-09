@@ -173,7 +173,7 @@ impl NpcDatabase {
         };
 
         // 尝试从 YAML 加载
-        let yaml_paths = ["db/npc_db.yml", "rathena/db/npc_db.yml"];
+        let yaml_paths = ["db/npc_db.yml"];
 
         for path in &yaml_paths {
             if std::path::Path::new(path).exists() {

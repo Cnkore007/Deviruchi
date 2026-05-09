@@ -10,6 +10,7 @@ pub struct GameServer {
     addr: String,
     session_manager: Arc<SessionManager>,
     packet_handler: Arc<PacketHandler>,
+    initial_stage: crate::network::session::SessionStage,
 }
 
 impl GameServer {
@@ -22,7 +23,14 @@ impl GameServer {
             addr,
             session_manager,
             packet_handler,
+            initial_stage: crate::network::session::SessionStage::Login,
         }
+    }
+
+    /// 设置新连接的初始会话阶段（Login/Char/Map）
+    pub fn with_initial_stage(mut self, stage: crate::network::session::SessionStage) -> Self {
+        self.initial_stage = stage;
+        self
     }
 
     pub async fn listen(&self) -> anyhow::Result<()> {
@@ -34,9 +42,10 @@ impl GameServer {
                 Ok((stream, addr)) => {
                     let session_manager = self.session_manager.clone();
                     let packet_handler = self.packet_handler.clone();
+                    let initial_stage = self.initial_stage.clone();
                     tokio::spawn(async move {
                         if let Err(e) =
-                            Self::handle_connection(stream, addr, session_manager, packet_handler)
+                            Self::handle_connection(stream, addr, session_manager, packet_handler, initial_stage)
                                 .await
                         {
                             error!("Connection error: {}", e);
@@ -55,10 +64,12 @@ impl GameServer {
         addr: std::net::SocketAddr,
         session_manager: Arc<SessionManager>,
         packet_handler: Arc<PacketHandler>,
+        initial_stage: crate::network::session::SessionStage,
     ) -> anyhow::Result<()> {
         info!("New connection: {}", addr);
 
         let mut session = Session::new();
+        session.stage = initial_stage;
         let session_id = session.id;
 
         // Create channel for game events from ChannelBus to client
@@ -105,6 +116,9 @@ impl GameServer {
                 }
             }
         }
+
+        // 断连时保存玩家数据并从地图移除
+        packet_handler.handle_disconnect(&session);
 
         session_manager.remove(&session_id);
         info!("Connection closed: {}", addr);

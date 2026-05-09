@@ -323,6 +323,7 @@ mod tests {
     fn make_mob(level: u16, defense: u16, magic_defense: u16, hit: i16, flee: i16) -> Mob {
         Mob {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "TestMob".to_string(),
             pos: RwLock::new(MobPosition { x: 100, y: 100 }),

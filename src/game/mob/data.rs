@@ -254,6 +254,8 @@ pub enum MobAIState {
 #[derive(Debug)]
 pub struct Mob {
     pub id: Uuid,
+    /// 客户端可见的实体 ID（u32），由 MobSpawnManager 注册时分配
+    pub entity_id: std::sync::atomic::AtomicU32,
     pub mob_id: u16,
     pub name: String,
     pub pos: RwLock<MobPosition>,
@@ -329,6 +331,7 @@ impl Mob {
     pub fn new(mob_id: u16, x: u16, y: u16, map: &str) -> Self {
         Self {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id,
             name: format!("Mob_{}", mob_id),
             pos: RwLock::new(MobPosition { x, y }),
@@ -380,6 +383,7 @@ impl Mob {
         let template = MobDatabase::default_instance().get(mob_id);
         Self {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id,
             name: template.name.to_string(),
             pos: RwLock::new(MobPosition { x, y }),
@@ -453,6 +457,16 @@ impl Mob {
 
     pub fn is_dead(&self) -> bool {
         *self.hp.read() == 0
+    }
+
+    /// 获取客户端可见的实体 ID
+    pub fn get_entity_id(&self) -> u32 {
+        self.entity_id.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// 设置实体 ID（由 MobSpawnManager 在注册时调用）
+    pub fn set_entity_id(&self, id: u32) {
+        self.entity_id.store(id, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// 获取当前 HP 百分比（0-100）

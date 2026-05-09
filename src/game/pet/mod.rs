@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod data;
 pub mod manager;
+pub mod yaml_loader;
 
 pub use ai::{PetAI, PetAIManager, PetAIState};
 pub use data::{Pet, PetData, PetDatabase};

@@ -32,10 +32,10 @@ impl PacketHandler {
         battle_handler: Arc<BattleHandler>,
         spawn_manager: Arc<MobSpawnManager>,
         death_drop_items: bool,
+        guild_manager: Arc<GuildManager>,
     ) -> Self {
         let storage_manager = Arc::new(StorageManager::new());
         let trade_manager = Arc::new(TradeManager::new());
-        let guild_manager = Arc::new(GuildManager::with_db(db.clone()));
 
         // Create teleport manager, save point manager and warp service
         let teleport_manager = Arc::new(RwLock::new(TeleportManager::new()));
@@ -98,7 +98,7 @@ impl PacketHandler {
                 }
             }
             SessionStage::Char => {
-                if matches!(packet_id, 0x0065..=0x0068) {
+                if matches!(packet_id, 0x0065..=0x0068 | 0x01F8) {
                     let result = self.char_server.handle_packet(packet_id, data, session);
                     // Advance to Map stage on successful char selection
                     if packet_id == 0x0065 && result.is_some() && session.char_id.is_some() {

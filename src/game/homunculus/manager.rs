@@ -66,6 +66,25 @@ pub struct HomunculusManager {
 }
 
 impl HomunculusManager {
+    /// 创建管理器（仅硬编码模板，供测试使用）
+    pub fn new_hardcoded(db: Arc<Database>) -> Self {
+        let max_id = db
+            .query_row(
+                "SELECT COALESCE(MAX(homun_id), 0) FROM homunculus",
+                &[],
+                |row| row.get_i64(0),
+            )
+            .unwrap_or(0) as u32;
+
+        Self {
+            db,
+            homunculi: RwLock::new(HashMap::new()),
+            summoned: RwLock::new(HashMap::new()),
+            database: HomunculusDatabase::new_hardcoded(),
+            next_id: AtomicU32::new(max_id + 1),
+        }
+    }
+
     /// 创建管理器，从数据库初始化 next_id
     pub fn new(db: Arc<Database>) -> Self {
         // 从数据库初始化 next_id（如果 homunculus 表存在）
@@ -559,7 +578,7 @@ mod tests {
             )",
         )
         .expect("创建 homunculus_skills 表失败");
-        HomunculusManager::new(db)
+        HomunculusManager::new_hardcoded(db)
     }
 
     #[test]

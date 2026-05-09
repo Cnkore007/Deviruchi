@@ -387,7 +387,35 @@ pub struct QuestDatabase {
 
 impl QuestDatabase {
     pub fn new() -> Self {
-        Self::default()
+        let mut db = Self::default();
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["db/quest_db.yml"];
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match super::yaml_loader::load_quest_db(path) {
+                    Ok(quests) if !quests.is_empty() => {
+                        let count = quests.len();
+                        for (_, quest) in quests {
+                            db.add(quest);
+                        }
+                        tracing::info!("从 {} 加载了 {} 个任务", path, count);
+                        return db;
+                    }
+                    Ok(_) => {
+                        tracing::warn!("{} 解析结果为空", path);
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        // 回退到硬编码
+        tracing::info!("使用硬编码任务数据");
+        db.load_default_quests();
+        db
     }
 
     /// 添加任务

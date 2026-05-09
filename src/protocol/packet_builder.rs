@@ -23,24 +23,42 @@ pub struct PacketBuilderCtx {
     data: BytesMut,
 }
 
-macro_rules! impl_put {
-    ($ty:ty, $method:ident) => {
-        impl PacketBuilderCtx {
-            pub fn $method(mut self, val: $ty) -> Self {
-                self.data.$method(val);
-                self
-            }
-        }
-    };
-}
+impl PacketBuilderCtx {
+    pub fn put_u8(mut self, val: u8) -> Self {
+        self.data.put_u8(val);
+        self
+    }
 
-impl_put!(u8, put_u8);
-impl_put!(u16, put_u16);
-impl_put!(u32, put_u32);
-impl_put!(u64, put_u64);
-impl_put!(i16, put_i16);
-impl_put!(i32, put_i32);
-impl_put!(i64, put_i64);
+    pub fn put_u16(mut self, val: u16) -> Self {
+        self.data.put_u16_le(val);
+        self
+    }
+
+    pub fn put_u32(mut self, val: u32) -> Self {
+        self.data.put_u32_le(val);
+        self
+    }
+
+    pub fn put_u64(mut self, val: u64) -> Self {
+        self.data.put_u64_le(val);
+        self
+    }
+
+    pub fn put_i16(mut self, val: i16) -> Self {
+        self.data.put_i16_le(val);
+        self
+    }
+
+    pub fn put_i32(mut self, val: i32) -> Self {
+        self.data.put_i32_le(val);
+        self
+    }
+
+    pub fn put_i64(mut self, val: i64) -> Self {
+        self.data.put_i64_le(val);
+        self
+    }
+}
 
 impl PacketBuilderCtx {
     pub fn put_str(mut self, s: &str) -> Self {

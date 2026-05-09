@@ -335,4 +335,45 @@ impl MapServer {
 
         None
     }
+
+    /// Handle heartbeat/time sync (0x00A7)
+    /// 客户端定期发送，服务器返回当前时间戳
+    pub(super) fn handle_request_time(&self) -> Option<Vec<u8>> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as u32;
+
+        // ZC_ACK_TIME (0x007F): packet_id(2) + timestamp(4) = 6 bytes
+        let mut response = Vec::with_capacity(6);
+        response.extend_from_slice(&6u16.to_le_bytes()); // length
+        response.extend_from_slice(&0x007Fu16.to_le_bytes()); // packet_id
+        response.extend_from_slice(&now.to_le_bytes()); // timestamp
+        Some(response)
+    }
+
+    /// Handle quit request (0x00F3)
+    /// 保存玩家数据并断开连接
+    pub(super) fn handle_request_quit(&self, session: &mut Session) -> Option<Vec<u8>> {
+        let player_id = session.player_id?;
+
+        // 保存玩家数据到数据库
+        if let Err(e) = self.save_player(&player_id) {
+            tracing::error!("保存玩家数据失败 (quit): {}", e);
+        }
+
+        // 从地图移除玩家
+        if let Some(player) = self.map_state.get_player(&player_id) {
+            let map_name = player.map_name.clone();
+            let channel_name = format!("map:{}", map_name);
+            self.channel_bus.unsubscribe(&channel_name, &player_id);
+            self.map_state.remove_player(&player_id);
+        }
+
+        // 返回断开确认包 ZC_ACK_REQ_DISCONNECT (0x018A)
+        let mut response = Vec::with_capacity(4);
+        response.extend_from_slice(&4u16.to_le_bytes()); // length
+        response.extend_from_slice(&0x018Au16.to_le_bytes()); // packet_id
+        Some(response)
+    }
 }

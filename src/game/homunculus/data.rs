@@ -308,13 +308,22 @@ pub struct HomunculusDatabase {
 }
 
 impl HomunculusDatabase {
+    /// 仅使用硬编码数据创建（供测试使用）
+    pub fn new_hardcoded() -> Self {
+        let mut db = Self {
+            templates: std::collections::HashMap::new(),
+        };
+        db.init_hardcoded();
+        db
+    }
+
     pub fn new() -> Self {
         let mut db = Self {
             templates: std::collections::HashMap::new(),
         };
 
         // 尝试从 YAML 加载
-        let yaml_paths = ["rathena/db/re/homunculus_db.yml", "db/homunculus_db.yml"];
+        let yaml_paths = ["db/homunculus_db.yml"];
 
         for path in &yaml_paths {
             if std::path::Path::new(path).exists() {
@@ -342,11 +351,38 @@ impl HomunculusDatabase {
     }
 
     fn load_from_yaml(
-        _path: &str,
+        path: &str,
     ) -> Result<std::collections::HashMap<String, HomunculusTemplate>, Box<dyn std::error::Error>>
     {
-        // TODO: 实现完整解析 rAthena homunculus_db.yml 格式
-        Ok(std::collections::HashMap::new())
+        let yaml_db = super::yaml_loader::load_homunculus_db(path)?;
+        let mut templates = std::collections::HashMap::new();
+
+        for (class, yt) in yaml_db {
+            let race = HomunculusRace::from_str(&yt.race);
+            templates.insert(class, HomunculusTemplate {
+                class_name: yt.class_name,
+                name: yt.name,
+                evolution_class: if yt.evolution_class.is_empty() { None } else { Some(yt.evolution_class) },
+                food_item: None,
+                hungry_delay: 60000,
+                race,
+                element: yt.element,
+                size: yt.size,
+                evolution_size: None,
+                attack_delay: yt.attack_delay,
+                hp_growth: StatGrowth { base: yt.hp_base, growth_min: yt.hp_growth_min, growth_max: yt.hp_growth_max, evolution_min: 0, evolution_max: 0 },
+                sp_growth: StatGrowth { base: yt.sp_base, growth_min: yt.sp_growth_min, growth_max: yt.sp_growth_max, evolution_min: 0, evolution_max: 0 },
+                str_growth: StatGrowth { base: yt.str_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                agi_growth: StatGrowth { base: yt.agi_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                vit_growth: StatGrowth { base: yt.vit_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                int_growth: StatGrowth { base: yt.int_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                dex_growth: StatGrowth { base: yt.dex_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                luk_growth: StatGrowth { base: yt.luk_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
+                skill_tree: Vec::new(),
+            });
+        }
+
+        Ok(templates)
     }
 
     fn init_hardcoded(&mut self) {
@@ -727,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_from_template() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
         let template = db.get_by_type(HomunculusType::Lif).unwrap();
 
         let homun = Homunculus::from_template(1, 100, template, "MyLif".to_string());
@@ -748,7 +784,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_feed() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
         let template = db.get_by_type(HomunculusType::Lif).unwrap();
         let mut homun = Homunculus::from_template(1, 100, template, "Test".to_string());
 
@@ -763,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_intimacy() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
         let template = db.get_by_type(HomunculusType::Lif).unwrap();
         let mut homun = Homunculus::from_template(1, 100, template, "Test".to_string());
 
@@ -780,7 +816,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_damage_and_death() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
         let template = db.get_by_type(HomunculusType::Amistr).unwrap();
         let mut homun = Homunculus::from_template(1, 100, template, "Tank".to_string());
 
@@ -799,7 +835,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_revive() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
         let template = db.get_by_type(HomunculusType::Filir).unwrap();
         let mut homun = Homunculus::from_template(1, 100, template, "Test".to_string());
 
@@ -813,7 +849,7 @@ mod tests {
 
     #[test]
     fn test_homunculus_database_types() {
-        let db = HomunculusDatabase::new();
+        let db = HomunculusDatabase::new_hardcoded();
 
         // 验证 4 种基础生命体都存在
         assert!(db.get_by_type(HomunculusType::Lif).is_some());

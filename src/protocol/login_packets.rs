@@ -34,12 +34,23 @@ impl Packed for CALogin {
 }
 
 /// 服务器接受登录 (0x0069)
+///
+/// rAthena 格式包含 char server 地址列表。
+/// 当前实现支持单个 char server 条目。
 #[derive(Debug, Clone)]
 pub struct ACAceptLogin {
     pub account_id: u32,
     pub login_id1: u32,
     pub login_id2: u32,
     pub sex: u8,
+    /// Char Server IP 地址（4 字节，大端序网络字节序）
+    pub char_ip: u32,
+    /// Char Server 端口
+    pub char_port: u16,
+    /// 服务器名称
+    pub server_name: String,
+    /// 在线用户数
+    pub user_count: u16,
 }
 
 impl Packed for ACAceptLogin {
@@ -49,6 +60,14 @@ impl Packed for ACAceptLogin {
             .put_u32(self.login_id1)
             .put_u32(self.login_id2)
             .put_u8(self.sex)
+            .put_u8(0) // padding
+            // Char server 条目：IP(4) + port(2) + name(20) + users(2) + type(1) + new(2)
+            .put_slice(&self.char_ip.to_be_bytes()) // IP 地址用网络字节序
+            .put_u16(self.char_port)
+            .put_fixed_str(&self.server_name, 20)
+            .put_u16(self.user_count)
+            .put_u8(0) // server type
+            .put_u16(0) // new flag
             .build()
     }
 

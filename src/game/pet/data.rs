@@ -145,6 +145,86 @@ impl Default for PetData {
     }
 }
 
+/// 物品名称到蛋 ID 的映射
+fn item_name_to_egg_id(name: &str) -> u16 {
+    match name {
+        "Poring_Egg" => 22001,
+        "Lunatic_Egg" => 22002,
+        "Fabre_Egg" => 22003,
+        "Picky_Egg" => 22004,
+        "PecoPeco_Egg" => 22005,
+        "Petit_Egg" => 22006,
+        "Deviruchi_Egg" => 22007,
+        "Bapho_Jr_Egg" => 22008,
+        "Desert_Wolf_B_Egg" => 22009,
+        "Drops_Egg" => 22010,
+        "Poporing_Egg" => 22011,
+        "Rocker_Egg" => 22012,
+        "Spore_Egg" => 22013,
+        "Chonchon_Egg" => 22014,
+        "Steel_Chonchon_Egg" => 22015,
+        "Hunter_Fly_Egg" => 22016,
+        "Orc_Warrior_Egg" => 22017,
+        "Baphomet_Egg" => 22018,
+        "Goblin_Egg" => 22019,
+        _ => 0,
+    }
+}
+
+/// 怪物名称到 ID 的映射
+fn mob_name_to_id(name: &str) -> u16 {
+    match name {
+        "PORING" => 1002,
+        "LUNATIC" => 1003,
+        "FABRE" => 1007,
+        "PICKY" => 1004,
+        "PECO_EGG" | "PECOPECO" => 1019,
+        "PETIT" => 1155,
+        "DEVIRUCHI" => 1109,
+        "BAPHOMET_JR" => 1299,
+        "DESERT_WOLF_B" => 1106,
+        "DROPS" => 1113,
+        "POPORING" => 1031,
+        "ROCKER" => 1052,
+        "SPORE" => 1012,
+        "CHONCHON" => 1010,
+        "STEEL_CHONCHON" => 1209,
+        "HUNTER_FLY" => 1035,
+        "ORC_WARRIOR" => 1023,
+        "BAPHOMET" => 1039,
+        "GOBLIN" => 1122,
+        _ => 0,
+    }
+}
+
+/// 装备名称到 ID 的映射
+fn item_name_to_equip_id(name: &str) -> u16 {
+    match name {
+        "Backpack" => 10000,
+        "Boy's_Cap" => 10001,
+        "Hair_Band" => 10002,
+        "Ribbon" => 10003,
+        "Bao" => 10004,
+        "Model_Festival_Hat" => 10005,
+        _ => 0,
+    }
+}
+
+/// 食物名称到 ID 列表的映射
+fn item_name_to_food_ids(name: &str) -> Vec<u16> {
+    match name {
+        "Apple_Juice" => vec![531],
+        "Orange_Juice" => vec![532],
+        "Yellow_Herb" => vec![503],
+        "Red_Herb" => vec![507],
+        "Green_Herb" => vec![510],
+        "Meat" => vec![517],
+        "Monster's_Feed" => vec![528],
+        "Pet_Food" => vec![530],
+        _ => Vec::new(),
+    }
+}
+
 /// 宠物数据库
 pub struct PetDatabase {
     pets: std::collections::HashMap<u16, PetData>,
@@ -155,6 +235,61 @@ impl PetDatabase {
         let mut db = Self {
             pets: std::collections::HashMap::new(),
         };
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["db/pet_db.yml"];
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match super::yaml_loader::load_pet_db(path) {
+                    Ok(templates) if !templates.is_empty() => {
+                        let count = templates.len();
+                        // 将 YAML 模板转换为 PetData 并加载
+                        // rAthena pet_db 使用物品名称，需要转换为 ID
+                        // 先加载硬编码数据作为基础映射
+                        db.init_default_pets();
+                        // 将 YAML 数据覆盖/补充硬编码数据
+                        let mut yaml_loaded = 0;
+                        for (_mob_name, template) in &templates {
+                            // 尝试从 egg_item 名称推断 pet_class
+                            // YAML 中的物品名称格式如 "Poring_Egg"，对应 egg_id 22001
+                            let egg_id = item_name_to_egg_id(&template.egg_item);
+                            let mob_id = mob_name_to_id(&template.mob_name);
+                            if egg_id > 0 && mob_id > 0 {
+                                let pet_class = egg_id; // 使用 egg_id 作为 pet_class
+                                db.pets.insert(pet_class, PetData {
+                                    pet_class,
+                                    name: template.mob_name.clone(),
+                                    mob_id,
+                                    egg_id,
+                                    equip_id: item_name_to_equip_id(&template.equip_item),
+                                    capture_rate: template.capture_rate as u16,
+                                    food: item_name_to_food_ids(&template.food_item),
+                                    hungry_delay: 60,
+                                    hunger_decrease: template.fullness,
+                                    intimacy_decrease: 1,
+                                    full_ratio: 500,
+                                    hungry_delay_min: 60,
+                                    script: None,
+                                    talk_convert: false,
+                                });
+                                yaml_loaded += 1;
+                            }
+                        }
+                        tracing::info!("从 {} 加载了 {} 个宠物模板（{} 个已转换）", path, count, yaml_loaded);
+                        return db;
+                    }
+                    Ok(_) => {
+                        tracing::warn!("{} 解析结果为空", path);
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        // 回退到硬编码
+        tracing::info!("使用硬编码宠物数据");
         db.init_default_pets();
         db
     }
@@ -264,6 +399,15 @@ impl PetDatabase {
     pub fn is_pet_food(&self, item_id: u16) -> Option<&PetData> {
         self.pets.values().find(|p| p.food.contains(&item_id))
     }
+
+    /// 仅使用硬编码数据创建（供测试使用）
+    pub fn new_hardcoded() -> Self {
+        let mut db = Self {
+            pets: std::collections::HashMap::new(),
+        };
+        db.init_default_pets();
+        db
+    }
 }
 
 impl Default for PetDatabase {
@@ -354,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_pet_database_lookup() {
-        let db = PetDatabase::new();
+        let db = PetDatabase::new_hardcoded();
         let poring = db.get_by_mob_id(1001);
         assert!(poring.is_some());
         assert_eq!(poring.unwrap().name, "Poring");
@@ -366,7 +510,7 @@ mod tests {
 
     #[test]
     fn test_pet_food_check() {
-        let db = PetDatabase::new();
+        let db = PetDatabase::new_hardcoded();
         // Jellopy (530) should be food for Poring
         let food_pet = db.is_pet_food(530);
         assert!(food_pet.is_some());

@@ -243,7 +243,7 @@ impl LogManager {
         // 文件层 - 使用 daily rotation
         let file_appender = RollingFileAppender::new(
             if config.rotation_hourly {
-                Rotation::MINUTELY
+                Rotation::HOURLY
             } else {
                 Rotation::DAILY
             },

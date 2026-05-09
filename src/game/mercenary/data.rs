@@ -135,13 +135,22 @@ pub struct MercenaryDatabase {
 }
 
 impl MercenaryDatabase {
+    /// 仅使用硬编码数据创建（供测试使用）
+    pub fn new_hardcoded() -> Self {
+        let mut db = Self {
+            templates: HashMap::new(),
+        };
+        db.init_hardcoded();
+        db
+    }
+
     pub fn new() -> Self {
         let mut db = Self {
             templates: HashMap::new(),
         };
 
         // 尝试从 YAML 加载
-        let yaml_paths = ["rathena/db/mercenary_db.yml", "db/mercenary_db.yml"];
+        let yaml_paths = ["db/mercenary_db.yml"];
 
         for path in &yaml_paths {
             if std::path::Path::new(path).exists() {
@@ -169,10 +178,44 @@ impl MercenaryDatabase {
     }
 
     fn load_from_yaml(
-        _path: &str,
+        path: &str,
     ) -> Result<HashMap<u16, MercenaryData>, Box<dyn std::error::Error>> {
-        // TODO: 实现完整解析 rAthena mercenary_db.yml 格式
-        Ok(HashMap::new())
+        let yaml_db = super::yaml_loader::load_mercenary_db(path)?;
+        let mut templates = HashMap::new();
+
+        for (id, yt) in yaml_db {
+            // 根据 ID 范围推断职业类型
+            let class_type = match id {
+                6001..=6019 => MercenaryClass::Swordman,
+                6020..=6039 => MercenaryClass::Lancer,
+                _ => MercenaryClass::Archer,
+            };
+
+            templates.insert(id, MercenaryData {
+                class_id: yt.id,
+                name: yt.name,
+                class_type,
+                level: yt.level,
+                hp: yt.hp,
+                sp: yt.sp,
+                atk: yt.attack,
+                atk2: yt.attack2,
+                defense: yt.defense,
+                magic_defense: yt.magic_defense,
+                str: yt.str,
+                agi: yt.agi,
+                vit: yt.vit,
+                int: yt.int,
+                dex: yt.dex,
+                luk: yt.luk,
+                attack_range: yt.attack_range,
+                walk_speed: yt.walk_speed,
+                contract_cost: 0,
+                skills: yt.skills.iter().map(|s| (s.name.clone(), s.max_level)).collect(),
+            });
+        }
+
+        Ok(templates)
     }
 
     fn init_hardcoded(&mut self) {
@@ -354,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_mercenary_database_hardcoded() {
-        let db = MercenaryDatabase::new();
+        let db = MercenaryDatabase::new_hardcoded();
         assert!(db.count() >= 5);
 
         let mina = db.get(6017).unwrap();
@@ -365,7 +408,7 @@ mod tests {
 
     #[test]
     fn test_mercenary_database_all_types() {
-        let db = MercenaryDatabase::new();
+        let db = MercenaryDatabase::new_hardcoded();
 
         // 弓手
         let archer = db.get(6017).unwrap();

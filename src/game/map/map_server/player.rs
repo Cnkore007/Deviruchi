@@ -135,6 +135,16 @@ impl MapServer {
         self.channel_bus
             .update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
 
+        // Broadcast movement to other players on the same map
+        let event = GameEvent::PlayerMove {
+            player_id,
+            from_x,
+            from_y,
+            to_x: move_pkt.pos_x,
+            to_y: move_pkt.pos_y,
+        };
+        self.channel_bus.publish(&channel_name, &event, vec![]);
+
         // Check for warp trigger
         if let Some(warp_action) = self.warp_service.handle_move_with_warp_on_map(
             session,
@@ -215,12 +225,12 @@ impl MapServer {
         let action_pkt = CZRequestAction::from_slice(data)?;
 
         let player = self.map_state.get_player(&player_id)?;
-        let target_id = Uuid::from_u128(action_pkt.target_id as u128);
 
-        // 从 spawn_manager 查找目标怪物
+        // 从 spawn_manager 通过客户端实体 ID 查找目标怪物
         let mob = self
             .spawn_manager
-            .find_mob_by_id(&player.map_name, &target_id)?;
+            .find_mob_by_entity_id(&player.map_name, action_pkt.target_id)?;
+        let target_id = mob.id;
 
         // 已死亡的怪物不能重复攻击
         if mob.is_dead() {

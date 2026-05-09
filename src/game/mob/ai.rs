@@ -696,6 +696,7 @@ mod tests {
     fn create_test_mob(position: (u16, u16), level: u16) -> Arc<Mob> {
         Arc::new(Mob {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "TestMob".to_string(),
             pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
@@ -848,6 +849,7 @@ mod tests {
         let position = (100u16, 100u16);
         let mob = Arc::new(Mob {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "PassiveMob".to_string(),
             pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
@@ -1194,6 +1196,7 @@ mod tests {
     ) -> Arc<Mob> {
         Arc::new(Mob {
             id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1002,
             name: "SkilledMob".to_string(),
             pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),

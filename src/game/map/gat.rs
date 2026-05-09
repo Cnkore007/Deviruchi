@@ -66,6 +66,23 @@ fn cell_type_from_u8(value: u8) -> CellType {
     }
 }
 
+fn cell_type_to_u8(cell_type: CellType) -> u8 {
+    match cell_type {
+        CellType::Walkable => 0,
+        CellType::Wall => 1,
+        CellType::Water => 2,
+        CellType::Cliff => 3,
+        CellType::Snipable => 4,
+        CellType::Npc => 5,
+        CellType::Warp => 6,
+        CellType::Icetrap => 7,
+        CellType::Basilica => 8,
+        CellType::Landmine => 9,
+        CellType::NoChat => 10,
+        CellType::Novice => 11,
+    }
+}
+
 /// .gat 文件解析器
 pub struct GatParser;
 
@@ -80,6 +97,36 @@ impl GatParser {
             .unwrap_or("unknown")
             .to_string();
         Self::parse_bytes(&data, &map_name)
+    }
+
+    /// 将 MapData 序列化为 .gat 二进制格式
+    pub fn to_gat_bytes(map: &MapData) -> Vec<u8> {
+        let mut data = Vec::with_capacity(10 + map.width as usize * map.height as usize * 4);
+        // Magic: "GRAT"
+        data.extend_from_slice(b"GRAT");
+        // Version: 5
+        data.extend_from_slice(&5u16.to_le_bytes());
+        // Width, Height
+        data.extend_from_slice(&map.width.to_le_bytes());
+        data.extend_from_slice(&map.height.to_le_bytes());
+        // Cell data: 每个 cell 4 bytes
+        for y in 0..map.height {
+            for x in 0..map.width {
+                let cell_type = map.get_cell(x, y).map(|c| c.cell_type).unwrap_or(CellType::Wall);
+                data.push(cell_type_to_u8(cell_type));
+                data.push(0); // padding
+                data.push(0); // padding
+                data.push(0); // padding
+            }
+        }
+        data
+    }
+
+    /// 将 MapData 写入 .gat 文件
+    pub fn write_file<P: AsRef<Path>>(path: P, map: &MapData) -> Result<(), GatError> {
+        let data = Self::to_gat_bytes(map);
+        fs::write(path, data)?;
+        Ok(())
     }
 
     /// 从字节数组解析 .gat 数据
@@ -228,6 +275,34 @@ mod tests {
         let data = build_gat_bytes(1, 1, &[255]);
         let map = GatParser::parse_bytes(&data, "unknown").unwrap();
         assert_eq!(map.get_cell(0, 0).unwrap().cell_type, CellType::Wall);
+    }
+
+    #[test]
+    fn test_write_and_read_roundtrip() {
+        // 创建一个有各种 cell 类型的地图
+        let mut map = MapData::new("roundtrip_test", 4, 4);
+        map.set_cell(0, 0, CellType::Walkable);
+        map.set_cell(1, 0, CellType::Wall);
+        map.set_cell(2, 0, CellType::Water);
+        map.set_cell(3, 0, CellType::Npc);
+        map.set_cell(0, 1, CellType::Warp);
+        map.set_cell(1, 1, CellType::Snipable);
+
+        // 写入字节
+        let bytes = GatParser::to_gat_bytes(&map);
+
+        // 读回
+        let parsed = GatParser::parse_bytes(&bytes, "roundtrip_test").unwrap();
+
+        assert_eq!(parsed.name, "roundtrip_test.gat");
+        assert_eq!(parsed.width, 4);
+        assert_eq!(parsed.height, 4);
+        assert_eq!(parsed.get_cell(0, 0).unwrap().cell_type, CellType::Walkable);
+        assert_eq!(parsed.get_cell(1, 0).unwrap().cell_type, CellType::Wall);
+        assert_eq!(parsed.get_cell(2, 0).unwrap().cell_type, CellType::Water);
+        assert_eq!(parsed.get_cell(3, 0).unwrap().cell_type, CellType::Npc);
+        assert_eq!(parsed.get_cell(0, 1).unwrap().cell_type, CellType::Warp);
+        assert_eq!(parsed.get_cell(1, 1).unwrap().cell_type, CellType::Snipable);
     }
 
     #[test]

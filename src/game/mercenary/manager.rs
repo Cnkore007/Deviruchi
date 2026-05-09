@@ -55,6 +55,25 @@ pub struct MercenaryManager {
 }
 
 impl MercenaryManager {
+    /// 创建管理器（仅硬编码模板，供测试使用）
+    pub fn new_hardcoded(db: Arc<Database>) -> Self {
+        let max_id = db
+            .query_row(
+                "SELECT COALESCE(MAX(mercenary_id), 0) FROM mercenaries",
+                &[],
+                |row| row.get_i64(0),
+            )
+            .unwrap_or(0) as u32;
+
+        Self {
+            db,
+            mercenaries: RwLock::new(HashMap::new()),
+            summoned: RwLock::new(HashMap::new()),
+            database: MercenaryDatabase::new_hardcoded(),
+            next_id: AtomicU32::new(max_id + 1),
+        }
+    }
+
     /// 创建管理器，从数据库初始化 next_id
     pub fn new(db: Arc<Database>) -> Self {
         let max_id = db
@@ -435,7 +454,7 @@ mod tests {
             )",
         )
         .expect("创建 mercenary_skills 表失败");
-        MercenaryManager::new(db)
+        MercenaryManager::new_hardcoded(db)
     }
 
     #[test]

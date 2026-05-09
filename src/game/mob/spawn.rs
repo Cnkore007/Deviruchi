@@ -23,6 +23,8 @@ pub struct MobSpawnManager {
     spawns: RwLock<HashMap<String, Vec<SpawnPoint>>>,
     active_mobs: RwLock<HashMap<String, Vec<Arc<Mob>>>>,
     death_times: RwLock<HashMap<Uuid, Instant>>,
+    /// 实体 ID 计数器，用于分配唯一的 u32 实体 ID
+    entity_counter: std::sync::atomic::AtomicU32,
 }
 
 impl MobSpawnManager {
@@ -31,7 +33,13 @@ impl MobSpawnManager {
             spawns: RwLock::new(HashMap::new()),
             active_mobs: RwLock::new(HashMap::new()),
             death_times: RwLock::new(HashMap::new()),
+            entity_counter: std::sync::atomic::AtomicU32::new(1),
         }
+    }
+
+    /// 分配下一个实体 ID
+    fn next_entity_id(&self) -> u32 {
+        self.entity_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// 添加刷新点
@@ -49,8 +57,10 @@ impl MobSpawnManager {
             .unwrap_or_default()
     }
 
-    /// 注册活跃怪物
+    /// 注册活跃怪物，自动分配实体 ID
     pub fn register_mob(&self, map_name: &str, mob: Arc<Mob>) {
+        let eid = self.next_entity_id();
+        mob.set_entity_id(eid);
         let mut active = self.active_mobs.write();
         active.entry(map_name.to_string()).or_default().push(mob);
     }
@@ -80,6 +90,14 @@ impl MobSpawnManager {
             .read()
             .get(map_name)
             .and_then(|mobs| mobs.iter().find(|m| &m.id == mob_id).cloned())
+    }
+
+    /// 根据客户端实体 ID (u32) 查找指定地图上的怪物
+    pub fn find_mob_by_entity_id(&self, map_name: &str, entity_id: u32) -> Option<Arc<Mob>> {
+        self.active_mobs
+            .read()
+            .get(map_name)
+            .and_then(|mobs| mobs.iter().find(|m| m.get_entity_id() == entity_id).cloned())
     }
 
     /// 获取所有地图上的所有活跃怪物

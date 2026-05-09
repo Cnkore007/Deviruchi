@@ -17,20 +17,57 @@ impl SkillEffect {
         }
     }
 
-    fn apply_attack(skill: &Skill, _caster: &Player, _target: &Player, level: u8) -> SkillResult {
-        // 计算伤害 (简化版，实际需要引用战斗公式)
-        let base_damage = skill.damage * level as i32 / 10;
+    fn apply_attack(skill: &Skill, caster: &Player, _target: &Player, level: u8) -> SkillResult {
+        // 基于施法者属性计算物理/魔法伤害
+        let base_level = caster.base_level() as i32;
+        let str = caster.str() as i32;
+        let dex = caster.dex() as i32;
+        let int = caster.int() as i32;
+
+        // 基础 ATK = base_level*2 + STR + DEX/2
+        let base_atk = base_level * 2 + str + dex / 2;
+
+        // 技能倍率：默认 100% + 每级 10%，如有 damage 字段则使用
+        let multiplier = if skill.damage > 0 {
+            skill.damage + (level as i32 * 10)
+        } else {
+            100 + (level as i32 * 10)
+        };
+
+        // 区分物理/魔法：元素为 Weapon(0) 或有 hit 标记时用物理，否则用魔法
+        let raw_damage = if skill.element == 0 {
+            // 物理技能
+            base_atk * multiplier / 100
+        } else {
+            // 魔法技能：MATK = INT*2 + DEX
+            let matk = int * 2 + dex;
+            matk * multiplier / 100
+        };
+
+        let damage = raw_damage.max(1);
+
         SkillResult::Damage {
-            damage: base_damage,
+            damage,
             element: skill.element,
             hit_bonus: skill.hit,
         }
     }
 
     fn apply_healing(skill: &Skill, caster: &Player, _target: &Player, level: u8) -> SkillResult {
-        let heal_amount = skill.damage * level as i32 / 10;
-        let matk = caster.int() * 2 + caster.dex();
-        let total_heal = (heal_amount * matk as i32 / 100).max(1);
+        // 治疗量 = (INT + VIT/2 + base_level) * 技能倍率
+        let int = caster.int() as i32;
+        let vit = caster.vit() as i32;
+        let base_level = caster.base_level() as i32;
+
+        let heal_base = int + vit / 2 + base_level;
+        // 倍率：默认 100% + 每级 20%
+        let multiplier = if skill.damage > 0 {
+            skill.damage + (level as i32 * 20)
+        } else {
+            100 + (level as i32 * 20)
+        };
+
+        let total_heal = (heal_base * multiplier / 100).max(1);
 
         SkillResult::Heal {
             amount: total_heal as u32,

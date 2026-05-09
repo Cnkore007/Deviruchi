@@ -63,7 +63,33 @@ impl QuestManager {
     /// 创建任务管理器
     pub fn new() -> Self {
         let mut database = QuestDatabase::new();
-        database.load_default_quests();
+
+        // 尝试从 YAML 加载
+        let yaml_paths = ["db/quest_db.yml"];
+        let mut loaded = false;
+        for path in &yaml_paths {
+            if std::path::Path::new(path).exists() {
+                match super::yaml_loader::load_quest_db(path) {
+                    Ok(quests) => {
+                        let count = quests.len();
+                        for (_, quest) in quests {
+                            database.add(quest);
+                        }
+                        tracing::info!("从 {} 加载了 {} 个任务", path, count);
+                        loaded = true;
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!("加载 {} 失败: {}", path, e);
+                    }
+                }
+            }
+        }
+
+        if !loaded {
+            tracing::info!("使用硬编码任务数据");
+            database.load_default_quests();
+        }
 
         Self {
             database: Arc::new(database),

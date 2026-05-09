@@ -9,6 +9,7 @@ use uuid::Uuid;
 pub mod data;
 pub mod effect;
 pub mod handler;
+pub mod yaml_loader;
 
 pub use data::{Skill, SkillDatabase, SkillTarget, SkillType};
 pub use handler::SkillHandler;

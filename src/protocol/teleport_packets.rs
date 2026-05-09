@@ -91,8 +91,8 @@ impl Packed for CZGmWarp {
         }
         let mut offset = 0;
         let map_name = parse_fixed_string(slice, &mut offset, MAP_NAME_LENGTH)?;
-        let x = u16::from_be_bytes([slice[offset], slice[offset + 1]]);
-        let y = u16::from_be_bytes([slice[offset + 2], slice[offset + 3]]);
+        let x = u16::from_le_bytes([slice[offset], slice[offset + 1]]);
+        let y = u16::from_le_bytes([slice[offset + 2], slice[offset + 3]]);
         Some(Self { map_name, x, y })
     }
 }

@@ -2,6 +2,7 @@
 
 pub mod data;
 pub mod manager;
+pub mod yaml_loader;
 
 pub use data::{
     EvolutionStage, Homunculus, HomunculusDatabase, HomunculusRace, HomunculusTemplate,

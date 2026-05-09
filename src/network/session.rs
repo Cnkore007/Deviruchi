@@ -23,6 +23,9 @@ pub struct Session {
     pub player_id: Option<Uuid>,
     /// Channel sender for game events pushed to client (connected to ChannelBus)
     pub map_event_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    /// 登录会话标识符，由 LoginServer 生成，用于 Char/Map 阶段身份验证
+    pub login_id1: u32,
+    pub login_id2: u32,
 }
 
 impl Default for Session {
@@ -43,6 +46,8 @@ impl Session {
             stage: SessionStage::Login,
             player_id: None,
             map_event_tx: None,
+            login_id1: 0,
+            login_id2: 0,
         }
     }
 
@@ -74,6 +79,9 @@ impl SessionManager {
 
     pub fn remove(&self, id: &Uuid) {
         self.sessions.write().remove(id);
+        // 清理 addr_to_session 中的对应映射，防止内存泄漏
+        let mut addr_map = self.addr_to_session.write();
+        addr_map.retain(|_, v| v != id);
     }
 
     pub fn get(&self, id: &Uuid) -> Option<Session> {

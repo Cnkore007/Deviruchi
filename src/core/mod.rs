@@ -111,6 +111,7 @@ impl Core {
         // 创建共享的游戏系统组件
         let battle_handler = Arc::new(BattleHandler::default());
         let spawn_manager = Arc::new(MobSpawnManager::new());
+        let guild_manager = Arc::new(crate::game::guild::GuildManager::with_db(db.clone()));
 
         // 创建 PacketHandler
         let packet_handler = Arc::new(PacketHandler::new(
@@ -124,6 +125,7 @@ impl Core {
             battle_handler.clone(),
             spawn_manager.clone(),
             self.config.game.death_drop_items,
+            guild_manager.clone(),
         ));
 
         tracing::info!("服务器初始化完成");
@@ -160,7 +162,8 @@ impl Core {
             Arc::new(ExpDistributor),
             self.heal_service.clone(),
             Arc::new(crate::game::heal::FoodManager::new()),
-        ));
+            guild_manager.clone(),
+        ).with_db(db.clone()));
         game_loop.clone().start();
         tracing::info!("GameLoop 已启动");
 
@@ -187,7 +190,8 @@ impl Core {
                 let ph = packet_handler.clone();
                 handles.push(tokio::spawn(async move {
                     tracing::info!("启动 Login Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph);
+                    let server = GameServer::new(addr, sm, ph)
+                        .with_initial_stage(crate::network::session::SessionStage::Login);
                     server.listen().await
                 }));
             }
@@ -199,7 +203,8 @@ impl Core {
                 let ph = packet_handler.clone();
                 handles.push(tokio::spawn(async move {
                     tracing::info!("启动 Char Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph);
+                    let server = GameServer::new(addr, sm, ph)
+                        .with_initial_stage(crate::network::session::SessionStage::Char);
                     server.listen().await
                 }));
             }
@@ -211,7 +216,8 @@ impl Core {
                 let ph = packet_handler.clone();
                 handles.push(tokio::spawn(async move {
                     tracing::info!("启动 Map Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph);
+                    let server = GameServer::new(addr, sm, ph)
+                        .with_initial_stage(crate::network::session::SessionStage::Map);
                     server.listen().await
                 }));
             }

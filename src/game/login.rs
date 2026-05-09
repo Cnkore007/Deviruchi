@@ -1,6 +1,5 @@
 //! 登录服务器业务逻辑
 
-use parking_lot::RwLock;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -9,13 +8,20 @@ use crate::protocol::login_packets::{ACAceptLogin, ACRefuseLogin, CALogin};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
 
+/// Char Server 连接信息
+#[derive(Debug, Clone)]
+pub struct CharServerInfo {
+    pub ip: u32,
+    pub port: u16,
+    pub name: String,
+}
+
 /// 登录服务器
 #[allow(dead_code)]
 pub struct LoginServer {
     db: Arc<Database>,
     session_manager: Arc<SessionManager>,
-    login_id1: Arc<RwLock<u32>>,
-    login_id2: Arc<RwLock<u32>>,
+    char_server: CharServerInfo,
 }
 
 impl LoginServer {
@@ -23,15 +29,18 @@ impl LoginServer {
         Self {
             db,
             session_manager,
-            login_id1: Arc::new(RwLock::new(0)),
-            login_id2: Arc::new(RwLock::new(0)),
+            char_server: CharServerInfo {
+                ip: 0x7F000001, // 127.0.0.1
+                port: 6000,
+                name: "Deviruchi".to_string(),
+            },
         }
     }
 
-    /// 设置登录 ID
-    pub fn set_login_ids(&self, id1: u32, id2: u32) {
-        *self.login_id1.write() = id1;
-        *self.login_id2.write() = id2;
+    /// 设置 Char Server 连接信息
+    pub fn with_char_server(mut self, info: CharServerInfo) -> Self {
+        self.char_server = info;
+        self
     }
 
     /// 根据 packet_id 分发处理
@@ -105,26 +114,32 @@ impl LoginServer {
             error!("Failed to update last_login: {}", e);
         }
 
-        // 获取登录 ID
-        let login_id1 = *self.login_id1.read();
-        let login_id2 = *self.login_id2.read();
+        // 生成每会话唯一的 login_id
+        let login_id1 = rand::random::<u32>();
+        let login_id2 = rand::random::<u32>();
 
         // 更新 session
         session.account_id = Some(account.account_id);
         session.authenticated = true;
+        session.login_id1 = login_id1;
+        session.login_id2 = login_id2;
 
         info!(
             "Login success: account_id={}, user={}",
             account.account_id, login.username
         );
 
-        // 返回成功响应
+        // 返回成功响应（包含 char server 地址）
         Some(
             ACAceptLogin {
                 account_id: account.account_id,
                 login_id1,
                 login_id2,
                 sex: account.sex,
+                char_ip: self.char_server.ip,
+                char_port: self.char_server.port,
+                server_name: self.char_server.name.clone(),
+                user_count: 0,
             }
             .to_packet(),
         )
@@ -170,8 +185,9 @@ mod tests {
         assert!(result.is_some(), "成功登录应返回响应包");
 
         let response = result.unwrap();
-        // ACAceptLogin 包头: 2字节长度 + 2字节 packet_id (0x0069)
-        assert_eq!(response.len(), 4 + 4 + 4 + 4 + 1, "ACAceptLogin 包长度应为 17 字节");
+        // ACAceptLogin: header(4) + account_id(4) + login_id1(4) + login_id2(4) + sex(1) + pad(1)
+        //             + char_ip(4) + char_port(2) + server_name(20) + user_count(2) + type(1) + new(2) = 49
+        assert_eq!(response.len(), 49, "ACAceptLogin 包长度应为 49 字节");
         let packet_id = u16::from_le_bytes([response[2], response[3]]);
         assert_eq!(packet_id, 0x0069, "应返回 ACAceptLogin (0x0069)");
 
@@ -274,19 +290,18 @@ mod tests {
         let (server, db) = create_test_server();
         db.create_account("user", "pass", 0).unwrap();
 
-        // 设置自定义 login_id
-        server.set_login_ids(12345, 67890);
-
         let packet = make_login_packet("user", "pass", 20);
         let mut session = Session::new();
 
         let result = server.handle_ca_login(&packet[4..], &mut session).unwrap();
-        // ACAceptLogin 结构: [len:2LE][id:2LE][account_id:4BE][login_id1:4BE][login_id2:4BE][sex:1]
-        // 注意: PacketBuilder::put_u32 使用大端序（bytes crate 默认行为）
-        let login_id1 = u32::from_be_bytes([result[8], result[9], result[10], result[11]]);
-        let login_id2 = u32::from_be_bytes([result[12], result[13], result[14], result[15]]);
-        assert_eq!(login_id1, 12345, "login_id1 应匹配设置的值");
-        assert_eq!(login_id2, 67890, "login_id2 应匹配设置的值");
+        // ACAceptLogin 结构: [len:2LE][id:2LE][account_id:4LE][login_id1:4LE][login_id2:4LE][sex:1]
+        let login_id1 = u32::from_le_bytes([result[8], result[9], result[10], result[11]]);
+        let login_id2 = u32::from_le_bytes([result[12], result[13], result[14], result[15]]);
+        // 验证 login_id 被正确设置到 session 中，且与响应包一致
+        assert_eq!(session.login_id1, login_id1, "session.login_id1 应与响应包一致");
+        assert_eq!(session.login_id2, login_id2, "session.login_id2 应与响应包一致");
+        // login_id 应为非零随机值（极小概率为 0，可接受）
+        assert!(session.login_id1 != 0 || session.login_id2 != 0, "login_id 不应全为 0");
     }
 
     #[test]

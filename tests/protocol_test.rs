@@ -39,6 +39,10 @@ fn test_ac_acept_login_pack() {
         login_id1: 11111,
         login_id2: 22222,
         sex: 0,
+        char_ip: 0xC0A80101, // 192.168.1.1
+        char_port: 6900,
+        server_name: "TestServer".to_string(),
+        user_count: 100,
     };
     let bytes = packet.to_packet();
     assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 0x0069);
