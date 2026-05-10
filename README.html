@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deviruchi - 高性能 Ragnarok Online 服务端</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-secondary: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --header-bg: #1c2129;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .container { max-width: 980px; margin: 0 auto; padding: 32px 24px; }
+
+  /* 标题 */
+  h1 { font-size: 2.5em; margin-bottom: 8px; }
+  h1 span.icon { margin-right: 8px; }
+  .subtitle { color: var(--text-secondary); font-size: 1.15em; margin-bottom: 32px; }
+
+  h2 {
+    font-size: 1.6em;
+    margin-top: 40px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.3em; margin-top: 28px; margin-bottom: 12px; color: var(--accent); }
+  h4 { font-size: 1.1em; margin-top: 20px; margin-bottom: 10px; color: var(--text-secondary); }
+
+  /* 列表 */
+  ul { margin-left: 24px; margin-bottom: 16px; }
+  li { margin-bottom: 6px; }
+  li strong { color: var(--accent); }
+
+  /* 表格 */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 0.92em;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+  }
+  th { background: var(--header-bg); color: var(--accent); font-weight: 600; }
+  tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+
+  /* 代码块 */
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    font-size: 0.9em;
+    line-height: 1.5;
+  }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  /* 行内代码 */
+  p code, li code, td code {
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+
+  /* 引用块 */
+  blockquote {
+    border-left: 4px solid var(--accent);
+    background: var(--surface);
+    padding: 12px 20px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+    font-size: 1.05em;
+  }
+  blockquote strong { color: var(--green); }
+
+  /* 状态标记 */
+  .status-done { color: var(--green); }
+  .status-wip { color: var(--orange); }
+  .status-planned { color: var(--text-secondary); }
+
+  /* 链接 */
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* 分节 */
+  .section { margin-bottom: 36px; }
+
+  /* 响应式 */
+  @media (max-width: 768px) {
+    .container { padding: 16px; }
+    h1 { font-size: 1.8em; }
+    table { font-size: 0.82em; }
+    th, td { padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1><span class="icon">&#9876;</span>Deviruchi</h1>
+<p class="subtitle">高性能 Ragnarok Online 服务端，用 Rust 语言，基于 rAthena 重构而来，简单、高效、稳定、易扩展。</p>
+
+<div class="section">
+<h2>目标</h2>
+<p>Deviruchi 是 rAthena 服务端的 Rust 实现，目标是：</p>
+<ul>
+  <li><strong>零配置运行</strong> &mdash; 双击运行，无需导入数据库等</li>
+  <li><strong>语言级安全</strong> &mdash; Rust 快速重构</li>
+  <li><strong>微秒级延迟</strong> &mdash; 内存 channel 直连通信，公会战多人 boss 战依然流畅</li>
+  <li><strong>无缝升级</strong> &mdash; 自动数据库迁移，SQLite 到 MySQL 一行配置</li>
+  <li><strong>配套客户端</strong> &mdash; 不仅支持原生客户端，还开发独立的 Devi 客户端（开发中，基于 Bevy 重构 RO 现代化客户端）</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>核心特性</h2>
+<table>
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>简单部署</td><td>单可执行文件包含 Login/Char/Map 全部服务</td></tr>
+  <tr><td>开箱即用</td><td>无需安装 MySQL 数据库或配置连接参数</td></tr>
+  <tr><td>统一 Log</td><td>统一的日志及崩溃报告，方便调试</td></tr>
+  <tr><td>极低延迟</td><td>模块间内存 channel 通信，延迟微秒级</td></tr>
+  <tr><td>无忧升级</td><td>自动数据库迁移，支持 SQLite &rarr; MySQL</td></tr>
+  <tr><td>双协议支持</td><td>Legacy TCP（二进制）兼容 rAthena 客户端，Modern WebSocket 服务 Devi 客户端</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>架构</h2>
+<pre><code>Deviruchi
+&#9500;&#9472;&#9472; Login Server  : 6900 (Legacy) / 16900 (Modern)
+&#9500;&#9472;&#9472; Char Server   : 6000 (Legacy) / 16000 (Modern)
+&#9492;&#9472;&#9472; Map Server    : 6121 (Legacy) / 16121 (Modern)
+
+Devi (&#23458;&#25143;&#31471;)
+&#9500;&#9472;&#9472; 渲染引擎: Bevy + wgpu
+&#9500;&#9472;&#9472; 像素增强: Integer Scaling + xBRZ
+&#9500;&#9472;&#9472; 同步策略: 混合同步（自己角色预测，他人角色插值）
+&#9492;&#9472;&#9472; 同步频率: 20ms tick
+
+Python 工具
+&#9500;&#9472;&#9472; 资源转换: GRF &rarr; PNG 图集 + JSON 配置
+&#9492;&#9472;&#9472; 地图导出: .gat &rarr; JSON + PNG</code></pre>
+</div>
+
+<div class="section">
+<h2>当前进度</h2>
+<blockquote><strong>65,000+ 行</strong> Rust 代码，229 个源文件，1,000+ 单元测试，覆盖 42 个游戏子系统 + Devi 客户端，整体完成度 <strong>~95%</strong>。</blockquote>
+
+<h3>服务端 &mdash; 已完成（36 个模块）</h3>
+
+<h4>核心战斗</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>battle</code></td><td>1,869 行</td><td>物理/魔法伤害公式、命中/闪避/暴击率、体型/元素修正、经验分配（单人+队伍），35+ 测试</td></tr>
+  <tr><td><code>mob</code></td><td>2,800+ 行</td><td>六状态 AI 状态机、A* 寻路、掉落表、MVP 判定、rAthena YAML 完整解析（Race/Class/Modes/Skills/MvpDrops），46 测试</td></tr>
+  <tr><td><code>status</code></td><td>2,872 行</td><td>60+ 种状态效果、属性计算器、DOT/回复 tick 处理、图标数据库，30+ 测试</td></tr>
+  <tr><td><code>skill</code></td><td>713 行</td><td>技能处理器（冷却/消耗/范围检查）、技能效果系统，10 测试</td></tr>
+  <tr><td><code>heal</code></td><td>860 行</td><td>HP/SP 自然回复、食物效果系统</td></tr>
+</table>
+
+<h4>地图与玩家</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>map</code></td><td>5,387 行</td><td>Player 结构（6 个分组锁）、MapServer（GM/NPC/社交/公会 handler）、频道消息总线、传送/重生/掉落物管理</td></tr>
+  <tr><td><code>item</code></td><td>4,775 行</td><td>物品使用效果、装备系统、背包管理、脚本执行、延迟系统，12 个文件，最庞大的子系统</td></tr>
+  <tr><td><code>trade</code></td><td>639 行</td><td>交易状态机（Requesting&rarr;Trading&rarr;Completed）、物品/金币转移、重量验证</td></tr>
+</table>
+
+<h4>社交与公会</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>party</code></td><td>388 行</td><td>组队创建/加入/离开/解散、经验分配模式</td></tr>
+  <tr><td><code>guild</code></td><td>597 行</td><td>公会创建/邀请/踢出、权限系统、职位管理</td></tr>
+  <tr><td><code>chat</code></td><td>1,383 行</td><td>统一聊天管理、私聊（在线/离线）、频率限制</td></tr>
+  <tr><td><code>command</code></td><td>422 行</td><td>@命令框架、GM 权限检查、传送/玩家命令</td></tr>
+</table>
+
+<h4>进阶系统</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>pet</code></td><td>1,170 行</td><td>宠物孵化/召唤/喂食/回收、宠物 AI（Follow/Attack/Pickup）</td></tr>
+  <tr><td><code>mount</code></td><td>667 行</td><td>坐骑骑乘/下马、等级检查</td></tr>
+  <tr><td><code>quest</code></td><td>1,029 行</td><td>任务接受/更新/完成/放弃、目标追踪</td></tr>
+  <tr><td><code>achievement</code></td><td>829 行</td><td>成就解锁/进度追踪、分类系统</td></tr>
+  <tr><td><code>instance</code></td><td>1,615 行</td><td>副本创建/加入/离开/清理、模板数据库</td></tr>
+  <tr><td><code>card</code></td><td>566 行</td><td>卡片插入/移除、属性计算</td></tr>
+  <tr><td><code>vending</code></td><td>1,081 行</td><td>摆摊开店/关店/购买、商品搜索</td></tr>
+  <tr><td><code>cashshop</code></td><td>1,827 行</td><td>商城购买/点数管理/礼物赠送、Kafra 服务</td></tr>
+  <tr><td><code>battleground</code></td><td>1,283 行</td><td>战场队列/匹配/状态管理</td></tr>
+  <tr><td><code>woe</code></td><td>1,052 行</td><td>攻城战城堡/时间安排/攻击冷却</td></tr>
+  <tr><td><code>auction</code></td><td>554 行</td><td>拍卖上架/竞价/领取</td></tr>
+  <tr><td><code>mail</code></td><td>452 行</td><td>邮件发送/收取/删除/附件</td></tr>
+</table>
+
+<h4>基础设施</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>network</code></td><td>815 行</td><td>Legacy TCP + Modern WebSocket 双协议服务器、Session 管理</td></tr>
+  <tr><td><code>protocol</code></td><td>2,155 行</td><td>~80 种包定义（map/guild/teleport/trade/party/char/storage/login）</td></tr>
+  <tr><td><code>storage</code></td><td>3,500+ 行</td><td>Backend 抽象层（SQLite/MySQL 双后端）、14 张表、仓库同步管理器、UPSERT 持久化、迁移框架（v5）、125+ 测试</td></tr>
+  <tr><td><code>game_loop</code></td><td>331 行</td><td>100ms tick 主循环：掉落物清理&rarr;Token 清理&rarr;怪物重生&rarr;AI 更新&rarr;玩家回复</td></tr>
+  <tr><td><code>token</code></td><td>319 行</td><td>Map Server 连接验证 Token，30 秒过期 TTL</td></tr>
+  <tr><td><code>zeny</code></td><td>150 行</td><td>金币管理，溢出保护</td></tr>
+  <tr><td><code>rand</code></td><td>176 行</td><td>可注入 RNG 接口，生产/测试双实现</td></tr>
+</table>
+
+<h4>登录与角色</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>login</code></td><td>339 行</td><td>登录认证（Argon2）、封禁过期检查、重复登录检测、8 测试</td></tr>
+  <tr><td><code>char</code></td><td>916 行</td><td>角色列表/创建/选择/删除/取消删除、名称验证（CJK+特殊字符）、Token 生成，11 测试</td></tr>
+</table>
+
+<h4>NPC 与脚本</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>npc</code></td><td>1,200+ 行</td><td>NPC 数据库（YAML 加载+硬编码回退）、5 种类型+Event 触发（OnTouch/OnInit）、商店/技能训练师/Warp/Quest/CashShop、20 测试</td></tr>
+  <tr><td><code>script</code></td><td>942 行</td><td>脚本解析器（mes/next/close/select/warp/goto/set/goto_if）、变量系统、错误报告、17 测试</td></tr>
+</table>
+
+<h4>仓库系统</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>storage</code></td><td>3,500+ 行</td><td>仓库 CRUD、UPSERT 持久化、后台同步调度器（实际执行+超时恢复）、迁移框架（v5）、125+ 测试</td></tr>
+</table>
+
+<h4>进阶系统（新增）</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>homunculus</code></td><td>1,400+ 行</td><td>生命体系统：数据结构（六属性/技能/进化）、经验/升级/进化/喂食、实时数据库持久化、13 测试</td></tr>
+  <tr><td><code>mercenary</code></td><td>1,000+ 行</td><td>佣兵系统：数据结构（六属性/技能/忠诚度）、合同计时到期自动解散+数据库删除、5 种模板、13 测试</td></tr>
+</table>
+
+<h4>地图基础设施（新增）</h4>
+<table>
+  <tr><th>模块</th><th>代码量</th><th>说明</th></tr>
+  <tr><td><code>gat</code></td><td>386 行</td><td>.gat 文件解析器（rAthena 格式 v1-5）、MapState 真实碰撞检测、6 测试</td></tr>
+  <tr><td><code>migration</code></td><td>420 行</td><td>数据库迁移框架（schema_version 版本追踪、事务保护、幂等执行）</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h3>客户端 (Devi) &mdash; 4,500+ 行，38 个源文件，80 个测试</h3>
+
+<h4>核心框架</h4>
+<table>
+  <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  <tr><td>项目结构</td><td class="status-done">&#10004; 已完成</td><td>Bevy ECS + Cargo Workspace，模块化架构</td></tr>
+  <tr><td>配置系统</td><td class="status-done">&#10004; 已完成</td><td>ClientConfig，服务器地址/窗口/协议配置</td></tr>
+  <tr><td>游戏状态机</td><td class="status-done">&#10004; 已完成</td><td>Login &rarr; CharSelect &rarr; InGame 状态流转</td></tr>
+  <tr><td>Tick 系统</td><td class="status-done">&#10004; 已完成</td><td>TickConfig 游戏循环定时</td></tr>
+</table>
+
+<h4>网络与协议</h4>
+<table>
+  <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  <tr><td>网络层</td><td class="status-done">&#10004; 已完成</td><td>Legacy TCP + WebSocket 双传输层，异步 I/O + Bevy 同步桥接</td></tr>
+  <tr><td>协议编解码</td><td class="status-done">&#10004; 已完成</td><td>17 种包类型（Login/Char/Map），rAthena 二进制格式</td></tr>
+  <tr><td>会话管理</td><td class="status-done">&#10004; 已完成</td><td>NetworkManager，tokio mpsc + 独立线程，支持多实例（登录+地图）</td></tr>
+</table>
+
+<h4>游戏流程</h4>
+<table>
+  <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  <tr><td>登录流程</td><td class="status-done">&#10004; 已完成</td><td>用户名/密码 UI，连接登录服务器，凭据传递</td></tr>
+  <tr><td>角色选择</td><td class="status-done">&#10004; 已完成</td><td>角色卡片列表，进入游戏按钮</td></tr>
+  <tr><td>角色创建</td><td class="status-done">&#10004; 已完成</td><td>名称输入 + 六属性分配（30 点）+ 确认/返回</td></tr>
+  <tr><td>地图连接</td><td class="status-done">&#10004; 已完成</td><td>MapEnterRequest 发送，初始位置接收，实体事件处理</td></tr>
+</table>
+
+<h4>渲染引擎</h4>
+<table>
+  <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  <tr><td>等距相机</td><td class="status-done">&#10004; 已完成</td><td>RO 风格 45&deg; 等距视角，平移/缩放控制</td></tr>
+  <tr><td>地形网格</td><td class="status-done">&#10004; 已完成</td><td>.gat 数据 &rarr; 3D 网格构建器</td></tr>
+  <tr><td>精灵动画</td><td class="status-done">&#10004; 已完成</td><td>SPR/ACT 解析，帧动画播放</td></tr>
+  <tr><td>Billboard</td><td class="status-done">&#10004; 已完成</td><td>精灵始终面向相机</td></tr>
+  <tr><td>HUD 界面</td><td class="status-done">&#10004; 已完成</td><td>原版 RO 布局（HP/SP/状态栏）</td></tr>
+  <tr><td>聊天窗口</td><td class="status-done">&#10004; 已完成</td><td>聊天消息显示 UI</td></tr>
+</table>
+
+<h4>实体系统</h4>
+<table>
+  <tr><th>模块</th><th>状态</th><th>说明</th></tr>
+  <tr><td>玩家组件</td><td class="status-done">&#10004; 已完成</td><td>Player/Mob ECS 组件定义</td></tr>
+  <tr><td>移动系统</td><td class="status-done">&#10004; 已完成</td><td>玩家移动逻辑</td></tr>
+  <tr><td>实体同步</td><td class="status-wip">&#128295; 进行中</td><td>EntityAppear/Disappear/Move &rarr; 场景实体（TODO）</td></tr>
+</table>
+
+<h4>待开发</h4>
+<table>
+  <tr><th>模块</th><th>状态</th></tr>
+  <tr><td>瓦片地图渲染</td><td class="status-planned">&#128203; 规划中</td></tr>
+  <tr><td>角色攻击</td><td class="status-planned">&#128203; 规划中</td></tr>
+  <tr><td>中文聊天 (IME)</td><td class="status-planned">&#128203; 规划中</td></tr>
+  <tr><td>像素增强着色器</td><td class="status-planned">&#128203; 规划中</td></tr>
+  <tr><td>资源热更新</td><td class="status-planned">&#128203; 规划中</td></tr>
+  <tr><td>启动器</td><td class="status-planned">&#128203; 规划中</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>技术栈</h2>
+<table>
+  <tr><th>组件</th><th>技术</th></tr>
+  <tr><td>服务端</td><td>Rust, Tokio, SQLite, MySQL（可选）</td></tr>
+  <tr><td>客户端</td><td>Rust, Bevy, wgpu</td></tr>
+  <tr><td>协议</td><td>rAthena 二进制包（兼容）+ WebSocket</td></tr>
+  <tr><td>构建</td><td>Cargo Workspace</td></tr>
+  <tr><td>协议参考</td><td>rAthena (C++)</td></tr>
+</table>
+</div>
+
+<div class="section">
+<h2>快速开始</h2>
+<pre><code># 克隆项目
+git clone https://github.com/Cnkore007/Deviruchi.git
+cd Deviruchi
+
+# 编译
+cargo build --release
+
+# 运行（单机模式）
+cargo run --release</code></pre>
+</div>
+
+<div class="section">
+<h2>文档</h2>
+<ul>
+  <li><a href="CONTEXT.md">CONTEXT.md</a> &mdash; 项目术语表</li>
+  <li><a href="docs/adr/">docs/adr/</a> &mdash; 架构决策记录</li>
+  <li><a href="docs/agents/">docs/agents/</a> &mdash; Agent 工作流配置</li>
+</ul>
+</div>
+
+<div class="section">
+<h2>License</h2>
+<p>GPL-3.0</p>
+</div>
+
+</div>
+</body>
+</html>
