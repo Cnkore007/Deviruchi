@@ -231,7 +231,7 @@ async fn handle_slash_command(
         }
 
         "/players" => {
-            match tools.execute("player_list", &serde_json::json!({})).await {
+            match tools.execute("player", &serde_json::json!({"action": "list"})).await {
                 Ok(r) => SlashResult::Output(r.output),
                 Err(e) => SlashResult::Output(format!("错误: {}", e)),
             }
