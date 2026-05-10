@@ -1,5 +1,5 @@
 [workspace]
-members = ["devi"]
+members = ["devi", "devi-agent"]
 resolver = "2"
 
 [package]
