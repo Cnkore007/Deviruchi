@@ -13,9 +13,21 @@
 
 # Logs
 *.log
+/logs/
 
 # Local config
 *.local.toml
 deviruchi.local.toml
 .worktrees/
 .claude/
+devi-agent/config.toml
+
+# 开发数据库和运行时产物
+*.db
+*.db-shm
+*.db-wal
+
+# Claude Flow 工具状态（运行时生成）
+.claude-flow/
+.swarm/
+.mcp.json

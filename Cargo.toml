@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "deviruchi"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 authors = ["Deviruchi Team"]
 description = "High-performance MMORPG game server in Rust"
