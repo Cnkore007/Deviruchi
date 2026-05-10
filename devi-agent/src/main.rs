@@ -5,8 +5,10 @@
 
 mod ipc;
 mod llm;
+mod memory;
 mod tools;
 mod repl;
+mod knowledge;
 
 use std::sync::Arc;
 use anyhow::Result;
@@ -21,6 +23,20 @@ async fn main() -> Result<()> {
 
     print_banner();
 
+    // 知识索引初始化
+    // 在启动时检查并生成 LLM 可用的参考文档
+    let source_dir = std::env::current_dir().unwrap_or_default();
+    let knowledge_dir = home_dir().join(".devi-agent").join("knowledge");
+    let knowledge = knowledge::KnowledgeIndex::new(knowledge_dir, source_dir);
+    if knowledge.needs_update() {
+        println!("正在生成知识索引...");
+        if let Err(e) = knowledge.generate() {
+            println!("⚠ 知识索引生成失败: {}", e);
+        } else {
+            println!("✓ 知识索引已更新");
+        }
+    }
+
     // 初始化 IPC 客户端
     let ipc = Arc::new(ipc::IpcClient::new("/tmp/deviruchi.sock"));
 
@@ -32,6 +48,19 @@ async fn main() -> Result<()> {
 
     // 初始化工具注册表
     let tools = Arc::new(tools::ToolRegistry::new(ipc.clone()));
+
+    // 初始化持久化记忆存储
+    let memory_path = home_dir().join(".devi-agent").join("memory.db");
+    let memory = match memory::MemoryStore::new(&memory_path) {
+        Ok(m) => {
+            println!("✓ 记忆存储已初始化");
+            Some(Arc::new(m))
+        }
+        Err(e) => {
+            println!("⚠ 记忆存储初始化失败: {}", e);
+            None
+        }
+    };
 
     // 初始化 LLM 客户端
     let llm_config = load_llm_config();
@@ -228,8 +257,15 @@ fn load_llm_config() -> llm::openai::LlmConfig {
 
 /// 配置文件路径: ~/.devi-agent/config.toml
 fn config_file_path() -> std::path::PathBuf {
-    let mut path = std::env::var("HOME").map(std::path::PathBuf::from).unwrap_or_default();
-    path.push(".devi-agent");
-    path.push("config.toml");
-    path
+    home_dir().join(".devi-agent").join("config.toml")
+}
+
+/// 获取用户主目录
+///
+/// 从 HOME 环境变量获取，如果未设置则返回空路径。
+/// 这是一个简化的实现，仅支持 Unix 系统。
+fn home_dir() -> std::path::PathBuf {
+    std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default()
 }
