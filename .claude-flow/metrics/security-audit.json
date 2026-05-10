@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-05-10T03:12:50.896Z",
+  "mode": "headless",
+  "workerType": "audit",
+  "model": "haiku",
+  "durationMs": 66093,
+  "executionId": "audit_1778382704803_aa6iv4",
+  "success": true,
+  "findings": {
+    "vulnerabilities": [
+      {
+        "severity": "high",
+        "file": "rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js",
+        "line": 122,
+        "description": "XSS 注入：`loadSpecs` 函数使用 jQuery `.html()` 直接将未转义的 specs.url 和 specs.projname 插入 DOM（`<a href=\"${specs.url}\">${specs.projname}</a>`）。如果 specs 来自外部 JSON 文件，攻击者可通过构造恶意 URL/project name 注入任意 HTML/JS。"
+      },
+      {
+        "severity": "high",
+        "file": "rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js",
+        "line": 85,
+        "description": "XSS 注入：`decodeHtmlEntities` 函数将 URL 参数中的 HTML 实体解码为原始字符后，`toc.append()` 中通过模板字符串直接拼接到 onclick 处理器（`setParam('bm', '${key}')`），攻击者可通过 URL 参数注入 JS 代码。"
+      },
+      {
+        "severity": "high",
+        "file": "rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js",
+        "line": 110,
+        "description": "XSS 注入：`getParam()` 的返回值未经任何转义就通过 `setParam('bm', '${key}')` 写入 onclick 属性。攻击者只需在 URL 中构造 `?bm=';alert(1)//` 即可执行任意 JS。"
+      },
+      {
+        "severity": "medium",
+        "file": ".claude/helpers/statusline.js",
+        "line": 11,
+        "description": "危险导入：`execSync` 被导入但从未使用。虽然当前使用了安全的 `execFileSync`，但保留 `execSync` 导入增加了未来误用的风险（命令注入）。应移除未使用的 `execSync` 导入。"
+      },
+      {
+        "severity": "medium",
+        "file": ".claude/helpers/session.js",
+        "line": 15,
+        "description": "可预测的会话 ID：`session-${Date.now()}` 使用毫秒时间戳生成会话 ID，攻击者若知道大致启动时间可暴力猜测有效会话。应使用 `crypto.randomBytes()` 生成不可预测的 ID。"
+      },
+      {
+        "severity": "medium",
+        "file": ".claude/helpers/session.js",
+        "line": 96,
+        "description": "原型污染风险：`session.context[key] = value` 中 key 来自 CLI 参数，未过滤 `__proto__`、`constructor`、`prototype` 等特殊属性名。恶意输入可污染 Object 原型链。"
+      },
+      {
+        "severity": "medium",
+        "file": ".claude/helpers/memory.js",
+        "line": 43,
+        "description": "原型污染风险：`memory[key] = value` 中 key 来自 CLI 参数，未过滤 `__proto__`、`constructor` 等特殊属性名。与 session.js 同类问题。"
+      },
+      {
+        "severity": "low",
+        "file": "rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js",
+        "line": 77,
+        "description": "XSS 防护不完整：`escapeHtml` 函数缺少对反引号 (`) 的转义。在模板字面量上下文中可能被绕过。此外该函数在代码中定义但未被调用——实际 HTML 插入点未使用任何转义。"
+      },
+      {
+        "severity": "low",
+        "file": "rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js",
+        "line": 63,
+        "description": "HTML 实体解码不完整：`decodeHtmlEntities` 仅处理 &amp; &lt; &gt; &quot; 和数字实体，遗漏了 &apos;、&nbsp; 等常用实体，且对同一实体多次出现的情况只替换第一次（replace 非 g 标志）。"
+      },
+      {
+        "severity": "low",
+        "file": ".claude/helpers/session.js",
+        "line": 42,
+        "description": "JSON 解析无大小限制：`JSON.parse(fs.readFileSync(...))` 未检查文件大小，恶意写入的超大 JSON 文件可导致内存耗尽 DoS。"
+      },
+      {
+        "severity": "low",
+        "file": ".claude/helpers/statusline.js",
+        "line": 12,
+        "description": "未使用的危险模块导入：`execSync` 被解构导入但在整个文件中未使用。属于代码卫生问题，增加了攻击面。"
+      }
+    ],
+    "riskScore": 45,
+    "recommendations": [
+      "【P0 高危】bm.js XSS 修复：将 specs.url 和 specs.projname 使用 escapeHtml() 转义后再插入 DOM；将 getParam() 返回值转义后再写入 onclick 属性；或改用 jQuery .text() 替代 .html()",
+      "【P1 中危】移除 statusline.js 中未使用的 execSync 导入，只保留 execFileSync",
+      "【P1 中危】session.js 会话 ID 改用 crypto.randomBytes(16).toString('hex') 生成不可预测的 ID",
+      "【P1 中危】session.js 和 memory.js 添加原型污染防护：在赋值前检查 key !== '__proto__' && key !== 'constructor' && key !== 'prototype'",
+      "【P2 低危】bm.js escapeHtml() 补充反引号转义，并确保所有用户可控数据插入 DOM 前都经过转义",
+      "【P2 低危】session.js 对读取的 JSON 文件设置大小上限（如 1MB），防止 DoS",
+      "【整体建议】这些文件为本地 CLI 辅助工具，非面向网络的服务端代码，实际被远程利用的风险较低。但 XSS 问题（bm.js）在用户打开恶意构造的 HTML 文件时仍可触发，建议优先修复"
+    ]
+  },
+  "rawOutputPreview": "以下是完整的安全漏洞分析报告：\n\n```json\n{\n  \"vulnerabilities\": [\n    {\n      \"severity\": \"high\",\n      \"file\": \"rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js\",\n      \"line\": 122,\n      \"description\": \"XSS 注入：`loadSpecs` 函数使用 jQuery `.html()` 直接将未转义的 specs.url 和 specs.projname 插入 DOM（`<a href=\\\"${specs.url}\\\">${specs.projname}</a>`）。如果 specs 来自外部 JSON 文件，攻击者可通过构造恶意 URL/project name 注入任意 HTML/JS。\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js\",\n      \"line\": 85,\n      \"description\": \"XSS 注入：`decodeHtmlEntities` 函数将 URL 参数中的 HTML 实体解码为原始字符后，`toc.append()` 中通过模板字符串直接拼接到 onclick 处理器（`setParam('bm', '${key}')`），攻击者可通过 URL 参数注入 JS 代码。\"\n    },\n    {\n      \"severity\": \"high\",\n      \"file\": \"rathena/3rdparty/rapidyaml/ext/c4core/cmake/bm-xp/bm.js\",\n      \"line\": 110,\n      \"description\": \"XSS 注入：`getParam()` 的返回值未经任何转义就通过 `setParam('bm', '${key}')` 写入 onclick 属性。攻击者只需在 URL 中构造 `?bm=';alert(1)//` 即可执行任意 JS。\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".claude/helpers/statusline.js\",\n      \"line\": 11,\n      \"description\": \"危险导入：`execSync` 被导入但从未使用。虽然当前使用了安全的 `execFileSync`，但保留 `execSync` 导入增加了未来误用的风险（命令注入）。应移除未使用的 `execSync` 导入。\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".claude/helpers/session.js\",\n      \"line\": 15,\n      \"description\": \"可预测的会话 ID：`session-${Date.now()}` 使用毫秒时间戳生成会话 ID，攻击者若知道大致启动时间可暴力猜测有效会话。应使用 `crypto.randomBytes()` 生成不可预测的 ID。\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".claude/helpers/session.js\",\n      \"line\": 96,\n      \"description\": \"原型污染风险：`session.context[key] = value` 中 key 来自 CLI 参数，未过滤 `__proto__`、`constructor`、`prototype` 等特殊属性名。恶意输入可污染 Object 原型链。\"\n    },\n    {\n      \"severity\": \"medium\",\n      \"file\": \".claude/helpers/memory.js\",\n      \"line\": 43,\n      \"description\": \"原型污染风险：`memory[key] = value` 中 key 来自 CLI 参数，未过滤 `__proto__`、`constructor` 等特殊属性名。与 session.js 同类问题。\"\n    },\n    {\n      \"severity\": \"low\",\n      \"file\": \"rathena/3rdparty/rapidyaml/ex",
+  "rawOutputLength": 3708
+}

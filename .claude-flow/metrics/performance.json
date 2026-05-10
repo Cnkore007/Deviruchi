@@ -1,0 +1,68 @@
+{
+  "timestamp": "2026-05-10T03:06:14.776Z",
+  "mode": "headless",
+  "workerType": "optimize",
+  "model": "sonnet",
+  "durationMs": 220948,
+  "executionId": "optimize_1778382153828_so9oqz",
+  "success": true,
+  "findings": {
+    "sections": [
+      {
+        "title": "补充：网络/协议层性能问题",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "网络包双重拷贝（P0）",
+        "content": "\n`src/network/packet.rs:58`：\n\n```rust\nlet data = bytes[4..length as usize].to_vec();  // BytesMut → Vec<u8> 再次拷贝\n```\n\n`Codec::decode` 中 `split_to` 已经零拷贝分离数据，但 `from_bytes` 内部又 `to_vec()` 完全抵消了优势。应让 Packet 直接持有 `Bytes`。\n\n",
+        "level": 3
+      },
+      {
+        "title": "PacketBuilder build() 双重分配（P0）",
+        "content": "\n`src/protocol/packet_builder.rs:85-92`：\n\n```rust\nfn build(self) -> Vec<u8> {\n    let mut buf = BytesMut::with_capacity(4 + self.data.len());  // 分配1\n    buf.put_u16_le(packet_id);\n    buf.put_u16_le(total_len);\n    buf.extend_from_slice(&self.data);\n    buf.to_vec()  // 分配2：再次拷贝\n}\n```\n\n应预留 header 空间，直接在原 BytesMut 前部写入 header，一次 `freeze()` 完成。\n\n",
+        "level": 3
+      },
+      {
+        "title": "ChannelBus publish 对每个订阅者克隆 packet（P0）",
+        "content": "\n`src/game/map/channel.rs:452`：\n\n```rust\nsub.sender.send(packet.clone())  // N 个订阅者 = N 次堆分配\n```\n\n应改为 `Arc<Vec<u8>>` 或 `Bytes`（引用计数），克隆仅 +1 引用计数。\n\n",
+        "level": 3
+      },
+      {
+        "title": "Session 每次收包都 clone",
+        "content": "\n`src/network/server.rs:95`：\n\n```rust\nsession_manager.update(&session_id, session.clone())  // 每个入站包一次\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "cleanup_expired_with_broadcast 三次锁获取",
+        "content": "\n`src/game/map/drop_item.rs:135-172` 先读锁收集信息、再写锁收集 ID、再写锁删除，应合并为一次写锁。\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "全局最终优先级矩阵",
+        "content": "| 优先级 | 层 | 问题 | 位置 |\n|--------|-----|------|------|\n| **P0** | 游戏 | Player::clone() 深克隆贯穿全系统 | player.rs:101 |\n| **P0** | 游戏 | SkillExecutor 每次 new SkillDatabase | executor.rs:96 |\n| **P0** | 存储 | 3 个 save 方法无事务（数据丢失风险） | character.rs:434/549/613 |\n| **P0** | 存储 | load_all_guilds N+1 查询 (301 次) | guild.rs:224 |\n| **P0** | 网络 | publish 对每个订阅者 clone packet | channel.rs:452 |\n| **P0** | 网络 | Packet::from_bytes to_vec() 二次拷贝 | packet.rs:58 |\n| **P0** | 网络 | PacketBuilder build() 双重分配 | packet_builder.rs:85 |\n| **P1** | 游戏 | Mob AI 全图玩家克隆（每个怪物/tick） | ai.rs:130 |\n| **P1** | 游戏 | 距离计算 sqrt（5000+次/tick） | ai.rs:771 |\n| **P1** | 游戏 | find_player_by_name O(n) 线性扫描 | map_state.rs:96 |\n| **P1** | 游戏 | players_by_map 用 Vec 而非 HashSet | map_state.rs:319 |\n| **P1** | 游戏 | 同一 tick 重复查找玩家 (try_use_skill) | ai.rs:384 |\n| **P1** | 存储 | 缺少 4 个关键数据库索引 | schema.rs |\n| **P1** | 存储 | prepared statement 未缓存 | sqlite_backend.rs:85 |\n| **P1** | 网络 | Session 每次收包 clone | server.rs:95 |\n| **P1** | 网络 | cleanup_expired 三次锁获取 | drop_item.rs:135 |\n| **P2** | 游戏 | 定期保存逐个写 DB | game_loop.rs:117 |\n| **P2** | 存储 | Value/Row String 双重克隆 | backend.rs |\n| **P2** | 网络 | parse_fixed_string 双重分配 | packet_builder.rs:107 |\n| **P2** | 网络 | GameEvent 每次独立 Vec 分配 | channel.rs:119 |\n\n---\n\n**核心结论**：性能瓶颈集中在三个领域——**Player 深克隆**（游戏层）、**网络包双重拷贝**（网络层）、**存储层无事务写入**。修复这三类问题能带来 80% 以上的性能提升。\n\n需要我从哪个 P0 问题开始实施修复？",
+        "level": 2
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "rust",
+        "code": "let data = bytes[4..length as usize].to_vec();  // BytesMut → Vec<u8> 再次拷贝"
+      },
+      {
+        "language": "rust",
+        "code": "fn build(self) -> Vec<u8> {\n    let mut buf = BytesMut::with_capacity(4 + self.data.len());  // 分配1\n    buf.put_u16_le(packet_id);\n    buf.put_u16_le(total_len);\n    buf.extend_from_slice(&self.data);\n    buf.to_vec()  // 分配2：再次拷贝\n}"
+      },
+      {
+        "language": "rust",
+        "code": "sub.sender.send(packet.clone())  // N 个订阅者 = N 次堆分配"
+      },
+      {
+        "language": "rust",
+        "code": "session_manager.update(&session_id, session.clone())  // 每个入站包一次"
+      }
+    ]
+  },
+  "rawOutputPreview": "三个分析代理全部完成。以下是网络/协议层的补充发现：\n\n---\n\n## 补充：网络/协议层性能问题\n\n### 网络包双重拷贝（P0）\n\n`src/network/packet.rs:58`：\n\n```rust\nlet data = bytes[4..length as usize].to_vec();  // BytesMut → Vec<u8> 再次拷贝\n```\n\n`Codec::decode` 中 `split_to` 已经零拷贝分离数据，但 `from_bytes` 内部又 `to_vec()` 完全抵消了优势。应让 Packet 直接持有 `Bytes`。\n\n### PacketBuilder build() 双重分配（P0）\n\n`src/protocol/packet_builder.rs:85-92`：\n\n```rust\nfn build(self) -> Vec<u8> {\n    let mut buf = BytesMut::with_capacity(4 + self.data.len());  // 分配1\n    buf.put_u16_le(packet_id);\n    buf.put_u16_le(total_len);\n    buf.extend_from_slice(&self.data);\n    buf.to_vec()  // 分配2：再次拷贝\n}\n```\n\n应预留 header 空间，直接在原 BytesMut 前部写入 header，一次 `freeze()` 完成。\n\n### ChannelBus publish 对每个订阅者克隆 packet（P0）\n\n`src/game/map/channel.rs:452`：\n\n```rust\nsub.sender.send(packet.clone())  // N 个订阅者 = N 次堆分配\n```\n\n应改为 `Arc<Vec<u8>>` 或 `Bytes`（引用计数），克隆仅 +1 引用计数。\n\n### Session 每次收包都 clone\n\n`src/network/server.rs:95`：\n\n```rust\nsession_manager.update(&session_id, session.clone())  // 每个入站包一次\n```\n\n### cleanup_expired_with_broadcast 三次锁获取\n\n`src/game/map/drop_item.rs:135-172` 先读锁收集信息、再写锁收集 ID、再写锁删除，应合并为一次写锁。\n\n---\n\n## 全局最终优先级矩阵\n\n| 优先级 | 层 | 问题 | 位置 |\n|--------|-----|------|------|\n| **P0** | 游戏 | Player::clone() 深克隆贯穿全系统 | player.rs:101 |\n| **P0** | 游戏 | SkillExecutor 每次 new SkillDatabase | executor.rs:96 |\n| **P0** | 存储 | 3 个 save 方法无事务（数据丢失风险） | character.rs:434/549/613 |\n| **P0** | 存储 | load_all_guilds N+1 查询 (301 次) | guild.rs:224 |\n| **P0** | 网络 | publish 对每个订阅者 clone packet | channel.rs:452 |\n| **P0** | 网络 | Packet::from_bytes to_vec() 二次拷贝 | packet.rs:58 |\n| **P0** | 网络 | PacketBuilder build() 双重分配 | packet_builder.rs:85 |\n| **P1** | 游戏 | Mob AI 全图玩家克隆（每个怪物/tick） | ai.rs:130 |\n| **P1** | 游戏 | 距离计算 sqrt（5000+次/tick） | ai.rs:771 |\n| **P1** | 游戏 | find_player_by_name O(n) 线性扫描 | map_state.rs:96 |\n| **P1** | 游戏 | players_by_map 用 Vec 而非 HashSet | map_state.rs:319 |\n| **P1** | 游戏 | 同一 tick 重复查找玩家 (try_use_skill) | ai.rs:384 |\n| **P1** | 存储 | 缺少 4 个关键数据库索引 | schema.rs |\n| **P1** | 存储 | pre",
+  "rawOutputLength": 2503
+}
