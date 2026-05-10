@@ -81,7 +81,8 @@ pub use item::ItemHandler;
 pub use login::LoginServer;
 pub use mail::{MailAttachResult, MailError, MailItem, MailListEntry, MailMessage, MailSystem};
 pub use map::{
-    MapAdjacency, MapEdge, MapState, TeleportAction, TeleportManager, WarpError, WarpService,
+    MapAdjacency, MapDatabase, MapEdge, MapState, TeleportAction, TeleportManager, WarpError,
+    WarpService,
 };
 pub use mercenary::{Mercenary, MercenaryClass, MercenaryData, MercenaryDatabase, MercenaryError, MercenaryManager, MercenarySkill};
 pub use mob::{MobAI, MobSpawnManager};

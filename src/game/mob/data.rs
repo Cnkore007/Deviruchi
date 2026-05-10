@@ -325,6 +325,8 @@ pub struct Mob {
 
     // 伤害记录（用于确定 MVP）
     pub damage_log: RwLock<std::collections::HashMap<Uuid, u64>>,
+    // 伤害记录（用于血条同步，参考 rAthena dmglog）
+    pub dmglog: RwLock<HashMap<Uuid, u32>>,
 }
 
 impl Mob {
@@ -376,6 +378,7 @@ impl Mob {
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
             damage_log: RwLock::new(std::collections::HashMap::new()),
+            dmglog: RwLock::new(HashMap::new()),
         }
     }
 
@@ -428,6 +431,7 @@ impl Mob {
             drops_processed: RwLock::new(false),
             path_manager: RwLock::new(MobPathManager::new()),
             damage_log: RwLock::new(std::collections::HashMap::new()),
+            dmglog: RwLock::new(HashMap::new()),
         }
     }
 
@@ -478,6 +482,13 @@ impl Mob {
         (hp as u64 * 100 / self.max_hp as u64) as u32
     }
 
+    /// 记录玩家对此怪物造成的伤害
+    pub fn add_damage(&self, player_id: Uuid, damage: u32) {
+        let mut log = self.dmglog.write();
+        let entry = log.entry(player_id).or_insert(0);
+        *entry += damage;
+    }
+
     /// 重生：回到出生点并恢复满血
     pub fn respawn(&self) {
         *self.hp.write() = self.max_hp;
@@ -490,6 +501,8 @@ impl Mob {
         *self.path_manager.write() = MobPathManager::new();
         // 清空技能冷却，重生后所有技能可用
         self.skill_cooldowns.write().clear();
+        // 清空伤害记录（血条同步数据）
+        self.dmglog.write().clear();
     }
 
     /// 恢复自身 HP（用于怪物自愈技能）
