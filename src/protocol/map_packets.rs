@@ -703,10 +703,10 @@ mod tests {
             left_damage: 0,
         };
         let bytes = pkt.to_packet();
-        // BytesMut uses big-endian, so read as BE
-        assert_eq!(u32::from_be_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 12345);
-        assert_eq!(u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 67890);
-        assert_eq!(u32::from_be_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]), 999);
+        // PacketBuilder 使用小端序 (put_u32_le)，所以用 LE 读取
+        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 12345);
+        assert_eq!(u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 67890);
+        assert_eq!(u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]), 999);
     }
 }
 

@@ -13,11 +13,15 @@ use devi::game::char_select::{
 use devi::game::login::{
     cleanup_login, handle_login_button, login_network_handler, setup_login,
 };
-use devi::game::map_connection::{map_network_handler, setup_map_connection};
+use devi::game::attack::{
+    attack_animation_system, attack_input_system, damage_display_system,
+    DamageDisplayEvent,
+};
+use devi::game::map_connection::{map_network_handler, setup_map_connection, chat_send_handler};
 use devi::game::movement::movement_system;
 use devi::render::camera::{camera_system, CameraConfig, RoCamera};
 use devi::render::sprite::{billboard_system, sprite_animation_system};
-use devi::render::ui::chat::build_chat_window;
+use devi::render::ui::chat::{build_chat_window, ChatPlugin};
 use devi::render::ui::hud::{build_hud, HudLayout};
 
 fn main() {
@@ -31,7 +35,9 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(ChatPlugin)
         .init_state::<GameState>()
+        .add_event::<DamageDisplayEvent>()
         .insert_resource(config)
         .insert_resource(RoCamera::new(CameraConfig::default()))
         // ===== Startup =====
@@ -73,7 +79,11 @@ fn main() {
                 sprite_animation_system,
                 billboard_system,
                 movement_system,
+                attack_input_system,
+                attack_animation_system,
+                damage_display_system,
                 map_network_handler,
+                chat_send_handler,
             )
                 .run_if(in_state(GameState::InGame)),
         )

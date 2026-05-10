@@ -110,7 +110,39 @@ impl SkillEffect {
         }
     }
 
-    fn apply_debuff(skill: &Skill, _caster: &Player, _target: &Player, _level: u8) -> SkillResult {
+    fn apply_debuff(skill: &Skill, _caster: &Player, target: &Player, level: u8) -> SkillResult {
+        // 根据技能 ID 映射到对应的减益状态效果
+        let status_change = match skill.id {
+            92 => StatusChange::Poison,             // 中毒术
+            93 => StatusChange::Silence,            // 沉默术
+            94 => StatusChange::Stun,               // 眩晕攻击
+            95 => StatusChange::Curse,              // 诅咒
+            96 => StatusChange::Blind,              // 暗黑
+            _ => StatusChange::Weakness,            // 默认：虚弱（ATK 降低）
+        };
+
+        let duration_ms = skill.skill_time as u64;
+        let val1 = level as i32; // 技能等级作为效果强度
+
+        let effect = StatusEffect::with_values(
+            status_change,
+            duration_ms,
+            StatusSource::Skill(skill.id),
+            val1,
+            0,
+            0,
+        );
+
+        target.add_status(effect);
+
+        tracing::info!(
+            "Applied {:?} debuff to {} (duration: {}ms, level: {})",
+            status_change,
+            target.name,
+            duration_ms,
+            level
+        );
+
         SkillResult::Debuff {
             debuff_type: skill.id,
             duration: skill.skill_time,

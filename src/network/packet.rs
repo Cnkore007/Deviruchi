@@ -118,6 +118,14 @@ pub mod id {
     // 状态点分配
     pub const CZ_STATUS_CHANGE: PacketId = 0x014D;
     pub const ZC_STATUS_CHANGE_ACK: PacketId = 0x00BC;
+
+    // 技能点分配
+    pub const CZ_SKILL_UP: PacketId = 0x010B;
+    pub const ZC_SKILLINFO_UPDATE: PacketId = 0x010E;
+
+    // 转职相关
+    pub const CZ_REQ_CHANGEJOB: PacketId = 0x019D;
+    pub const ZC_ACK_CHANGEJOB: PacketId = 0x019E;
     pub const ZC_TRADE_REQUEST: PacketId = 0x00E5;
     pub const ZC_TRADE_ACK: PacketId = 0x00E7;
     pub const ZC_TRADE_ADD_ITEM: PacketId = 0x00E8;

@@ -247,6 +247,8 @@ pub enum MobAIState {
     Chase,
     Attack,
     Return,
+    /// 逃跑状态：HP 过低时远离攻击者
+    Flee,
     Dead,
 }
 
@@ -327,6 +329,8 @@ pub struct Mob {
     pub damage_log: RwLock<std::collections::HashMap<Uuid, u64>>,
     // 伤害记录（用于血条同步，参考 rAthena dmglog）
     pub dmglog: RwLock<HashMap<Uuid, u32>>,
+    /// 逃跑目标（记录要逃离的攻击者 ID，用于 FleeWhenLowHp 行为）
+    pub flee_from: RwLock<Option<Uuid>>,
 }
 
 impl Mob {
@@ -379,6 +383,7 @@ impl Mob {
             path_manager: RwLock::new(MobPathManager::new()),
             damage_log: RwLock::new(std::collections::HashMap::new()),
             dmglog: RwLock::new(HashMap::new()),
+            flee_from: RwLock::new(None),
         }
     }
 
@@ -432,6 +437,7 @@ impl Mob {
             path_manager: RwLock::new(MobPathManager::new()),
             damage_log: RwLock::new(std::collections::HashMap::new()),
             dmglog: RwLock::new(HashMap::new()),
+            flee_from: RwLock::new(None),
         }
     }
 
@@ -503,6 +509,8 @@ impl Mob {
         self.skill_cooldowns.write().clear();
         // 清空伤害记录（血条同步数据）
         self.dmglog.write().clear();
+        // 清空逃跑目标
+        *self.flee_from.write() = None;
     }
 
     /// 恢复自身 HP（用于怪物自愈技能）

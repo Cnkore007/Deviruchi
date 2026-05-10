@@ -334,6 +334,8 @@ mod tests {
             drops_processed: parking_lot::RwLock::new(false),
             path_manager: parking_lot::RwLock::new(MobPathManager::new()),
             damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
         });
 
         // Register the mob

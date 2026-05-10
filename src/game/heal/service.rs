@@ -321,6 +321,8 @@ mod tests {
             save_y: 100,
             zeny: 10000,
             delete_timer: 0,
+            status_point: 0,
+            skill_point: 0,
             created_at: 0,
             updated_at: 0,
         };

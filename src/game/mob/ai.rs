@@ -11,14 +11,32 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+/// 远程攻击距离阈值（格数）
+/// 超过此距离的目标视为远程目标
+const LONG_RANGE_THRESHOLD: u16 = 3;
+
+/// 围攻检测所需的最小攻击者数量
+const RUDE_ATTACK_MIN_ATTACKERS: usize = 2;
+
+/// 逃跑触发阈值：HP 百分比低于此值时进入逃跑状态
+const FLEE_HP_THRESHOLD: u32 = 25;
+
+/// 逃跑恢复阈值：HP 百分比回升到此值以上时停止逃跑
+const FLEE_RECOVERY_THRESHOLD: u32 = 50;
+
 /// 检查技能触发条件是否满足
 ///
 /// 根据技能的 condition 类型和当前战斗状态判断：
 /// - Any: 无条件满足
 /// - HpCertain: 当 HP 百分比低于 condition_value 时满足
-/// - RudeAttacked: 被围攻时满足（当前简化为 always true）
-/// - LongRange: 远程目标时满足（当前简化为 always true）
-fn check_skill_condition(skill: &MobSkill, hp_percent: u32) -> bool {
+/// - RudeAttacked: 被围攻时满足（攻击者数量 >= 2）
+/// - LongRange: 目标距离 > 3 格时满足
+fn check_skill_condition(
+    skill: &MobSkill,
+    hp_percent: u32,
+    attacker_count: usize,
+    target_distance: u16,
+) -> bool {
     match skill.condition {
         MobSkillCondition::Any => true,
         MobSkillCondition::HpCertain => {
@@ -26,14 +44,12 @@ fn check_skill_condition(skill: &MobSkill, hp_percent: u32) -> bool {
             hp_percent <= skill.condition_value
         }
         MobSkillCondition::RudeAttacked => {
-            // 被围攻条件：当前简化实现，始终满足
-            // TODO: 后续可检查是否有多个敌人围攻
-            true
+            // 被围攻条件：有 2 个及以上不同攻击者时触发
+            attacker_count >= RUDE_ATTACK_MIN_ATTACKERS
         }
         MobSkillCondition::LongRange => {
-            // 远程目标条件：当前简化实现，始终满足
-            // TODO: 后续可检查目标距离
-            true
+            // 远程目标条件：目标距离超过阈值时触发
+            target_distance > LONG_RANGE_THRESHOLD
         }
     }
 }
@@ -100,6 +116,7 @@ impl MobAI {
             MobAIState::Chase => self.update_chase(mob, map_state),
             MobAIState::Attack => self.update_attack(mob, map_state),
             MobAIState::Return => self.update_return(mob),
+            MobAIState::Flee => self.update_flee(mob, map_state),
             MobAIState::Dead => self.update_dead(mob, map_state),
         }
     }
@@ -127,10 +144,68 @@ impl MobAI {
                 // 被动/固定：不主动追击，被攻击时由 take_damage 或 attack handler 设置目标
             }
             MobBehavior::FleeWhenLowHp => {
-                // 低血量逃跑：暂不实现逃跑逻辑，当前与被动行为一致
+                // 低血量逃跑：HP 低于 25% 时切换到逃跑状态
+                let hp_pct = mob.hp_percent();
+                if hp_pct <= FLEE_HP_THRESHOLD && hp_pct > 0 {
+                    // 记录最后攻击者作为逃跑目标
+                    let last_attacker = mob.damage_log.read().keys().next().copied();
+                    if let Some(attacker_id) = last_attacker {
+                        *mob.flee_from.write() = Some(attacker_id);
+                        *mob.ai_state.write() = MobAIState::Flee;
+                        return;
+                    }
+                }
             }
-            MobBehavior::Assist | MobBehavior::PassiveAssist => {
-                // 协助：暂不实现，当前与被动行为一致
+            MobBehavior::Assist => {
+                // 主动协助：当视野内的同类怪物被攻击时，协助攻击该玩家
+                // 获取同地图上所有活跃怪物
+                let nearby_mobs = self.spawn_manager.get_active_mobs(&mob.spawn_map);
+                for other_mob in &nearby_mobs {
+                    // 跳过自己
+                    if other_mob.id == mob.id {
+                        continue;
+                    }
+                    // 检查距离是否在视野内
+                    let (ox, oy) = other_mob.get_position();
+                    let dist = Self::calculate_distance(x, y, ox, oy);
+                    if dist > mob.sight_range {
+                        continue;
+                    }
+                    // 检查该怪物是否正在被玩家攻击（有伤害记录且处于战斗状态）
+                    let other_state = *other_mob.ai_state.read();
+                    if matches!(other_state, MobAIState::Chase | MobAIState::Attack) {
+                        if let Some(attacker_id) = *other_mob.target_id.read() {
+                            *mob.ai_state.write() = MobAIState::Chase;
+                            *mob.target_id.write() = Some(attacker_id);
+                            return;
+                        }
+                    }
+                }
+            }
+            MobBehavior::PassiveAssist => {
+                // 被动协助：只有自身被攻击过（有伤害记录）后，才会协助其他怪物
+                let has_been_attacked = !mob.damage_log.read().is_empty();
+                if has_been_attacked {
+                    let nearby_mobs = self.spawn_manager.get_active_mobs(&mob.spawn_map);
+                    for other_mob in &nearby_mobs {
+                        if other_mob.id == mob.id {
+                            continue;
+                        }
+                        let (ox, oy) = other_mob.get_position();
+                        let dist = Self::calculate_distance(x, y, ox, oy);
+                        if dist > mob.sight_range {
+                            continue;
+                        }
+                        let other_state = *other_mob.ai_state.read();
+                        if matches!(other_state, MobAIState::Chase | MobAIState::Attack) {
+                            if let Some(attacker_id) = *other_mob.target_id.read() {
+                                *mob.ai_state.write() = MobAIState::Chase;
+                                *mob.target_id.write() = Some(attacker_id);
+                                return;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -150,6 +225,17 @@ impl MobAI {
     }
 
     fn update_chase(&self, mob: &Arc<Mob>, map_state: &MapState) {
+        // FleeWhenLowHp 行为：追击过程中 HP 过低时逃跑
+        if mob.behavior == MobBehavior::FleeWhenLowHp {
+            let hp_pct = mob.hp_percent();
+            if hp_pct <= FLEE_HP_THRESHOLD && hp_pct > 0 {
+                let target = *mob.target_id.read();
+                *mob.flee_from.write() = target;
+                *mob.ai_state.write() = MobAIState::Flee;
+                return;
+            }
+        }
+
         let target_id = *mob.target_id.read();
 
         if let Some(target_id) = target_id {
@@ -226,6 +312,17 @@ impl MobAI {
     }
 
     fn update_attack(&self, mob: &Arc<Mob>, map_state: &MapState) {
+        // FleeWhenLowHp 行为：战斗中 HP 过低时逃跑
+        if mob.behavior == MobBehavior::FleeWhenLowHp {
+            let hp_pct = mob.hp_percent();
+            if hp_pct <= FLEE_HP_THRESHOLD && hp_pct > 0 {
+                let target = *mob.target_id.read();
+                *mob.flee_from.write() = target;
+                *mob.ai_state.write() = MobAIState::Flee;
+                return;
+            }
+        }
+
         let target_id = *mob.target_id.read();
 
         if let Some(target_id) = target_id {
@@ -256,7 +353,8 @@ impl MobAI {
                             let event = GameEvent::PlayerDeath {
                                 player_id: target_id,
                             };
-                            self.channel_bus.publish(&channel_name, &event, vec![]);
+                            let packet = event.to_packet_bytes();
+                            self.channel_bus.publish(&channel_name, &event, packet);
 
                             *mob.ai_state.write() = MobAIState::Idle;
                             *mob.target_id.write() = None;
@@ -280,6 +378,16 @@ impl MobAI {
         }
 
         let hp_percent = mob.hp_percent();
+        // 计算攻击者数量（用于 RudeAttacked 条件）
+        let attacker_count = mob.dmglog.read().len();
+        // 计算目标距离（用于 LongRange 条件）
+        let target_distance = if let Some(target) = map_state.get_player(&target_id) {
+            let (mx, my) = mob.get_position();
+            let (tx, ty) = target.get_position();
+            Self::calculate_distance(mx, my, tx, ty)
+        } else {
+            0
+        };
 
         for skill in &mob.skills {
             // 检查冷却时间
@@ -288,7 +396,7 @@ impl MobAI {
             }
 
             // 检查触发条件
-            if !check_skill_condition(skill, hp_percent) {
+            if !check_skill_condition(skill, hp_percent, attacker_count, target_distance) {
                 continue;
             }
 
@@ -451,7 +559,8 @@ impl MobAI {
                     let event = GameEvent::PlayerDeath {
                         player_id: target_id,
                     };
-                    self.channel_bus.publish(&channel_name, &event, vec![]);
+                    let packet = event.to_packet_bytes();
+                    self.channel_bus.publish(&channel_name, &event, packet);
 
                     *mob.ai_state.write() = MobAIState::Idle;
                     *mob.target_id.write() = None;
@@ -473,6 +582,52 @@ impl MobAI {
         *mob.ai_state.write() = MobAIState::Idle;
     }
 
+    /// 逃跑状态更新
+    ///
+    /// FleeWhenLowHp 怪物的逃跑逻辑：
+    /// 1. 如果 HP 恢复到 50% 以上，停止逃跑回到 Idle
+    /// 2. 否则远离攻击者方向移动
+    fn update_flee(&self, mob: &Arc<Mob>, map_state: &MapState) {
+        // 检查 HP 是否已恢复到可以停止逃跑的阈值
+        let hp_pct = mob.hp_percent();
+        if hp_pct >= FLEE_RECOVERY_THRESHOLD {
+            *mob.ai_state.write() = MobAIState::Idle;
+            *mob.flee_from.write() = None;
+            mob.path_manager.write().stop_chase();
+            return;
+        }
+
+        let (x, y) = mob.get_position();
+        let flee_from_id = *mob.flee_from.read();
+
+        // 获取逃跑方向（远离攻击者）
+        if let Some(attacker_id) = flee_from_id {
+            if let Some(attacker) = map_state.get_player(&attacker_id) {
+                let (ax, ay) = attacker.get_position();
+                // 计算远离方向：从攻击者位置指向怪物位置
+                let dx = x as i32 - ax as i32;
+                let dy = y as i32 - ay as i32;
+                let dist = Self::calculate_distance(x, y, ax, ay);
+
+                if dist > 0 {
+                    // 归一化方向后移动 2 格
+                    let move_x = (dx as f64 / dist as f64 * 2.0) as i32;
+                    let move_y = (dy as f64 / dist as f64 * 2.0) as i32;
+                    let new_x = (x as i32 + move_x).max(0) as u16;
+                    let new_y = (y as i32 + move_y).max(0) as u16;
+                    mob.move_to(new_x, new_y);
+                }
+            } else {
+                // 攻击者已不在地图上，停止逃跑
+                *mob.ai_state.write() = MobAIState::Idle;
+                *mob.flee_from.write() = None;
+            }
+        } else {
+            // 没有逃跑目标，回到 Idle
+            *mob.ai_state.write() = MobAIState::Idle;
+        }
+    }
+
     fn update_dead(&self, mob: &Arc<Mob>, map_state: &MapState) {
         // 首次死亡处理：发布事件 + 掉落 + 经验
         if !*mob.drops_processed.read() {
@@ -486,7 +641,8 @@ impl MobAI {
                 mob_id: mob.id,
                 killer_id,
             };
-            self.channel_bus.publish(&channel_name, &event, vec![]);
+            let packet = event.to_packet_bytes();
+            self.channel_bus.publish(&channel_name, &event, packet);
 
             // 使用 DropTableResolver 计算掉落
             self.process_drops_with_resolver(mob);
@@ -570,7 +726,8 @@ impl MobAI {
                     y: mob_y,
                     amount,
                 };
-                self.channel_bus.publish(&channel_name, &drop_event, vec![]);
+                let packet = drop_event.to_packet_bytes();
+                self.channel_bus.publish(&channel_name, &drop_event, packet);
             }
         }
     }
@@ -741,6 +898,8 @@ mod tests {
             drops_processed: parking_lot::RwLock::new(false),
             path_manager: parking_lot::RwLock::new(MobPathManager::new()),
             damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
         })
     }
 
@@ -769,6 +928,7 @@ mod tests {
                 base_exp: 0,
                 job_exp: 0,
                 status_point: 0,
+                skill_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 10,
@@ -894,7 +1054,10 @@ mod tests {
             drops_processed: parking_lot::RwLock::new(false),
             path_manager: parking_lot::RwLock::new(MobPathManager::new()),
             damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
         });
+
 
         let player = create_test_player((105, 105), 10); // Distance = 7.07 < sight_range
 
@@ -1142,6 +1305,7 @@ mod tests {
                 base_exp: 0,
                 job_exp: 0,
                 status_point: 0,
+                skill_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 10,
@@ -1241,6 +1405,8 @@ mod tests {
             drops_processed: parking_lot::RwLock::new(false),
             path_manager: parking_lot::RwLock::new(MobPathManager::new()),
             damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
         })
     }
 
@@ -1255,10 +1421,10 @@ mod tests {
             condition_value: 0,
             cooldown_ms: 0,
         };
-        // Any 条件始终满足
-        assert!(check_skill_condition(&skill, 100));
-        assert!(check_skill_condition(&skill, 50));
-        assert!(check_skill_condition(&skill, 0));
+        // Any 条件始终满足（attacker_count 和 target_distance 不影响结果）
+        assert!(check_skill_condition(&skill, 100, 0, 0));
+        assert!(check_skill_condition(&skill, 50, 3, 10));
+        assert!(check_skill_condition(&skill, 0, 0, 0));
     }
 
     #[test]
@@ -1273,11 +1439,11 @@ mod tests {
             cooldown_ms: 10000,
         };
         // HP 低于 50% 时满足
-        assert!(!check_skill_condition(&skill, 100));
-        assert!(!check_skill_condition(&skill, 51));
-        assert!(check_skill_condition(&skill, 50));
-        assert!(check_skill_condition(&skill, 25));
-        assert!(check_skill_condition(&skill, 1));
+        assert!(!check_skill_condition(&skill, 100, 0, 0));
+        assert!(!check_skill_condition(&skill, 51, 0, 0));
+        assert!(check_skill_condition(&skill, 50, 0, 0));
+        assert!(check_skill_condition(&skill, 25, 0, 0));
+        assert!(check_skill_condition(&skill, 1, 0, 0));
     }
 
     #[test]
@@ -1490,5 +1656,489 @@ mod tests {
             "伤害记录应该包含对玩家的伤害");
         assert!(*damage_log.get(&player.id).unwrap() > 0,
             "技能应该造成正数伤害");
+    }
+
+    // ============================================
+    // RudeAttacked 条件测试
+    // ============================================
+
+    #[test]
+    fn test_check_skill_condition_rude_attacked_with_multiple_attackers() {
+        let skill = MobSkill {
+            skill_id: 100,
+            level: 1,
+            chance: 10000,
+            target: MobSkillTarget::Target,
+            condition: MobSkillCondition::RudeAttacked,
+            condition_value: 0,
+            cooldown_ms: 0,
+        };
+        // 2 个攻击者 -> 围攻，条件满足
+        assert!(check_skill_condition(&skill, 100, 2, 0));
+        // 3 个攻击者 -> 围攻，条件满足
+        assert!(check_skill_condition(&skill, 100, 3, 0));
+    }
+
+    #[test]
+    fn test_check_skill_condition_rude_attacked_with_single_attacker() {
+        let skill = MobSkill {
+            skill_id: 100,
+            level: 1,
+            chance: 10000,
+            target: MobSkillTarget::Target,
+            condition: MobSkillCondition::RudeAttacked,
+            condition_value: 0,
+            cooldown_ms: 0,
+        };
+        // 1 个攻击者 -> 不算围攻
+        assert!(!check_skill_condition(&skill, 100, 1, 0));
+        // 0 个攻击者 -> 不算围攻
+        assert!(!check_skill_condition(&skill, 100, 0, 0));
+    }
+
+    // ============================================
+    // LongRange 条件测试
+    // ============================================
+
+    #[test]
+    fn test_check_skill_condition_long_range_far_target() {
+        let skill = MobSkill {
+            skill_id: 100,
+            level: 1,
+            chance: 10000,
+            target: MobSkillTarget::Target,
+            condition: MobSkillCondition::LongRange,
+            condition_value: 0,
+            cooldown_ms: 0,
+        };
+        // 距离 > 3 -> 远程目标，条件满足
+        assert!(check_skill_condition(&skill, 100, 0, 4));
+        assert!(check_skill_condition(&skill, 100, 0, 10));
+        assert!(check_skill_condition(&skill, 100, 0, 100));
+    }
+
+    #[test]
+    fn test_check_skill_condition_long_range_close_target() {
+        let skill = MobSkill {
+            skill_id: 100,
+            level: 1,
+            chance: 10000,
+            target: MobSkillTarget::Target,
+            condition: MobSkillCondition::LongRange,
+            condition_value: 0,
+            cooldown_ms: 0,
+        };
+        // 距离 <= 3 -> 近程目标，条件不满足
+        assert!(!check_skill_condition(&skill, 100, 0, 0));
+        assert!(!check_skill_condition(&skill, 100, 0, 1));
+        assert!(!check_skill_condition(&skill, 100, 0, 3));
+    }
+
+    // ============================================
+    // FleeWhenLowHp 行为测试
+    // ============================================
+
+    /// 创建 FleeWhenLowHp 行为的测试怪物
+    fn create_flee_mob(position: (u16, u16), hp: u32, max_hp: u32) -> Arc<Mob> {
+        Arc::new(Mob {
+            id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
+            mob_id: 1001,
+            name: "FleeMob".to_string(),
+            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            map_name: "test_map".to_string(),
+            level: 5,
+            hp: parking_lot::RwLock::new(hp),
+            max_hp,
+            sp: parking_lot::RwLock::new(0),
+            max_sp: 0,
+            atk: 30,
+            matk: 0,
+            defense: 0,
+            magic_defense: 0,
+            hit: 10,
+            flee: 5,
+            crit: 0,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
+            atk_range: 1,
+            element: crate::game::battle::element::Element::Neutral,
+            element_level: crate::game::battle::element::ElementLevel::Level1,
+            size: crate::game::battle::element::MobSize::Medium,
+            race: crate::game::mob::MobRace::Formless,
+            mob_type: crate::game::mob::MobType::Normal,
+            ai_state: parking_lot::RwLock::new(MobAIState::Idle),
+            target_id: parking_lot::RwLock::new(None),
+            behavior: crate::game::mob::MobBehavior::FleeWhenLowHp,
+            skills: Vec::new(),
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            sight_range: 10,
+            chase_range: 20,
+            aggro_rate: 0,
+            spawn_delay: 0,
+            respawn_time: 60000,
+            spawn_x: position.0,
+            spawn_y: position.1,
+            spawn_map: "test_map".to_string(),
+            death_time: parking_lot::RwLock::new(None),
+            drops: vec![],
+            base_exp: 10,
+            job_exp: 5,
+            zeny: Some(100),
+            drops_processed: parking_lot::RwLock::new(false),
+            path_manager: parking_lot::RwLock::new(MobPathManager::new()),
+            damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
+        })
+    }
+
+    #[test]
+    fn flee_mob_stays_idle_when_hp_above_threshold() {
+        // HP 75% > 25% 阈值，不应逃跑
+        let mob = create_flee_mob((100, 100), 375, 500);
+        let player = create_test_player((105, 105), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 模拟被该玩家攻击过
+        mob.damage_log.write().insert(player.id, 100);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![10], map_state);
+        ai.update(&mob, &map_state);
+
+        // HP 75% > 25%，不应进入 Flee
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+    }
+
+    #[test]
+    fn flee_mob_enters_flee_when_hp_low() {
+        // HP 20% < 25% 阈值，应该逃跑
+        let mob = create_flee_mob((100, 100), 100, 500);
+        let player = create_test_player((105, 105), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 模拟被该玩家攻击过
+        mob.damage_log.write().insert(player.id, 100);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![10], map_state);
+        ai.update(&mob, &map_state);
+
+        // HP 20% <= 25%，应进入 Flee
+        assert_eq!(*mob.ai_state.read(), MobAIState::Flee);
+        assert_eq!(*mob.flee_from.read(), Some(player.id));
+    }
+
+    #[test]
+    fn flee_mob_chase_transitions_to_flee_when_hp_low() {
+        // 追击中 HP 降低到 25% 以下时应切换到逃跑
+        let mob = create_flee_mob((100, 100), 100, 500); // HP 20%
+        let player = create_test_player((105, 105), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 设置为 Chase 状态
+        *mob.ai_state.write() = MobAIState::Chase;
+        *mob.target_id.write() = Some(player.id);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![0], map_state);
+        ai.update(&mob, &map_state);
+
+        // 应切换到 Flee
+        assert_eq!(*mob.ai_state.read(), MobAIState::Flee);
+        assert_eq!(*mob.flee_from.read(), Some(player.id));
+    }
+
+    #[test]
+    fn flee_mob_attack_transitions_to_flee_when_hp_low() {
+        // 攻击中 HP 降低到 25% 以下时应切换到逃跑
+        let mob = create_flee_mob((100, 100), 100, 500); // HP 20%
+        let player = create_test_player((100, 101), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 设置为 Attack 状态
+        *mob.ai_state.write() = MobAIState::Attack;
+        *mob.target_id.write() = Some(player.id);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![0], map_state);
+        ai.update(&mob, &map_state);
+
+        // 应切换到 Flee
+        assert_eq!(*mob.ai_state.read(), MobAIState::Flee);
+    }
+
+    #[test]
+    fn flee_mob_moves_away_from_attacker() {
+        // 怪物在 (100, 100)，攻击者在 (103, 100)
+        // 逃跑方向应该是向左（远离攻击者）
+        let mob = create_flee_mob((100, 100), 100, 500);
+        let player = create_test_player((103, 100), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 设置逃跑状态
+        *mob.ai_state.write() = MobAIState::Flee;
+        *mob.flee_from.write() = Some(player.id);
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![0], map_state);
+        ai.update(&mob, &map_state);
+
+        // 怪物应该向远离攻击者的方向移动
+        let (new_x, new_y) = mob.get_position();
+        // 攻击者在右边 (103, 100)，怪物应该向左移动
+        assert!(new_x < 100, "怪物应该向左移动远离攻击者，实际位置: ({}, {})", new_x, new_y);
+    }
+
+    #[test]
+    fn flee_mob_recovers_when_hp_restored() {
+        // HP 恢复到 50% 以上时停止逃跑
+        let mob = create_flee_mob((100, 100), 100, 500); // HP 20%
+        let player = create_test_player((103, 100), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 设置逃跑状态
+        *mob.ai_state.write() = MobAIState::Flee;
+        *mob.flee_from.write() = Some(player.id);
+
+        // 恢复 HP 到 60%
+        *mob.hp.write() = 300;
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![0], map_state);
+        ai.update(&mob, &map_state);
+
+        // HP 60% >= 50%，应停止逃跑
+        assert_eq!(*mob.ai_state.read(), MobAIState::Idle);
+        assert_eq!(*mob.flee_from.read(), None);
+    }
+
+    #[test]
+    fn flee_mob_stays_flee_when_hp_below_recovery() {
+        // HP 仍在恢复阈值以下时继续逃跑
+        let mob = create_flee_mob((100, 100), 100, 500); // HP 20%
+        let player = create_test_player((103, 100), 10);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 设置逃跑状态
+        *mob.ai_state.write() = MobAIState::Flee;
+        *mob.flee_from.write() = Some(player.id);
+
+        // HP 恢复到 40%（仍低于 50% 阈值）
+        *mob.hp.write() = 200;
+
+        let (ai, map_state) = create_test_mob_ai_with_map(vec![0], map_state);
+        ai.update(&mob, &map_state);
+
+        // HP 40% < 50%，应继续逃跑
+        assert_eq!(*mob.ai_state.read(), MobAIState::Flee);
+    }
+
+    // ============================================
+    // Assist 行为测试
+    // ============================================
+
+    /// 创建 Assist 行为的测试怪物
+    fn create_assist_mob(position: (u16, u16), behavior: crate::game::mob::MobBehavior) -> Arc<Mob> {
+        Arc::new(Mob {
+            id: Uuid::new_v4(),
+            entity_id: std::sync::atomic::AtomicU32::new(0),
+            mob_id: 1001,
+            name: "AssistMob".to_string(),
+            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            map_name: "test_map".to_string(),
+            level: 5,
+            hp: parking_lot::RwLock::new(500),
+            max_hp: 500,
+            sp: parking_lot::RwLock::new(0),
+            max_sp: 0,
+            atk: 30,
+            matk: 0,
+            defense: 0,
+            magic_defense: 0,
+            hit: 10,
+            flee: 5,
+            crit: 0,
+            walk_speed: constants::DEFAULT_WALK_SPEED,
+            atk_range: 1,
+            element: crate::game::battle::element::Element::Neutral,
+            element_level: crate::game::battle::element::ElementLevel::Level1,
+            size: crate::game::battle::element::MobSize::Medium,
+            race: crate::game::mob::MobRace::Formless,
+            mob_type: crate::game::mob::MobType::Normal,
+            ai_state: parking_lot::RwLock::new(MobAIState::Idle),
+            target_id: parking_lot::RwLock::new(None),
+            behavior,
+            skills: Vec::new(),
+            skill_cooldowns: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            sight_range: 10,
+            chase_range: 20,
+            aggro_rate: 0,
+            spawn_delay: 0,
+            respawn_time: 60000,
+            spawn_x: position.0,
+            spawn_y: position.1,
+            spawn_map: "test_map".to_string(),
+            death_time: parking_lot::RwLock::new(None),
+            drops: vec![],
+            base_exp: 10,
+            job_exp: 5,
+            zeny: Some(100),
+            drops_processed: parking_lot::RwLock::new(false),
+            path_manager: parking_lot::RwLock::new(MobPathManager::new()),
+            damage_log: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            flee_from: parking_lot::RwLock::new(None),
+        })
+    }
+
+    #[test]
+    fn assist_mob_chases_attacker_of_nearby_mob() {
+        // 创建 Assist 怪物在 (100, 100)
+        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::Assist);
+        // 创建被攻击的怪物在 (105, 105)，距离 = 7.07 < sight_range (10)
+        let other_mob = create_test_mob((105, 105), 5);
+        let player = create_test_player((106, 106), 10);
+
+        // 模拟 other_mob 正在追击该玩家
+        *other_mob.ai_state.write() = MobAIState::Chase;
+        *other_mob.target_id.write() = Some(player.id);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 使用带 spawn_manager 的 AI，注册 other_mob
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+        spawn_manager.register_mob("test_map", other_mob.clone());
+
+        let ai = MobAI::new(
+            spawn_manager,
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![10])),
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
+        );
+
+        ai.update(&assist_mob, &map_state);
+
+        // Assist 怪物应该追击攻击者
+        assert_eq!(*assist_mob.ai_state.read(), MobAIState::Chase);
+        assert_eq!(*assist_mob.target_id.read(), Some(player.id));
+    }
+
+    #[test]
+    fn assist_mob_ignores_distant_mob() {
+        // Assist 怪物在 (100, 100)，远处怪物在 (200, 200)
+        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::Assist);
+        let other_mob = create_test_mob((200, 200), 5);
+        let player = create_test_player((201, 201), 10);
+
+        *other_mob.ai_state.write() = MobAIState::Chase;
+        *other_mob.target_id.write() = Some(player.id);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+        spawn_manager.register_mob("test_map", other_mob.clone());
+
+        let ai = MobAI::new(
+            spawn_manager,
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![10])),
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
+        );
+
+        ai.update(&assist_mob, &map_state);
+
+        // 距离太远，不应追击
+        assert_eq!(*assist_mob.ai_state.read(), MobAIState::Idle);
+    }
+
+    #[test]
+    fn passive_assist_mob_chases_after_being_attacked() {
+        // PassiveAssist 怪物被攻击后才会协助
+        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
+        let other_mob = create_test_mob((105, 105), 5);
+        let player = create_test_player((106, 106), 10);
+
+        *other_mob.ai_state.write() = MobAIState::Chase;
+        *other_mob.target_id.write() = Some(player.id);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 模拟 assist_mob 被该玩家攻击过
+        assist_mob.damage_log.write().insert(player.id, 50);
+
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+        spawn_manager.register_mob("test_map", other_mob.clone());
+
+        let ai = MobAI::new(
+            spawn_manager,
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![10])),
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
+        );
+
+        ai.update(&assist_mob, &map_state);
+
+        // 被攻击过，应协助追击
+        assert_eq!(*assist_mob.ai_state.read(), MobAIState::Chase);
+        assert_eq!(*assist_mob.target_id.read(), Some(player.id));
+    }
+
+    #[test]
+    fn passive_assist_mob_stays_idle_without_damage() {
+        // PassiveAssist 怪物未被攻击时不应协助
+        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
+        let other_mob = create_test_mob((105, 105), 5);
+        let player = create_test_player((106, 106), 10);
+
+        *other_mob.ai_state.write() = MobAIState::Chase;
+        *other_mob.target_id.write() = Some(player.id);
+
+        let map_state = create_test_map_state();
+        map_state.add_player((*player).clone());
+
+        // 未被攻击（damage_log 为空）
+
+        let spawn_manager = Arc::new(MobSpawnManager::new());
+        spawn_manager.register_mob("test_map", other_mob.clone());
+
+        let ai = MobAI::new(
+            spawn_manager,
+            Arc::new(ChannelBus::new()),
+            Arc::new(DropManager::new()),
+            Arc::new(PartyManager::new()),
+            Arc::new(MapDatabase::new()),
+            Arc::new(MockRng::new(vec![10])),
+            Arc::new(BattleHandler::new(Arc::new(MockRng::new(vec![50])))),
+            Arc::new(SkillDatabase::new()),
+        );
+
+        ai.update(&assist_mob, &map_state);
+
+        // 未被攻击，不应协助
+        assert_eq!(*assist_mob.ai_state.read(), MobAIState::Idle);
     }
 }

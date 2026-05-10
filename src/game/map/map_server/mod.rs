@@ -9,6 +9,7 @@
 
 mod gm;
 mod guild;
+mod job;
 mod movement;
 mod npc;
 mod player;
@@ -163,6 +164,8 @@ impl MapServer {
             CZ_REQUEST_CHANGE_DIRECTION => self.handle_change_direction(data, session),
             CZ_WHISPER => self.handle_whisper(data, session),
             CZ_STATUS_CHANGE => self.handle_status_change(data, session),
+            CZ_SKILL_UP => self.handle_skill_up(data, session),
+            CZ_REQ_CHANGEJOB => self.handle_job_change(data, session),
             unknown_id => {
                 tracing::warn!(
                     "Unknown packet ID 0x{:04X} from session {}",

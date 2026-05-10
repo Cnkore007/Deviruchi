@@ -38,10 +38,16 @@ pub enum Packet {
     EntityMove(map::EntityMoveNotify),
     /// 聊天消息 (0x008c)
     ChatMessage(map::ChatMessage),
+    /// 发送聊天消息请求 (0x008c)
+    ChatSendRequest(map::ChatSendRequest),
     /// 实体出现通知 (0x0078)
     EntityAppear(map::EntityAppearNotify),
     /// 实体消失通知 (0x007a)
     EntityDisappear(map::EntityDisappearNotify),
+    /// 攻击请求 (0x0089)
+    AttackRequest(map::AttackRequest),
+    /// 攻击通知 (0x008a)
+    AttackNotify(map::AttackNotify),
 }
 
 impl Packet {
@@ -66,8 +72,11 @@ impl Packet {
             Packet::PlayerMove(_) => 0x0085,
             Packet::EntityMove(_) => 0x0086,
             Packet::ChatMessage(_) => 0x008c,
+            Packet::ChatSendRequest(_) => 0x008c,
             Packet::EntityAppear(_) => 0x0078,
             Packet::EntityDisappear(_) => 0x007a,
+            Packet::AttackRequest(_) => 0x0089,
+            Packet::AttackNotify(_) => 0x008a,
         }
     }
 
@@ -100,8 +109,11 @@ impl Packet {
                 | Packet::PlayerMove(_)
                 | Packet::EntityMove(_)
                 | Packet::ChatMessage(_)
+                | Packet::ChatSendRequest(_)
                 | Packet::EntityAppear(_)
                 | Packet::EntityDisappear(_)
+                | Packet::AttackRequest(_)
+                | Packet::AttackNotify(_)
         )
     }
 }

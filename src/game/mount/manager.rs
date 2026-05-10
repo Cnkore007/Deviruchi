@@ -252,6 +252,7 @@ mod tests {
                 base_exp: 0,
                 job_exp: 0,
                 status_point: 0,
+                skill_point: 0,
             }),
             attrs: RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

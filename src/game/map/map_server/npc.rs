@@ -118,6 +118,24 @@ impl MapServer {
                 let pkt = ZcWaitDialog { npc_id };
                 Some(pkt.to_packet())
             }
+            // 新增命令的响应（当前返回 WaitDialog，未来可扩展）
+            DialogueResponse::Input(_) => {
+                // TODO: 实现玩家输入请求的网络协议
+                let pkt = ZcWaitDialog { npc_id };
+                Some(pkt.to_packet())
+            }
+            DialogueResponse::Announce { message, flag } => {
+                // TODO: 实现全服公告的广播逻辑
+                tracing::info!("公告 [flag={}]: {}", flag, message);
+                // 公告后继续处理脚本
+                let pkt = ZcWaitDialog { npc_id };
+                Some(pkt.to_packet())
+            }
+            DialogueResponse::Sleep(_) => {
+                // TODO: 实现异步延迟执行
+                let pkt = ZcWaitDialog { npc_id };
+                Some(pkt.to_packet())
+            }
         }
     }
 

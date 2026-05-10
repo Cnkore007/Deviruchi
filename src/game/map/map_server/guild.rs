@@ -224,7 +224,8 @@ impl MapServer {
             message: pkt.message.clone(),
             chat_type: ChatType::Party, // 复用Party聊天类型
         };
-        self.channel_bus.publish(&channel_name, &event, vec![]);
+        let packet = event.to_packet_bytes();
+        self.channel_bus.publish(&channel_name, &event, packet);
 
         Some(
             ZCGuildChat {

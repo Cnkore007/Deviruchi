@@ -101,15 +101,55 @@ impl SkillHandler {
             SkillEffect::apply(skill, &caster, &caster, level)
         };
 
-        // 应用伤害/治疗
-        if let SkillResult::Damage { damage, .. } = &result
-            && let Some(ref t) = target
-        {
-            let died = t.take_damage(*damage as u32);
-            tracing::info!("Skill {} dealt {} damage to {}", skill.name, damage, t.name);
-            if died {
-                tracing::info!("Player {} was killed", t.name);
+        // 应用效果（伤害/治疗/Buff）
+        match &result {
+            SkillResult::Damage { damage, .. } => {
+                if let Some(ref t) = target {
+                    let died = t.take_damage(*damage as u32);
+                    tracing::info!("Skill {} dealt {} damage to {}", skill.name, damage, t.name);
+                    if died {
+                        tracing::info!("Player {} was killed", t.name);
+                    }
+                }
             }
+            SkillResult::Heal { amount } => {
+                // 治疗目标（或自身）
+                let heal_target = target.as_ref().unwrap_or(&caster);
+                let hp_before = heal_target.hp();
+                heal_target.apply_heal(*amount);
+                let actual = heal_target.hp() - hp_before;
+                tracing::info!(
+                    "Skill {} healed {} for {} HP (actual {})",
+                    skill.name,
+                    heal_target.name,
+                    amount,
+                    actual
+                );
+            }
+            SkillResult::Buff { buff_type, duration } => {
+                // Buff 已在 SkillEffect::apply_support 中通过 target.add_status 施加
+                let buff_target = target.as_ref().unwrap_or(&caster);
+                tracing::info!(
+                    "Skill {} applied buff {} to {} (duration {}ms)",
+                    skill.name,
+                    buff_type,
+                    buff_target.name,
+                    duration
+                );
+            }
+            SkillResult::Debuff { debuff_type, duration } => {
+                // Debuff 已在 SkillEffect::apply_debuff 中通过 target.add_status 施加
+                if let Some(ref t) = target {
+                    tracing::info!(
+                        "Skill {} applied debuff {} to {} (duration {}ms)",
+                        skill.name,
+                        debuff_type,
+                        t.name,
+                        duration
+                    );
+                }
+            }
+            SkillResult::None => {}
         }
 
         // 设置冷却

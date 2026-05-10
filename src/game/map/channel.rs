@@ -109,6 +109,86 @@ pub enum GameEvent {
 }
 
 impl GameEvent {
+    /// 将事件序列化为 rAthena 格式的网络包字节
+    ///
+    /// 根据事件类型构建对应的客户端可见包：
+    /// - 0x0078: EntityAppear（实体出现，玩家/怪物共用）
+    /// - 0x007a: EntityDisappear（实体消失）
+    /// - 0x0086: EntityMove（实体移动）
+    /// - 其他事件暂返回空字节（由上层单独处理）
+    pub fn to_packet_bytes(&self) -> Vec<u8> {
+        match self {
+            // ==================== 玩家进入：0x0078 EntityAppear ====================
+            // rAthena 格式：packet_id(u16) + entity_id(u32) + walk_speed(u16) +
+            // body_state(u16) + health_state(u16) + effect_state(u32) +
+            // job(u16) + head(u16) + weapon(u16) + accessory(u16) +
+            // move_start_time(u32) + accessory2(u16) + accessory3(u16) +
+            // head_palette(u16) + body_palette(u16) + head_dir(u16) +
+            // robe(u16) + guild_id(u32) + emblem_id(u32) +
+            // manner(u16) + karma(u16) + sex(u8) +
+            // x(u16) + y(u16) + dir(u8) + x(u16) + y(u16) + dir(u8)
+            GameEvent::PlayerEnter {
+                player_id, x, y, ..
+            } => {
+                // 使用 player_id 的前 4 字节作为客户端实体 ID
+                let entity_id = uuid_to_entity_id(player_id);
+                build_entity_appear_packet(entity_id, 0, *x, *y, 0, 0)
+            }
+
+            // ==================== 玩家离开：0x007a EntityDisappear ====================
+            // 格式：packet_id(u16) + entity_id(u32) + reason(u8)
+            GameEvent::PlayerLeave { player_id } => {
+                let entity_id = uuid_to_entity_id(player_id);
+                build_entity_disappear_packet(entity_id)
+            }
+
+            // ==================== 玩家移动：0x0086 EntityMove ====================
+            // 格式：packet_id(u16) + entity_id(u32) +
+            // from_x(u16) + from_y(u16) + dest_x(u16) + dest_y(u16) +
+            // move_start_time(u32)
+            GameEvent::PlayerMove {
+                player_id,
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+            } => {
+                let entity_id = uuid_to_entity_id(player_id);
+                build_entity_move_packet(entity_id, *from_x, *from_y, *to_x, *to_y)
+            }
+
+            // ==================== 怪物生成：0x0078 EntityAppear ====================
+            // entity_type=6 表示怪物，job 字段使用 mob_type（怪物外观 ID）
+            GameEvent::MobSpawn {
+                mob_id, mob_type, x, y,
+            } => {
+                let entity_id = uuid_to_entity_id(mob_id);
+                // mob_type 作为 job 字段传入，entity_type=6
+                build_entity_appear_packet(entity_id, 6, *x, *y, *mob_type as u16, 0)
+            }
+
+            // ==================== 怪物死亡：0x007a EntityDisappear ====================
+            GameEvent::MobDeath { mob_id, .. } => {
+                let entity_id = uuid_to_entity_id(mob_id);
+                build_entity_disappear_packet(entity_id)
+            }
+
+            // ==================== 怪物移动：0x0086 EntityMove ====================
+            GameEvent::MobMove {
+                mob_id,
+                to_x,
+                to_y,
+            } => {
+                let entity_id = uuid_to_entity_id(mob_id);
+                // 怪物移动没有 from 信息，使用 to 作为起始点（客户端会插值）
+                build_entity_move_packet(entity_id, *to_x, *to_y, *to_x, *to_y)
+            }
+
+            // ==================== 其他事件暂不生成包 ====================
+            _ => vec![],
+        }
+    }
+
     pub fn source_player_id(&self) -> Option<Uuid> {
         match self {
             GameEvent::PlayerEnter { player_id, .. } => Some(*player_id),
@@ -147,6 +227,118 @@ impl GameEvent {
 }
 
 const VISION_RADIUS: u16 = 14;
+
+/// 将 UUID 转换为客户端可见的 u32 实体 ID
+///
+/// 取 UUID 的前 4 字节作为实体 ID，保证同一 UUID 始终映射到同一值
+pub fn uuid_to_entity_id(uuid: &Uuid) -> u32 {
+    let bytes = uuid.as_bytes();
+    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+}
+
+/// 构建 0x0078 EntityAppear 包（实体出现）
+///
+/// # 参数
+/// - `entity_id`: 客户端实体 ID
+/// - `entity_type`: 实体类型（0=玩家, 6=怪物）
+/// - `x`, `y`: 坐标
+/// - `mob_type`: 怪物外观 ID（仅怪物有效，玩家为 0）
+/// - `dir`: 朝向
+pub fn build_entity_appear_packet(
+    entity_id: u32,
+    entity_type: u16,
+    x: u16,
+    y: u16,
+    mob_type: u16,
+    dir: u8,
+) -> Vec<u8> {
+    // 包长度：2(packet_id) + 4(entity_id) + 2(walk_speed) + 2(body_state) +
+    // 2(health_state) + 4(effect_state) + 2(job) + 2(head) + 2(weapon) +
+    // 2(accessory) + 4(move_start_time) + 2(accessory2) + 2(accessory3) +
+    // 2(head_palette) + 2(body_palette) + 2(head_dir) + 2(robe) +
+    // 4(guild_id) + 4(emblem_id) + 2(manner) + 2(karma) + 1(sex) +
+    // 2(x) + 2(y) + 1(dir) + 2(x2) + 2(y2) + 1(dir2) = 63 字节
+    let mut pkt = Vec::with_capacity(63);
+    pkt.extend_from_slice(&0x0078u16.to_le_bytes());    // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes());     // entity_id
+    pkt.extend_from_slice(&150u16.to_le_bytes());        // walk_speed (默认 150)
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // body_state
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // health_state
+    pkt.extend_from_slice(&0u32.to_le_bytes());          // effect_state
+    let job = if entity_type == 6 { mob_type } else { 0 };
+    pkt.extend_from_slice(&job.to_le_bytes());           // job (怪物外观/玩家职业)
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // head
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // weapon
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory
+    pkt.extend_from_slice(&0u32.to_le_bytes());          // move_start_time
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory2
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory3
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // head_palette
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // body_palette
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // head_dir
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // robe
+    pkt.extend_from_slice(&0u32.to_le_bytes());          // guild_id
+    pkt.extend_from_slice(&0u32.to_le_bytes());          // emblem_id
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // manner
+    pkt.extend_from_slice(&0u16.to_le_bytes());          // karma
+    pkt.push(0u8);                                       // sex
+    pkt.extend_from_slice(&x.to_le_bytes());             // x
+    pkt.extend_from_slice(&y.to_le_bytes());             // y
+    pkt.push(dir);                                       // dir
+    // 0x0078 包末尾还有重复的坐 x2, y2, dir2（站位数据，与当前位置相同）
+    pkt.extend_from_slice(&x.to_le_bytes());             // x2
+    pkt.extend_from_slice(&y.to_le_bytes());             // y2
+    pkt.push(dir);                                       // dir2
+    pkt
+}
+
+/// 构建 0x007a EntityDisappear 包（实体消失）
+///
+/// 格式：packet_id(u16) + entity_id(u32) + reason(u8)
+/// reason=0 表示正常消失（离开视野/死亡）
+pub fn build_entity_disappear_packet(entity_id: u32) -> Vec<u8> {
+    let mut pkt = Vec::with_capacity(7);
+    pkt.extend_from_slice(&0x007au16.to_le_bytes());  // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes());  // entity_id
+    pkt.push(0u8);                                    // reason (0=正常消失)
+    pkt
+}
+
+/// 构建 0x0086 EntityMove 包（实体移动）
+///
+/// 格式：packet_id(u16) + entity_id(u32) +
+/// from_x(u16) + from_y(u16) + dest_x(u16) + dest_y(u16) +
+/// move_start_time(u32)
+pub fn build_entity_move_packet(
+    entity_id: u32,
+    from_x: u16,
+    from_y: u16,
+    dest_x: u16,
+    dest_y: u16,
+) -> Vec<u8> {
+    let mut pkt = Vec::with_capacity(20);
+    pkt.extend_from_slice(&0x0086u16.to_le_bytes());       // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes());       // entity_id
+    // from_x 和 from_y 需要编码为 3 字节格式（x9 位 + y9 位 + dir3 位）
+    let from_xy = encode_pos3(from_x, from_y, 0);
+    pkt.extend_from_slice(&from_xy);
+    // dest_x 和 dest_y 同样编码
+    let dest_xy = encode_pos3(dest_x, dest_y, 0);
+    pkt.extend_from_slice(&dest_xy);
+    pkt.extend_from_slice(&0u32.to_le_bytes());            // move_start_time
+    pkt
+}
+
+/// rAthena 位置编码：将 x(u16) + y(u16) + dir(u8) 编码为 3 字节
+///
+/// 编码方式：bytes = [x_lo, (x_hi << 2) | (y_lo >> 6), (y_mid << 4) | dir]
+fn encode_pos3(x: u16, y: u16, dir: u8) -> [u8; 3] {
+    [
+        (x & 0xFF) as u8,
+        ((x >> 8) | ((y & 0x03) << 2)) as u8,
+        ((y >> 2) | ((dir as u16 & 0x07) << 6)) as u8,
+    ]
+}
 
 pub struct Subscriber {
     pub player_id: Uuid,
@@ -412,5 +604,158 @@ mod tests {
 
         // Non-existent channel returns 0
         assert_eq!(bus.subscriber_count("nonexistent"), 0);
+    }
+
+    // ==================== GameEvent 序列化测试 ====================
+
+    #[test]
+    fn player_enter_to_packet_bytes_returns_0x0078() {
+        let player_id = Uuid::new_v4();
+        let event = GameEvent::PlayerEnter {
+            player_id,
+            name: "Test".to_string(),
+            x: 100,
+            y: 200,
+            job: 1,
+            level: 10,
+            hp: 500,
+            max_hp: 500,
+        };
+        let pkt = event.to_packet_bytes();
+
+        // 0x0078 包长度应为 63 字节
+        assert_eq!(pkt.len(), 63);
+        // 验证 packet_id = 0x0078
+        assert_eq!(pkt[0], 0x78);
+        assert_eq!(pkt[1], 0x00);
+        // 验证 entity_id（UUID 前 4 字节）
+        let expected_eid = uuid_to_entity_id(&player_id);
+        let actual_eid = u32::from_le_bytes([pkt[2], pkt[3], pkt[4], pkt[5]]);
+        assert_eq!(actual_eid, expected_eid);
+        // 验证 walk_speed = 150
+        let walk_speed = u16::from_le_bytes([pkt[6], pkt[7]]);
+        assert_eq!(walk_speed, 150);
+        // 验证坐标（末尾 x2, y2 位置：偏移 58-59 和 60-61）
+        let x = u16::from_le_bytes([pkt[58], pkt[59]]);
+        let y = u16::from_le_bytes([pkt[60], pkt[61]]);
+        assert_eq!(x, 100);
+        assert_eq!(y, 200);
+    }
+
+    #[test]
+    fn player_leave_to_packet_bytes_returns_0x007a() {
+        let player_id = Uuid::new_v4();
+        let event = GameEvent::PlayerLeave { player_id };
+        let pkt = event.to_packet_bytes();
+
+        // 0x007a 包长度应为 7 字节
+        assert_eq!(pkt.len(), 7);
+        // packet_id = 0x007a
+        assert_eq!(pkt[0], 0x7a);
+        assert_eq!(pkt[1], 0x00);
+        // reason = 0
+        assert_eq!(pkt[6], 0);
+    }
+
+    #[test]
+    fn player_move_to_packet_bytes_returns_0x0086() {
+        let player_id = Uuid::new_v4();
+        let event = GameEvent::PlayerMove {
+            player_id,
+            from_x: 50,
+            from_y: 60,
+            to_x: 55,
+            to_y: 65,
+        };
+        let pkt = event.to_packet_bytes();
+
+        // 0x0086 包：packet_id(2) + entity_id(4) + from(3) + dest(3) + move_start_time(4) = 16 字节
+        assert_eq!(pkt.len(), 16);
+        // packet_id = 0x0086
+        assert_eq!(pkt[0], 0x86);
+        assert_eq!(pkt[1], 0x00);
+    }
+
+    #[test]
+    fn mob_spawn_to_packet_bytes_returns_0x0078_with_entity_type_6() {
+        let mob_id = Uuid::new_v4();
+        let event = GameEvent::MobSpawn {
+            mob_id,
+            mob_type: 1001,
+            x: 150,
+            y: 250,
+        };
+        let pkt = event.to_packet_bytes();
+
+        // 0x0078 包长度应为 63 字节
+        assert_eq!(pkt.len(), 63);
+        // packet_id = 0x0078
+        assert_eq!(pkt[0], 0x78);
+        assert_eq!(pkt[1], 0x00);
+        // 验证 job 字段 = mob_type = 1001
+        let job = u16::from_le_bytes([pkt[16], pkt[17]]);
+        assert_eq!(job, 1001);
+    }
+
+    #[test]
+    fn mob_death_to_packet_bytes_returns_0x007a() {
+        let mob_id = Uuid::new_v4();
+        let killer_id = Uuid::new_v4();
+        let event = GameEvent::MobDeath { mob_id, killer_id };
+        let pkt = event.to_packet_bytes();
+
+        // 0x007a 包长度应为 7 字节
+        assert_eq!(pkt.len(), 7);
+        assert_eq!(pkt[0], 0x7a);
+        assert_eq!(pkt[1], 0x00);
+    }
+
+    #[test]
+    fn unimplemented_events_return_empty_vec() {
+        let player_id = Uuid::new_v4();
+
+        // PlayerAttack 未实现序列化
+        let event = GameEvent::PlayerAttack {
+            attacker_id: player_id,
+            target_id: Uuid::new_v4(),
+            damage: 100,
+            is_crit: false,
+            killed: false,
+        };
+        assert!(event.to_packet_bytes().is_empty());
+
+        // PlayerChat 未实现序列化
+        let event = GameEvent::PlayerChat {
+            player_id,
+            message: "hello".to_string(),
+            chat_type: ChatType::Map,
+        };
+        assert!(event.to_packet_bytes().is_empty());
+
+        // ItemDrop 未实现序列化
+        let event = GameEvent::ItemDrop {
+            item_id: 1001,
+            x: 10,
+            y: 20,
+            amount: 1,
+        };
+        assert!(event.to_packet_bytes().is_empty());
+    }
+
+    #[test]
+    fn uuid_to_entity_id_is_deterministic() {
+        let uuid = Uuid::new_v4();
+        let eid1 = uuid_to_entity_id(&uuid);
+        let eid2 = uuid_to_entity_id(&uuid);
+        assert_eq!(eid1, eid2);
+    }
+
+    #[test]
+    fn encode_pos3_roundtrip() {
+        // 测试 encode_pos3 的编码结果长度
+        let encoded = encode_pos3(100, 200, 3);
+        assert_eq!(encoded.len(), 3);
+        // x=100 的低 8 位 = 100
+        assert_eq!(encoded[0], 100);
     }
 }

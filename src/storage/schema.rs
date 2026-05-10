@@ -96,6 +96,7 @@ pub fn init_schema(db: &Database) -> Result<()> {
             skill_id INTEGER NOT NULL,
             lv INTEGER NOT NULL,
             flag INTEGER DEFAULT 0,
+            UNIQUE(char_id, skill_id),
             FOREIGN KEY (char_id) REFERENCES characters(char_id)
         )",
     )?;

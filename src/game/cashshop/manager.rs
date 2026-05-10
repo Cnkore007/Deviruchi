@@ -590,6 +590,7 @@ mod tests {
                 base_exp: 5000,
                 job_exp: 3000,
                 status_point: 0,
+                skill_point: 0,
             }),
             attrs: parking_lot::RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

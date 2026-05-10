@@ -72,7 +72,8 @@ impl DropManager {
             y,
             amount,
         };
-        channel_bus.publish(&channel_name, &event, vec![]);
+        let packet = event.to_packet_bytes();
+        channel_bus.publish(&channel_name, &event, packet);
 
         id
     }
@@ -99,7 +100,8 @@ impl DropManager {
                 item_id: drop.item_id,
                 amount: drop.amount,
             };
-            channel_bus.publish(&channel_name, &event, vec![]);
+            let packet = event.to_packet_bytes();
+            channel_bus.publish(&channel_name, &event, packet);
         }
         item
     }
@@ -162,7 +164,8 @@ impl DropManager {
         for (_drop_id, item_id, x, y, map_name) in expired_info {
             let channel_name = format!("map:{}", map_name);
             let event = GameEvent::ItemDespawn { item_id, x, y };
-            channel_bus.publish(&channel_name, &event, vec![]);
+            let packet = event.to_packet_bytes();
+            channel_bus.publish(&channel_name, &event, packet);
         }
 
         expired

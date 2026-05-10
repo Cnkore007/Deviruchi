@@ -131,7 +131,8 @@ impl MapServer {
                 message: pkt.message,
                 chat_type: ChatType::Party,
             };
-            self.channel_bus.publish(&channel_name, &event, vec![]);
+            let packet = event.to_packet_bytes();
+            self.channel_bus.publish(&channel_name, &event, packet);
         }
 
         None
@@ -150,7 +151,8 @@ impl MapServer {
             message: pkt.message,
             chat_type: ChatType::Map,
         };
-        self.channel_bus.publish(&channel_name, &event, vec![]);
+        let packet = event.to_packet_bytes();
+        self.channel_bus.publish(&channel_name, &event, packet);
 
         None
     }

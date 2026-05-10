@@ -73,6 +73,15 @@ pub struct ChatMessage {
     pub message: String,
 }
 
+/// 发送聊天消息请求包 (0x008c - CZ_REQUEST_CHAT)
+///
+/// 客户端向服务器发送聊天消息
+#[derive(Debug, Clone)]
+pub struct ChatSendRequest {
+    /// 消息内容
+    pub message: String,
+}
+
 /// 实体出现通知包 (0x0078 - ZC_NOTIFY_STANDENTRY)
 ///
 /// 服务器通知客户端一个实体出现在视野中
@@ -101,4 +110,38 @@ pub struct EntityDisappearNotify {
     pub entity_id: u32,
     /// 消失原因（0=走出视野, 1=死亡等）
     pub reason: u8,
+}
+
+/// 攻击请求包 (0x0089 - CZ_REQUEST_ACT)
+///
+/// 客户端向服务器发起攻击请求
+#[derive(Debug, Clone)]
+pub struct AttackRequest {
+    /// 目标实体 ID
+    pub target_id: u32,
+    /// 动作类型（0=攻击）
+    pub action: u8,
+}
+
+/// 攻击通知包 (0x008a - ZC_NOTIFY_ACT)
+///
+/// 服务器广播攻击动作结果，包含攻击者、目标、伤害等信息
+#[derive(Debug, Clone)]
+pub struct AttackNotify {
+    /// 攻击者实体 ID
+    pub src_id: u32,
+    /// 目标实体 ID
+    pub dst_id: u32,
+    /// 服务器时间戳
+    pub start_time: u32,
+    /// 攻击速度
+    pub attack_speed: u32,
+    /// 伤害值
+    pub damage: u32,
+    /// 命中数（多段攻击时 > 1）
+    pub count: u16,
+    /// 动作类型（0=普通攻击, 8=技能攻击等）
+    pub action: u8,
+    /// 伤害类型（0=普通, 3=暴击等）
+    pub damage_type: u8,
 }

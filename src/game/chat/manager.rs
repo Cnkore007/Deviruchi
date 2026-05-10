@@ -164,7 +164,8 @@ impl ChatManager {
         };
 
         let channel_name = format!("map:{}", player.map_name);
-        channel_bus.publish(&channel_name, &event, vec![]);
+        let packet = event.to_packet_bytes();
+        channel_bus.publish(&channel_name, &event, packet);
     }
 }
 
@@ -275,6 +276,8 @@ mod tests {
             save_x: 100,
             save_y: 100,
             delete_timer: 0,
+            status_point: 0,
+            skill_point: 0,
             created_at: 0,
             updated_at: 0,
         };

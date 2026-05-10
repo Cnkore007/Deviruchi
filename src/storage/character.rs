@@ -127,8 +127,10 @@ impl Database {
             save_x: row.get_i32(31)?,
             save_y: row.get_i32(32)?,
             delete_timer: row.get_i32(33)? as u32,
-            created_at: row.get_i64(34)?,
-            updated_at: row.get_i64(35)?,
+            status_point: row.get_i32(34)? as u16,
+            skill_point: row.get_i32(35)? as u16,
+            created_at: row.get_i64(36)?,
+            updated_at: row.get_i64(37)?,
         })
     }
 
@@ -140,7 +142,7 @@ impl Database {
                 hair, hair_color, clothes_color,
                 weapon, shield, head_top, head_mid, head_bottom,
                 last_map, last_x, last_y, save_map, save_x, save_y,
-                delete_timer, created_at, updated_at
+                delete_timer, status_point, skill_point, created_at, updated_at
          FROM characters";
 
     pub fn get_characters_by_account(&self, account_id: u32) -> Result<Vec<Character>> {
@@ -285,6 +287,7 @@ impl Database {
         job_exp: u64,
         base_level: u16,
         job_level: u16,
+        class: u16,
         zeny: u32,
         str: u16,
         agi: u16,
@@ -292,6 +295,8 @@ impl Database {
         int: u16,
         dex: u16,
         luk: u16,
+        status_point: u16,
+        skill_point: u16,
         status_effects: &[StatusEffect],
         inventory: &[CharacterInventoryData],
         hotkeys: &[CharacterHotkeyData],
@@ -299,17 +304,19 @@ impl Database {
         let now = chrono_now();
 
         self.with_transaction(|tx| {
-            // 1. 更新 characters 表基础数据
+            // 1. 更新 characters 表基础数据（包含 class/职业 字段）
             tx.execute_params(
                 "UPDATE characters SET
                     last_map = ?1, last_x = ?2, last_y = ?3,
                     hp = ?4, max_hp = ?5, sp = ?6, max_sp = ?7,
                     base_exp = ?8, job_exp = ?9,
                     base_level = ?10, job_level = ?11,
-                    zeny = ?12,
-                    str = ?13, agi = ?14, vit = ?15, int = ?16, dex = ?17, luk = ?18,
-                    updated_at = ?19
-                 WHERE char_id = ?20",
+                    class = ?12,
+                    zeny = ?13,
+                    str = ?14, agi = ?15, vit = ?16, int = ?17, dex = ?18, luk = ?19,
+                    status_point = ?20, skill_point = ?21,
+                    updated_at = ?22
+                 WHERE char_id = ?23",
                 &[
                     &last_map as &dyn IntoValue,
                     &last_x as &dyn IntoValue,
@@ -322,6 +329,7 @@ impl Database {
                     &(job_exp as i64) as &dyn IntoValue,
                     &(base_level as i32) as &dyn IntoValue,
                     &(job_level as i32) as &dyn IntoValue,
+                    &(class as i32) as &dyn IntoValue,
                     &(zeny as i32) as &dyn IntoValue,
                     &(str as i32) as &dyn IntoValue,
                     &(agi as i32) as &dyn IntoValue,
@@ -329,6 +337,8 @@ impl Database {
                     &(int as i32) as &dyn IntoValue,
                     &(dex as i32) as &dyn IntoValue,
                     &(luk as i32) as &dyn IntoValue,
+                    &(status_point as i32) as &dyn IntoValue,
+                    &(skill_point as i32) as &dyn IntoValue,
                     &now as &dyn IntoValue,
                     &(char_id as i32) as &dyn IntoValue,
                 ],
@@ -735,6 +745,35 @@ impl Database {
 
         Ok(hotkeys)
     }
+
+    /// ==================== 技能管理 ====================
+
+    /// 获取角色的指定技能等级（未学习返回 0）
+    pub fn get_skill_level(&self, char_id: u32, skill_id: u16) -> Result<u8> {
+        self.query_row_optional(
+            "SELECT lv FROM skills WHERE char_id = ?1 AND skill_id = ?2",
+            &[
+                &(char_id as i32) as &dyn IntoValue,
+                &(skill_id as i32) as &dyn IntoValue,
+            ],
+            |row| Ok(row.get_i32(0)? as u8),
+        )
+        .map(|opt| opt.unwrap_or(0))
+    }
+
+    /// 设置角色技能等级（不存在则插入，已存在则更新）
+    pub fn set_skill_level(&self, char_id: u32, skill_id: u16, level: u8) -> Result<()> {
+        self.execute_params(
+            "INSERT INTO skills (char_id, skill_id, lv, flag) VALUES (?1, ?2, ?3, 0)
+             ON CONFLICT(char_id, skill_id) DO UPDATE SET lv = ?3",
+            &[
+                &(char_id as i32) as &dyn IntoValue,
+                &(skill_id as i32) as &dyn IntoValue,
+                &(level as i32) as &dyn IntoValue,
+            ],
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -773,6 +812,10 @@ pub struct Character {
     pub save_x: i32,
     pub save_y: i32,
     pub delete_timer: u32,
+    /// 可分配的状态点数（升级获得）
+    pub status_point: u16,
+    /// 可分配的技能点数（升级获得）
+    pub skill_point: u16,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -987,6 +1030,7 @@ mod tests {
             5000,
             50,
             30,
+            7, // class: Knight
             100000,
             50,
             50,
@@ -994,6 +1038,8 @@ mod tests {
             50,
             50,
             50,
+            48,
+            7,
             &status_effects,
             &inventory,
             &hotkeys,
@@ -1011,6 +1057,7 @@ mod tests {
         assert_eq!(char.last_y, 200);
         assert_eq!(char.hp, 500);
         assert_eq!(char.max_hp, 1000);
+        assert_eq!(char.class, 7); // Knight
         assert_eq!(char.zeny, 100000);
     }
 

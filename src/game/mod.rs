@@ -15,6 +15,7 @@ pub mod homunculus;
 pub mod instance;
 pub mod inter_server;
 pub mod item;
+pub mod job;
 pub mod login;
 pub mod mail;
 pub mod map;
@@ -78,6 +79,7 @@ pub use inter_server::{
     InterServerConnector, InterServerPacket, ServerTypeProto, TransferStatus,
 };
 pub use item::ItemHandler;
+pub use job::{JobChangeError, JobType};
 pub use login::LoginServer;
 pub use mail::{MailAttachResult, MailError, MailItem, MailListEntry, MailMessage, MailSystem};
 pub use map::{

@@ -129,6 +129,23 @@ impl MapState {
             return false;
         }
 
+        // 检查属性值是否超过上限（99）
+        {
+            let attrs = player.attrs.read();
+            let current = match status_id {
+                13 => attrs.str,
+                14 => attrs.agi,
+                15 => attrs.vit,
+                16 => attrs.int,
+                17 => attrs.dex,
+                18 => attrs.luk,
+                _ => return false,
+            };
+            if current + amount > crate::game::constants::MAX_STAT {
+                return false;
+            }
+        }
+
         // 修改属性
         {
             let mut attrs = player.attrs.write();
@@ -147,6 +164,112 @@ impl MapState {
         player.level.write().status_point -= amount;
 
         // 更新最大负重（STR 变化影响负重）
+        player.update_max_weight();
+
+        true
+    }
+
+    /// 消耗一个技能点（原地修改），返回是否成功
+    pub fn allocate_player_skill_point(&self, player_id: &Uuid) -> bool {
+        let players = self.players.read();
+        let Some(player) = players.get(player_id) else {
+            return false;
+        };
+
+        let mut lvl = player.level.write();
+        if lvl.skill_point == 0 {
+            return false;
+        }
+        lvl.skill_point -= 1;
+        true
+    }
+
+    /// 变更玩家职业（原地修改）
+    ///
+    /// 转职效果：
+    /// 1. 更新职业 ID（economy.job）
+    /// 2. 重置 Job 等级为 1，Job 经验为 0
+    /// 3. 重算最大 HP/SP（根据新职业的基础值）
+    /// 4. 恢复 HP/SP 到最大值
+    /// 5. 更新最大负重
+    ///
+    /// # 返回
+    /// - `true` 转职成功
+    /// - `false` 找不到玩家
+    pub fn change_player_job(&self, player_id: &Uuid, new_job: u16) -> bool {
+        let players = self.players.read();
+        let Some(player) = players.get(player_id) else {
+            return false;
+        };
+
+        let target_job = crate::game::job::JobType::from_u16(new_job);
+
+        // 1. 更新职业 ID
+        player.economy.write().job = new_job;
+
+        // 2. 重置 Job 等级和经验
+        {
+            let mut lvl = player.level.write();
+            lvl.job_level = 1;
+            lvl.job_exp = 0;
+        }
+
+        // 3-4. 重算最大 HP/SP 并恢复
+        if let Some(job_type) = target_job {
+            let base_hp = job_type.base_hp();
+            let base_sp = job_type.base_sp();
+            let base_level = player.level.read().base_level;
+
+            let hp_per_level = match job_type {
+                crate::game::job::JobType::Swordman
+                | crate::game::job::JobType::Knight
+                | crate::game::job::JobType::LordKnight
+                | crate::game::job::JobType::Paladin => 30,
+                crate::game::job::JobType::Mage
+                | crate::game::job::JobType::Wizard
+                | crate::game::job::JobType::HighWizard => 15,
+                crate::game::job::JobType::Archer
+                | crate::game::job::JobType::Hunter
+                | crate::game::job::JobType::Sniper => 20,
+                crate::game::job::JobType::Acolyte
+                | crate::game::job::JobType::Priest
+                | crate::game::job::JobType::HighPriest => 25,
+                crate::game::job::JobType::Merchant
+                | crate::game::job::JobType::Blacksmith
+                | crate::game::job::JobType::Whitesmith => 25,
+                crate::game::job::JobType::Thief
+                | crate::game::job::JobType::Assassin
+                | crate::game::job::JobType::AssassinCross => 25,
+                crate::game::job::JobType::Novice => 10,
+            };
+
+            let sp_per_level = match job_type {
+                crate::game::job::JobType::Mage
+                | crate::game::job::JobType::Wizard
+                | crate::game::job::JobType::HighWizard => 8,
+                crate::game::job::JobType::Acolyte
+                | crate::game::job::JobType::Priest
+                | crate::game::job::JobType::HighPriest => 5,
+                crate::game::job::JobType::Archer
+                | crate::game::job::JobType::Hunter
+                | crate::game::job::JobType::Sniper => 3,
+                crate::game::job::JobType::Merchant
+                | crate::game::job::JobType::Blacksmith
+                | crate::game::job::JobType::Whitesmith => 3,
+                _ => 2,
+            };
+
+            let new_max_hp = base_hp + (base_level.saturating_sub(1) as u32) * hp_per_level;
+            let new_max_sp = base_sp + (base_level.saturating_sub(1) as u32) * sp_per_level;
+
+            let mut combat = player.combat.write();
+            combat.max_hp = new_max_hp;
+            combat.max_sp = new_max_sp;
+            combat.hp = new_max_hp;
+            combat.sp = new_max_sp;
+        }
+
+        // 5. 更新最大负重
         player.update_max_weight();
 
         true
@@ -300,6 +423,7 @@ mod tests {
                 base_exp: 0,
                 job_exp: 0,
                 status_point: 0,
+                skill_point: 0,
             }),
             attrs: RwLock::new(crate::game::map::player::Attributes {
                 str: 1,

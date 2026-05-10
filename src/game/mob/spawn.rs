@@ -297,9 +297,9 @@ mod combat_integration_tests {
     #[test]
     fn test_from_template_has_correct_respawn_time() {
         let mob = Mob::from_template(1001, 10, 10, "prontera.gat");
-        // Poring 的 respawn_time 是 60000ms
+        // ID 1001 在 mob_db.yml 中是 Scorpion，HP=136，respawn_time=60000ms
         assert_eq!(mob.respawn_time, 60000);
-        assert_eq!(mob.max_hp, 50);
-        assert!(!mob.drops.is_empty()); // Poring 有掉落
+        assert_eq!(mob.max_hp, 136);
+        assert!(!mob.drops.is_empty()); // Scorpion 有掉落
     }
 }

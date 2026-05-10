@@ -315,8 +315,9 @@ impl MapServer {
             x: save_point.x,
             y: save_point.y,
         };
+        let packet = revive_event.to_packet_bytes();
         self.channel_bus
-            .publish(&new_channel, &revive_event, vec![]);
+            .publish(&new_channel, &revive_event, packet);
 
         // 更新数据库位置（best effort）
         if let Err(e) = self.db.execute_params(

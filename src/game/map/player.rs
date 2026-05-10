@@ -35,7 +35,7 @@ pub struct Position {
     pub(crate) y: u16,
 }
 
-/// 等级与经验值、状态点
+/// 等级与经验值、状态点、技能点
 pub struct LevelStats {
     pub(crate) base_level: u16,
     pub(crate) job_level: u16,
@@ -43,6 +43,8 @@ pub struct LevelStats {
     pub(crate) job_exp: u64,
     /// 可分配的状态点数（升级获得）
     pub(crate) status_point: u16,
+    /// 可分配的技能点数（职业升级获得）
+    pub(crate) skill_point: u16,
 }
 
 /// 六维属性
@@ -147,6 +149,7 @@ impl Clone for LevelStats {
             base_exp: self.base_exp,
             job_exp: self.job_exp,
             status_point: self.status_point,
+            skill_point: self.skill_point,
         }
     }
 }
@@ -213,7 +216,8 @@ impl Player {
                 job_level: char.job_level,
                 base_exp: char.base_exp as u64,
                 job_exp: char.job_exp as u64,
-                status_point: 0,
+                status_point: char.status_point,
+                skill_point: char.skill_point,
             }),
             attrs: RwLock::new(Attributes {
                 str: char.str,
@@ -349,6 +353,10 @@ impl Player {
     /// 获取可分配的状态点数
     pub fn status_point(&self) -> u16 {
         self.level.read().status_point
+    }
+    /// 获取可分配的技能点数
+    pub fn skill_point(&self) -> u16 {
+        self.level.read().skill_point
     }
 
     // --- Attributes 字段 ---
@@ -689,6 +697,7 @@ impl Player {
             job_exp: lvl.job_exp,
             base_level: lvl.base_level,
             job_level: lvl.job_level,
+            class: eco.job,
             zeny: eco.zeny,
             str: s.str,
             agi: s.agi,
@@ -696,6 +705,8 @@ impl Player {
             int: s.int,
             dex: s.dex,
             luk: s.luk,
+            status_point: lvl.status_point,
+            skill_point: lvl.skill_point,
             status_effects: self.status.get_all_statuses(),
             inventory: self.inventory.read().clone(),
             hotkeys: self.hotkeys.read().clone(),
@@ -718,6 +729,7 @@ impl Player {
             save_data.job_exp,
             save_data.base_level,
             save_data.job_level,
+            save_data.class,
             save_data.zeny,
             save_data.str,
             save_data.agi,
@@ -725,6 +737,8 @@ impl Player {
             save_data.int,
             save_data.dex,
             save_data.luk,
+            save_data.status_point,
+            save_data.skill_point,
             &save_data.status_effects,
             &save_data.inventory,
             &save_data.hotkeys,
@@ -750,6 +764,8 @@ pub struct PlayerSaveData {
     pub(crate) job_exp: u64,
     pub(crate) base_level: u16,
     pub(crate) job_level: u16,
+    /// 职业 ID（class 字段）
+    pub(crate) class: u16,
     pub(crate) zeny: u32,
     pub(crate) str: u16,
     pub(crate) agi: u16,
@@ -757,6 +773,8 @@ pub struct PlayerSaveData {
     pub(crate) int: u16,
     pub(crate) dex: u16,
     pub(crate) luk: u16,
+    pub(crate) status_point: u16,
+    pub(crate) skill_point: u16,
     pub(crate) status_effects: Vec<crate::game::status::effect::StatusEffect>,
     pub(crate) inventory: Vec<CharacterInventoryData>,
     pub(crate) hotkeys: Vec<CharacterHotkeyData>,
@@ -793,6 +811,7 @@ mod tests {
                 base_exp: 5000,
                 job_exp: 3000,
                 status_point: 100,
+                skill_point: 0,
             }),
             attrs: RwLock::new(Attributes {
                 str: 1,
@@ -989,6 +1008,7 @@ mod tests {
         assert_eq!(save_data.job_exp, 5000);
         assert_eq!(save_data.base_level, 50);
         assert_eq!(save_data.job_level, 30);
+        assert_eq!(save_data.class, 0); // Novice（make_player 默认）
         assert_eq!(save_data.zeny, 100000);
         assert_eq!(save_data.str, 50);
         assert_eq!(save_data.agi, 40);

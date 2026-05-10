@@ -50,7 +50,8 @@ impl MapServer {
             player_id,
             direction,
         };
-        self.channel_bus.publish(&channel_name, &event, vec![]);
+        let packet = event.to_packet_bytes();
+        self.channel_bus.publish(&channel_name, &event, packet);
 
         tracing::debug!(
             player = %player.name,
@@ -205,6 +206,7 @@ mod tests {
                 base_exp: 5000,
                 job_exp: 3000,
                 status_point: 100,
+                skill_point: 0,
             }),
             attrs: RwLock::new(Attributes {
                 str: 1,

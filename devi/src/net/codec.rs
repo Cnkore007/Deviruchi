@@ -13,7 +13,8 @@ use crate::protocol::char_mod::{
 };
 use crate::protocol::map::{
     MapEnterRequest, MapEnteredResponse, PlayerMoveRequest, EntityMoveNotify,
-    ChatMessage, EntityAppearNotify, EntityDisappearNotify,
+    ChatMessage, ChatSendRequest, EntityAppearNotify, EntityDisappearNotify,
+    AttackRequest, AttackNotify,
 };
 
 /// 协议包编解码器
@@ -54,8 +55,11 @@ impl PacketCodec {
             Packet::PlayerMove(req) => Self::encode_player_move(&mut buf, req),
             Packet::EntityMove(notify) => Self::encode_entity_move(&mut buf, notify),
             Packet::ChatMessage(msg) => Self::encode_chat_message(&mut buf, msg),
+            Packet::ChatSendRequest(req) => Self::encode_chat_send_request(&mut buf, req),
             Packet::EntityAppear(notify) => Self::encode_entity_appear(&mut buf, notify),
             Packet::EntityDisappear(notify) => Self::encode_entity_disappear(&mut buf, notify),
+            Packet::AttackRequest(req) => Self::encode_attack_request(&mut buf, req),
+            Packet::AttackNotify(notify) => Self::encode_attack_notify(&mut buf, notify),
         }
 
         // 回填长度字段（偏移 2-3）
@@ -270,6 +274,35 @@ impl PacketCodec {
         buf.push(notify.reason);
     }
 
+    /// 编码 ChatSendRequest (0x008c)
+    /// 格式：msg_len(u16) + message(variable)
+    fn encode_chat_send_request(buf: &mut Vec<u8>, req: &ChatSendRequest) {
+        let msg_len = req.message.len() as u16 + 4; // +4 包含 packet_id + msg_len 字段
+        buf.extend_from_slice(&msg_len.to_le_bytes());
+        buf.extend_from_slice(req.message.as_bytes());
+    }
+
+    /// 编码 AttackRequest (0x0089)
+    /// 格式：target_id(u32) + action(u8)
+    fn encode_attack_request(buf: &mut Vec<u8>, req: &AttackRequest) {
+        buf.extend_from_slice(&req.target_id.to_le_bytes());
+        buf.push(req.action);
+    }
+
+    /// 编码 AttackNotify (0x008a)
+    /// 格式：src_id(u32) + dst_id(u32) + start_time(u32) + attack_speed(u32)
+    ///        + damage(u32) + count(u16) + action(u8) + damage_type(u8)
+    fn encode_attack_notify(buf: &mut Vec<u8>, notify: &AttackNotify) {
+        buf.extend_from_slice(&notify.src_id.to_le_bytes());
+        buf.extend_from_slice(&notify.dst_id.to_le_bytes());
+        buf.extend_from_slice(&notify.start_time.to_le_bytes());
+        buf.extend_from_slice(&notify.attack_speed.to_le_bytes());
+        buf.extend_from_slice(&notify.damage.to_le_bytes());
+        buf.extend_from_slice(&notify.count.to_le_bytes());
+        buf.push(notify.action);
+        buf.push(notify.damage_type);
+    }
+
     // ========================================================================
     // 解码：字节序列 → Packet
     // ========================================================================
@@ -299,6 +332,8 @@ impl PacketCodec {
             0x008c => Self::decode_chat_message(data),
             0x0078 => Self::decode_entity_appear(data),
             0x007a => Self::decode_entity_disappear(data),
+            0x0089 => Self::decode_attack_request(data),
+            0x008a => Self::decode_attack_notify(data),
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!("未知包 ID: 0x{:04X}", packet_id),
@@ -609,6 +644,37 @@ impl PacketCodec {
         let entity_id = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         let reason = data[8];
         Ok(Packet::EntityDisappear(EntityDisappearNotify { entity_id, reason }))
+    }
+
+    /// 解码 AttackRequest (0x0089)
+    /// 需要至少 9 字节（4 header + 5 payload）
+    fn decode_attack_request(data: &[u8]) -> io::Result<Packet> {
+        if data.len() < 9 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "AttackRequest 数据不完整"));
+        }
+        let target_id = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        let action = data[8];
+        Ok(Packet::AttackRequest(AttackRequest { target_id, action }))
+    }
+
+    /// 解码 AttackNotify (0x008a)
+    /// 需要至少 22 字节（4 header + 18 payload）
+    fn decode_attack_notify(data: &[u8]) -> io::Result<Packet> {
+        if data.len() < 22 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "AttackNotify 数据不完整"));
+        }
+        let src_id = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        let dst_id = u32::from_le_bytes([data[8], data[9], data[10], data[11]]);
+        let start_time = u32::from_le_bytes([data[12], data[13], data[14], data[15]]);
+        let attack_speed = u32::from_le_bytes([data[16], data[17], data[18], data[19]]);
+        let damage = u32::from_le_bytes([data[20], data[21], data[22], data[23]]);
+        let count = u16::from_le_bytes([data[24], data[25]]);
+        let action = data[26];
+        let damage_type = data[27];
+        Ok(Packet::AttackNotify(AttackNotify {
+            src_id, dst_id, start_time, attack_speed,
+            damage, count, action, damage_type,
+        }))
     }
 
     // ========================================================================
