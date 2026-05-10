@@ -22,7 +22,8 @@ use crate::cli::Cli;
 use crate::game::map::{ChannelBus, DropManager, MapState};
 use crate::game::party::PartyManager;
 use crate::game::token::TokenStore;
-use crate::network::{GameServer, ModernServer, PacketHandler, SessionManager};
+use crate::game::AgentApi;
+use crate::network::{AgentServer, GameServer, ModernServer, PacketHandler, SessionManager};
 use crate::storage::{Database, init_schema};
 use std::sync::Arc;
 
@@ -179,6 +180,14 @@ impl Core {
         let session_manager = self.session_manager.clone();
         let packet_handler = packet_handler.clone();
 
+        // 启动 Agent API 服务器
+        let agent_api = Arc::new(AgentApi::new(
+            self.cli.config.clone(),
+            map_state.clone(),
+        ));
+        let agent_socket = "/tmp/deviruchi.sock".to_string();
+        let agent_server = AgentServer::new(agent_socket, agent_api);
+
         // 收集所有服务器任务
         let mut handles = Vec::new();
 
@@ -230,6 +239,14 @@ impl Core {
             tracing::info!("启动 Modern Server (WebSocket): {}", modern_addr);
             let server = ModernServer::new(modern_addr, sm);
             server.listen().await
+        }));
+
+        // Agent API 服务器（Unix Socket）
+        handles.push(tokio::spawn(async move {
+            if let Err(e) = agent_server.listen().await {
+                tracing::error!("Agent API 错误: {}", e);
+            }
+            Ok::<(), anyhow::Error>(())
         }));
 
         // 等待所有服务器

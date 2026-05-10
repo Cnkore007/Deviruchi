@@ -1,4 +1,5 @@
 pub mod achievement;
+pub mod agent_api;
 pub mod auction;
 pub mod battle;
 pub mod card;
@@ -38,6 +39,7 @@ pub mod vending;
 pub mod woe;
 pub mod zeny;
 
+pub use agent_api::AgentApi;
 pub use achievement::{
     Achievement, AchievementCategory, AchievementCondition, AchievementDatabase, AchievementError,
     AchievementManager, AchievementReward, PlayerAchievementProgress,

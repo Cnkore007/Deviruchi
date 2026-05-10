@@ -11,3 +11,6 @@ pub use modern_server::ModernServer;
 pub use packet::{Packet, PacketHeader, PacketId};
 pub use server::GameServer;
 pub use session::{Session, SessionManager};
+
+pub mod agent_server;
+pub use agent_server::AgentServer;
