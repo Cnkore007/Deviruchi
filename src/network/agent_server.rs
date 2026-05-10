@@ -1,24 +1,25 @@
 //! Agent 服务器
 //!
-//! 监听 Unix Socket，处理来自 Agent 进程的 JSON-RPC 请求。
+//! 监听 TCP 端口，处理来自 Agent 进程的 JSON-RPC 请求。
+//! 使用 TCP 而非 Unix Socket 以支持 Windows 跨平台。
 //! 每个连接独立处理，逐行读取 JSON-RPC 请求并返回响应。
 
 use std::sync::Arc;
 
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixListener;
+use tokio::net::TcpListener;
 use tracing::{error, info};
 
 use crate::game::agent_api::AgentApi;
 
 /// Agent API 服务器
 ///
-/// 在 Unix Socket 上监听，接受 Agent 进程的连接，
+/// 在 TCP 端口上监听，接受 Agent 进程的连接，
 /// 解析 JSON-RPC 请求并分发到 AgentApi 处理。
 pub struct AgentServer {
-    /// Unix Socket 文件路径
-    socket_path: String,
+    /// 监听地址（如 "127.0.0.1:16400"）
+    addr: String,
     /// API 处理器
     api: Arc<AgentApi>,
 }
@@ -26,30 +27,24 @@ pub struct AgentServer {
 impl AgentServer {
     /// 创建 AgentServer 实例
     ///
-    /// - `socket_path`: Unix Socket 文件路径（如 `/tmp/deviruchi.sock`）
+    /// - `addr`: 监听地址（如 "127.0.0.1:16400"）
     /// - `api`: AgentApi 处理器引用
-    pub fn new(socket_path: String, api: Arc<AgentApi>) -> Self {
-        Self { socket_path, api }
+    pub fn new(addr: String, api: Arc<AgentApi>) -> Self {
+        Self { addr, api }
     }
 
-    /// 启动监听
-    ///
-    /// 清理可能残留的旧 socket 文件后绑定监听。
-    /// 每个新连接独立 spawn 一个异步任务处理。
+    /// 启动 TCP 监听
     pub async fn listen(&self) -> anyhow::Result<()> {
-        // 清理可能残留的旧 socket 文件
-        let _ = std::fs::remove_file(&self.socket_path);
-
-        let listener = UnixListener::bind(&self.socket_path)?;
-        info!("Agent API 监听: {}", self.socket_path);
+        let listener = TcpListener::bind(&self.addr).await?;
+        info!("Agent API 监听: {}", self.addr);
 
         loop {
             match listener.accept().await {
-                Ok((stream, _addr)) => {
+                Ok((stream, addr)) => {
                     let api = self.api.clone();
                     tokio::spawn(async move {
                         if let Err(e) = Self::handle_connection(stream, api).await {
-                            error!("Agent 连接错误: {}", e);
+                            error!("Agent 连接错误 ({}): {}", addr, e);
                         }
                     });
                 }
@@ -63,25 +58,8 @@ impl AgentServer {
     /// 处理单个 Agent 连接
     ///
     /// 协议格式：每行一个 JSON-RPC 请求（以 `\n` 分隔）。
-    ///
-    /// 请求格式:
-    /// ```json
-    /// {"id": 1, "method": "server.status", "params": {}}
-    /// ```
-    ///
-    /// 成功响应:
-    /// ```json
-    /// {"id": 1, "result": {...}}
-    /// ```
-    ///
-    /// 错误响应:
-    /// ```json
-    /// {"id": 1, "error": {"code": -1, "message": "..."}}
-    /// ```
-    ///
-    /// 连接断开时自动清理。
     async fn handle_connection(
-        stream: tokio::net::UnixStream,
+        stream: tokio::net::TcpStream,
         api: Arc<AgentApi>,
     ) -> anyhow::Result<()> {
         let (reader, mut writer) = stream.into_split();

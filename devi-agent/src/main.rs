@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     }
 
     // 初始化 IPC 客户端
-    let ipc = Arc::new(ipc::IpcClient::new("/tmp/deviruchi.sock"));
+    let ipc = Arc::new(ipc::IpcClient::new("127.0.0.1:16400"));
 
     // 尝试连接游戏服务器
     match ipc.connect().await {
@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
 
     // 初始化持久化记忆存储
     let memory_path = home_dir().join(".devi-agent").join("memory.db");
-    let memory = match memory::MemoryStore::new(&memory_path) {
+    let _memory = match memory::MemoryStore::new(&memory_path) {
         Ok(m) => {
             println!("✓ 记忆存储已初始化");
             Some(Arc::new(m))
@@ -242,9 +242,18 @@ async fn handle_slash_command(
 }
 
 /// 加载 LLM 配置
-/// 从 ~/.devi-agent/config.toml 读取，不存在则使用默认值
+/// 优先读取项目目录下 devi-agent/config.toml，不存在则读 ~/.devi-agent/config.toml
 fn load_llm_config() -> llm::openai::LlmConfig {
-    let config_path = config_file_path();
+    // 优先：项目目录下的配置
+    let local_path = std::env::current_dir()
+        .unwrap_or_default()
+        .join("devi-agent")
+        .join("config.toml");
+    // 备选：用户主目录下的配置
+    let home_path = home_dir().join(".devi-agent").join("config.toml");
+
+    let config_path = if local_path.exists() { local_path } else { home_path };
+
     if config_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&config_path) {
             if let Ok(config) = toml::from_str::<llm::openai::LlmConfig>(&content) {
@@ -255,17 +264,9 @@ fn load_llm_config() -> llm::openai::LlmConfig {
     llm::openai::LlmConfig::default()
 }
 
-/// 配置文件路径: ~/.devi-agent/config.toml
-fn config_file_path() -> std::path::PathBuf {
-    home_dir().join(".devi-agent").join("config.toml")
-}
-
-/// 获取用户主目录
+/// 获取用户主目录（跨平台）
 ///
-/// 从 HOME 环境变量获取，如果未设置则返回空路径。
-/// 这是一个简化的实现，仅支持 Unix 系统。
+/// 使用 dirs crate 获取主目录，支持 Windows/macOS/Linux。
 fn home_dir() -> std::path::PathBuf {
-    std::env::var("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default()
+    dirs::home_dir().unwrap_or_default()
 }

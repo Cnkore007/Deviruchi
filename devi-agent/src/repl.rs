@@ -55,7 +55,7 @@ impl Repl {
     }
 }
 
-/// 获取用户主目录
+/// 获取用户主目录（跨平台）
 fn home_dir() -> Option<std::path::PathBuf> {
-    std::env::var("HOME").ok().map(std::path::PathBuf::from)
+    dirs::home_dir()
 }

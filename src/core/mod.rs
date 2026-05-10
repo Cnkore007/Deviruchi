@@ -185,8 +185,8 @@ impl Core {
             self.cli.config.clone(),
             map_state.clone(),
         ));
-        let agent_socket = "/tmp/deviruchi.sock".to_string();
-        let agent_server = AgentServer::new(agent_socket, agent_api);
+        let agent_addr = "127.0.0.1:16400".to_string();
+        let agent_server = AgentServer::new(agent_addr, agent_api);
 
         // 收集所有服务器任务
         let mut handles = Vec::new();

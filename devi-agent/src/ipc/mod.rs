@@ -1,23 +1,23 @@
 //! IPC 客户端模块
-//! 通过 Unix Socket 与游戏服务器通信
+//! 通过 TCP 连接与游戏服务器通信（跨平台兼容）
 
 pub mod protocol;
 
-use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::UnixStream;
-use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::TcpStream;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::Mutex;
 use protocol::{RpcRequest, RpcResponse};
 use anyhow::{Result, anyhow};
 
-/// Unix Socket IPC 客户端
+/// IPC 客户端
 ///
-/// 与游戏服务器的 Agent API 建立连接，
+/// 与游戏服务器的 Agent API 建立 TCP 连接，
 /// 发送 JSON-RPC 请求并接收响应。
+/// 使用 TCP 而非 Unix Socket 以支持 Windows 跨平台。
 pub struct IpcClient {
-    /// Unix Socket 文件路径
-    socket_path: PathBuf,
+    /// 服务器地址（如 "127.0.0.1:16400"）
+    addr: String,
     /// 连接流（读半部 + 写半部）
     stream: Mutex<Option<(
         BufReader<OwnedReadHalf>,
@@ -31,21 +31,19 @@ impl IpcClient {
     /// 创建新的 IPC 客户端
     ///
     /// # 参数
-    /// - `socket_path`: Unix Socket 文件路径
-    pub fn new(socket_path: impl Into<PathBuf>) -> Self {
+    /// - `addr`: 服务器地址（如 "127.0.0.1:16400"）
+    pub fn new(addr: impl Into<String>) -> Self {
         Self {
-            socket_path: socket_path.into(),
+            addr: addr.into(),
             stream: Mutex::new(None),
             next_id: Mutex::new(1),
         }
     }
 
     /// 连接到游戏服务器
-    ///
-    /// 建立 Unix Socket 连接并分离读写半部
     pub async fn connect(&self) -> Result<()> {
-        let stream = UnixStream::connect(&self.socket_path).await
-            .map_err(|e| anyhow!("无法连接到游戏服务器 {}: {}", self.socket_path.display(), e))?;
+        let stream = TcpStream::connect(&self.addr).await
+            .map_err(|e| anyhow!("无法连接到游戏服务器 {}: {}", self.addr, e))?;
         let (reader, writer) = stream.into_split();
         let mut guard = self.stream.lock().await;
         *guard = Some((BufReader::new(reader), writer));
@@ -58,13 +56,6 @@ impl IpcClient {
     }
 
     /// 发送 RPC 请求并等待响应
-    ///
-    /// # 参数
-    /// - `method`: 要调用的方法名
-    /// - `params`: 方法参数（JSON 值）
-    ///
-    /// # 返回
-    /// 服务器返回的 RPC 响应
     pub async fn call(&self, method: &str, params: serde_json::Value) -> Result<RpcResponse> {
         let mut guard = self.stream.lock().await;
         let (reader, writer) = guard.as_mut()
