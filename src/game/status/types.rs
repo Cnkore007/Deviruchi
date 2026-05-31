@@ -96,6 +96,7 @@ pub enum StatusChange {
     Invincible = 80,
     /// 不可视化 - 隐身
     Invisible = 81,
+    Disguise = 83,  // 伪装状态（变身为怪物）
     /// 圣体 - 免疫异常状态
     HolyBody = 82,
 
@@ -285,6 +286,7 @@ impl StatusChange {
             | StatusChange::Resurrection
             | StatusChange::DeathProtection => StatusCategory::Special,
 
+            StatusChange::Disguise => StatusCategory::Special,
             StatusChange::Unknown => StatusCategory::Neutral,
         }
     }
@@ -341,6 +343,7 @@ impl StatusChange {
             StatusChange::Invincible => 80,
             StatusChange::Invisible => 81,
             StatusChange::HolyBody => 82,
+            StatusChange::Disguise => 83,
             StatusChange::Poison => 100,
             StatusChange::Bleeding => 101,
             StatusChange::Hunger => 102,
@@ -394,6 +397,7 @@ impl StatusChange {
             StatusChange::Invincible => "Invincible",
             StatusChange::Invisible => "Invisible",
             StatusChange::HolyBody => "Holy Body",
+            StatusChange::Disguise => "Disguise",
             StatusChange::Poison => "Poison",
             StatusChange::Bleeding => "Bleeding",
             StatusChange::Hunger => "Hunger",
@@ -483,6 +487,7 @@ impl From<u32> for StatusChange {
             80 => StatusChange::Invincible,
             81 => StatusChange::Invisible,
             82 => StatusChange::HolyBody,
+            83 => StatusChange::Disguise,
             100 => StatusChange::Poison,
             101 => StatusChange::Bleeding,
             102 => StatusChange::Hunger,

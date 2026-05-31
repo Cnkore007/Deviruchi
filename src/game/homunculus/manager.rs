@@ -4,7 +4,7 @@
 //! 所有写操作实时持久化到数据库。
 
 use super::data::{
-    EvolutionStage, Homunculus, HomunculusDatabase, HomunculusRace, HomunculusTemplate,
+    EvolutionStage, Homunculus, HomunculusDatabase, HomunculusRace,
     HomunculusType,
 };
 use crate::storage::Database;

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_snake_case)]
+
 //! Mob YAML 数据加载器
 //!
 //! 从 rAthena mob_db.yml 格式加载怪物模板数据。

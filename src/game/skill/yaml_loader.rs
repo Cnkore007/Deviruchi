@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_snake_case)]
+
 //! rAthena skill_db.yml 格式加载器
 //!
 //! 从 `db/skill_db.yml` 加载技能数据，映射到 Deviruchi 的 Skill 结构。

@@ -4,7 +4,7 @@
 //! 校验转职条件，应用转职效果并持久化。
 
 use super::MapServer;
-use crate::game::job::{check_job_change_requirements, JobChangeError, JobType};
+use crate::game::job::{check_job_change_requirements, JobType};
 use crate::network::packet::id::*;
 use crate::network::session::Session;
 

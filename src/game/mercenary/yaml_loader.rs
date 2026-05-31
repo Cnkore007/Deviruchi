@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_snake_case)]
+
 //! rAthena mercenary_db.yml 格式加载器
 
 use serde::Deserialize;

@@ -9,7 +9,6 @@ use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
 use crate::protocol::map_packets::{CZRequestAction, CZRequestPickupItem, CZUseItem};
 use crate::protocol::packet_builder::Packed;
 use std::sync::Arc;
-use uuid::Uuid;
 
 impl MapServer {
     /// Handle player enter map (0x007C)

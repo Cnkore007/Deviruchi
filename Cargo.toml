@@ -29,6 +29,7 @@ bytes = "1"
 tokio-util = { version = "0.7", features = ["codec"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 rand = "0.8"
+regex = "1"
 log = "0.4"
 futures-util = { version = "0.3", features = ["sink"] }
 tokio-tungstenite = "0.21"
@@ -36,6 +37,7 @@ pathfinding = "4"
 notify = "6"
 chrono = { version = "0.4", features = ["serde"] }
 argon2 = "0.5"
+dashmap = "5"
 
 [features]
 default = []

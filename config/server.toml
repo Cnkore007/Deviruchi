@@ -1,24 +1,27 @@
-# Deviruchi Server Configuration
-
 [server]
 name = "Deviruchi"
 version = "0.1.0"
 mode = "all"
 standalone = true
-pid_file = null
 
 [database]
+backend = "sqlite"
 path = "deviruchi.db"
-backup_path = null
 auto_vacuum = true
 wal_mode = true
 busy_timeout_ms = 5000
 auto_backup_interval_hours = 24
+mysql_host = "127.0.0.1"
+mysql_port = 3306
+mysql_user = "deviruchi"
+mysql_password = ""
+mysql_database = "deviruchi"
 
 [network]
 login_port = 6900
 char_port = 6000
 map_port = 6121
+modern_port = 16121
 max_connections = 10000
 tcp_nodelay = true
 keepalive = true
@@ -58,6 +61,9 @@ sit_heal_sp_rate = 10
 natural_heal_interval_ms = 6000
 natural_heal_threshold_hp = 50
 natural_heal_threshold_sp = 50
+battle_heal_penalty = true
+overweight_heal_penalty = true
+status_heal_modifier = true
 
 [drop]
 mvp_bonus_multiplier = 1.1
@@ -90,7 +96,7 @@ default_y = 183
 auto_respawn_enabled = true
 auto_respawn_delay_ms = 10000
 
-[log]
+[logging]
 enabled = true
 console = true
 level = "info"
@@ -99,7 +105,7 @@ rotation_hourly = true
 timestamp = true
 timestamp_format = "%Y-%m-%d %H:%M:%S"
 
-[log.categories]
+[logging.categories]
 log_pick = true
 log_trade = true
 log_shop = true

@@ -160,14 +160,14 @@ impl Default for GameConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BattleConfig {
-    pub base_exp_rate: f32,
-    pub job_exp_rate: f32,
-    pub zeny_rate: f32,
-    pub item_drop_rate: f32,
+    pub base_exp_rate: f64,
+    pub job_exp_rate: f64,
+    pub zeny_rate: f64,
+    pub item_drop_rate: f64,
     pub pvp_mode: bool,
-    pub pvp_damage_rate: f32,
+    pub pvp_damage_rate: f64,
     pub gvg_mode: bool,
-    pub gvg_damage_rate: f32,
+    pub gvg_damage_rate: f64,
     pub atcommand_give_level: u16,
     pub max_hp_base_cap: u32,
     pub max_sp_base_cap: u32,
@@ -213,7 +213,7 @@ impl Default for BattleConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DropConfig {
-    pub mvp_bonus_multiplier: f32,
+    pub mvp_bonus_multiplier: f64,
     pub zeny_drop_rate: u32,
     pub zeny_drop_percent: u32,
     pub pickup_range: u16,
@@ -245,13 +245,13 @@ impl Default for DropConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExpConfig {
     pub party_share_mode: String,
-    pub level_penalty_diff_10: f32,
-    pub level_penalty_diff_15: f32,
-    pub level_penalty_diff_20: f32,
-    pub level_penalty_diff_25: f32,
-    pub level_penalty_diff_above: f32,
+    pub level_penalty_diff_10: f64,
+    pub level_penalty_diff_15: f64,
+    pub level_penalty_diff_20: f64,
+    pub level_penalty_diff_25: f64,
+    pub level_penalty_diff_above: f64,
     pub party_share_near_range: u16,
-    pub mvp_exp_bonus: f32,
+    pub mvp_exp_bonus: f64,
 }
 
 impl Default for ExpConfig {
@@ -502,6 +502,99 @@ impl Config {
     /// 加载或获取默认配置
     pub fn load_or_default() -> Result<Self> {
         Self::load(Self::get_default_path())
+    }
+
+    /// 检查配置文件是否存在
+    pub fn exists<P: AsRef<Path>>(path: P) -> bool {
+        path.as_ref().exists()
+    }
+
+    /// 运行交互式配置向导
+    ///
+    /// 引导用户配置服务器基本参数，生成 config/server.toml。
+    /// 所有选项可直接回车使用默认值。
+    pub fn run_setup_wizard() -> Result<Self> {
+        use std::io::{self, BufRead, Write};
+
+        let stdin = io::stdin();
+        let mut stdout = io::stdout();
+
+        println!();
+        println!("============================================");
+        println!("  Deviruchi 服务器配置向导");
+        println!("============================================");
+        println!("检测到首次运行，将引导您完成基础配置。");
+        println!("所有选项可直接回车使用默认值。");
+        println!();
+
+        let mut config = Config::default();
+
+        // 辅助函数：读取用户输入，空输入返回默认值
+        let mut read_input = |prompt: &str, default: &str| -> String {
+            print!("{} [{}]: ", prompt, default);
+            stdout.flush().unwrap();
+            let mut input = String::new();
+            stdin.lock().read_line(&mut input).unwrap();
+            let input = input.trim().to_string();
+            if input.is_empty() { default.to_string() } else { input }
+        };
+
+        // 1. 服务器名称
+        let name = read_input("服务器名称", "Deviruchi");
+        config.server.name = name;
+
+        // 2. 基础经验倍率
+        let base_exp = read_input("基础经验倍率 (1.0 = 100%)", "1.0");
+        config.battle.base_exp_rate = base_exp.parse().unwrap_or(1.0);
+
+        // 3. 职业经验倍率
+        let job_exp = read_input("职业经验倍率 (1.0 = 100%)", "1.0");
+        config.battle.job_exp_rate = job_exp.parse().unwrap_or(1.0);
+
+        // 4. 物品掉落倍率
+        let drop_rate = read_input("物品掉落倍率 (1.0 = 100%)", "1.0");
+        config.battle.item_drop_rate = drop_rate.parse().unwrap_or(1.0);
+
+        // 5. Zeny 掉落倍率
+        let zeny_rate = read_input("Zeny 掉落倍率 (1.0 = 100%)", "1.0");
+        config.battle.zeny_rate = zeny_rate.parse().unwrap_or(1.0);
+
+        // 6. 最大基础等级
+        let base_lv = read_input("最大基础等级", "99");
+        config.game.base_level_cap = base_lv.parse().unwrap_or(99);
+
+        // 7. 最大职业等级
+        let job_lv = read_input("最大职业等级", "50");
+        config.game.job_level_cap = job_lv.parse().unwrap_or(50);
+
+        // 8. 死亡经验惩罚
+        let death_penalty = read_input("死亡时损失经验？(y/N)", "n");
+        config.game.death_drop_items = death_penalty.to_lowercase() == "y";
+
+        // 9. 默认出生地图
+        let default_map = read_input("默认出生地图", "prontera");
+        config.respawn.default_map = default_map;
+
+        // 10. 最大玩家数
+        let max_players = read_input("最大玩家数", "5000");
+        config.game.max_players = max_players.parse().unwrap_or(5000);
+
+        // 确保 config 目录存在
+        let config_path = Self::get_default_path();
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // 保存配置
+        config.save(&config_path)?;
+
+        println!();
+        println!("============================================");
+        println!("配置已保存到 {:?}", config_path);
+        println!("============================================");
+        println!();
+
+        Ok(config)
     }
 }
 

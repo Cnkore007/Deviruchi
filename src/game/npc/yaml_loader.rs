@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_snake_case)]
+
 //! NPC YAML 数据加载器
 //!
 //! 从自定义 YAML 格式加载 NPC 模板数据。
@@ -21,7 +24,7 @@
 //!         sell_price: 25
 //! ```
 
-use super::data::{Npc, NpcDatabase, NpcEvent, NpcType, ShopItem};
+use super::data::{Npc, NpcEvent, NpcType};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -109,7 +112,7 @@ pub fn load_npc_db(path: &str) -> Result<HashMap<u32, Npc>, Box<dyn std::error::
     for entry in yaml.npcs {
         let npc_type = parse_npc_type(&entry.npc_type);
 
-        let mut npc = Npc {
+        let npc = Npc {
             id: entry.id,
             name: entry.name.clone(),
             display_name: entry.display_name.unwrap_or(entry.name),

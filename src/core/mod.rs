@@ -1,6 +1,7 @@
 //! 核心游戏逻辑模块
 
 pub mod config;
+pub mod guide;
 pub mod logging;
 pub mod panic;
 pub mod timer;

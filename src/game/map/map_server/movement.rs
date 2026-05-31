@@ -4,7 +4,6 @@ use super::MapServer;
 use crate::game::map::channel::GameEvent;
 use crate::network::packet::id::*;
 use crate::network::session::Session;
-use uuid::Uuid;
 
 impl MapServer {
     /// 处理方向改变请求 (CZ_REQUEST_CHANGE_DIRECTION, 0x00D9)

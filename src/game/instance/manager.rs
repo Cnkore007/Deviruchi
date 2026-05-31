@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use super::data::{EntityType, Instance, InstanceEntity, InstanceObjectiveType, InstanceState, InstanceType};
+use super::data::{EntityType, Instance, InstanceEntity, InstanceObjectiveType, InstanceState};
 use super::template::{InstanceTemplate, InstanceTemplateDatabase};
 
 /// Instance error types
@@ -562,6 +562,7 @@ impl Default for InstanceManager {
 
 #[cfg(test)]
 mod tests {
+    use super::super::data::InstanceType;
     use super::*;
 
     fn create_test_manager() -> InstanceManager {

@@ -1,6 +1,6 @@
 //! 玩家状态管理器
 
-use super::effect::{StackingRule, StatusEffect, StatusSource};
+use super::effect::{StackingRule, StatusEffect};
 use super::types::StatusChange;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -293,6 +293,7 @@ impl std::fmt::Debug for PlayerStatus {
 
 #[cfg(test)]
 mod tests {
+    use super::super::effect::StatusSource;
     use super::*;
 
     fn make_test_status() -> PlayerStatus {

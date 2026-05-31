@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(non_snake_case)]
+
 use super::data::{Item, ItemType};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -65,7 +68,7 @@ struct ItemRathenaEntry {
 }
 
 /// 将 rAthena Type 字段映射到 Deviruchi ItemType
-fn map_item_type(type_str: &Option<String>, sub_type: &Option<String>) -> ItemType {
+fn map_item_type(type_str: &Option<String>, _sub_type: &Option<String>) -> ItemType {
     match type_str.as_deref().unwrap_or("Etc") {
         "Healing" => ItemType::Heal,
         "Weapon" => ItemType::Weapon,

@@ -3,9 +3,9 @@
 //! 负责雇佣兵的创建、召唤、合同管理、忠诚度等操作。
 //! 所有写操作实时持久化到数据库。
 
-use super::data::{Mercenary, MercenaryDatabase, MercenaryData, MercenarySkill};
+use super::data::{Mercenary, MercenaryDatabase, MercenarySkill};
 use crate::storage::Database;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};

@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_variables, non_snake_case)]
+
 //! Deviruchi - High-performance MMORPG game server
 
 pub mod cli;

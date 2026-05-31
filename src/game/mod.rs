@@ -3,38 +3,52 @@ pub mod agent_api;
 pub mod auction;
 pub mod battle;
 pub mod card;
+pub mod clan;
 pub mod cashshop;
 pub mod constants;
 pub mod battleground;
+pub mod buyingstore;
 pub mod char;
 pub mod chat;
 pub mod command;
+pub mod duel;
+pub mod elemental;
+pub mod date;
 pub mod game_loop;
 pub mod guild;
 pub mod heal;
 pub mod homunculus;
 pub mod instance;
+pub mod intif;
 pub mod inter_server;
 pub mod item;
 pub mod job;
 pub mod login;
+pub mod log;
 pub mod mail;
+pub mod mapreg;
 pub mod map;
 pub mod mercenary;
 pub mod mob;
 pub mod mount;
+pub mod navi;
 pub mod npc;
+pub mod npc_chat;
 pub mod party;
+pub mod path;
 pub mod pet;
+pub mod pc_groups;
 pub mod quest;
 pub mod rand;
 pub mod script;
+pub mod searchstore;
 pub mod server_registry;
 pub mod skill;
 pub mod status;
 pub mod storage;
 pub mod token;
 pub mod trade;
+pub mod unit;
 pub mod vending;
 pub mod woe;
 pub mod zeny;
@@ -52,6 +66,7 @@ pub use battleground::{
     BGError, Battleground, BattlegroundConfig, BattlegroundManager, BattlegroundState,
     BattlegroundStats, BattlegroundTeam, BattlegroundType, RespawnType, TeamColor, TeamStats,
 };
+pub use buyingstore::{BuyingStore, BuyingStoreItem, BuyingStoreManager, BuyingStoreResult};
 pub use card::{
     CardData, CardDatabase, CardEffect, CardManager, CardSlot, CardStat, EquipSlotForCard,
     MonsterRace,
@@ -66,7 +81,11 @@ pub use chat::{
     ChatCommand, ChatManager, ChatResult, OfflineMessage, WhisperManager, WhisperRateLimiter,
     WhisperResult, parse_chat,
 };
+pub use clan::{AllianceType, Clan, ClanAlliance, ClanManager, ClanMember, ClanResult};
 pub use command::AtCommandHandler;
+pub use date::{DateType, GameDayOfWeek, GameDate, Month};
+pub use duel::{Duel, DuelManager, DuelResult, DuelState};
+pub use elemental::{Elemental, ElementalAIState, ElementalElement, ElementalManager, ElementalMode, ElementalSkill};
 pub use game_loop::GameLoop;
 pub use guild::{Guild, GuildManager, GuildMember, GuildPermission, GuildPosition};
 pub use heal::{FoodEffect, FoodManager, HealModifiers, HealService};
@@ -83,16 +102,22 @@ pub use inter_server::{
 pub use item::ItemHandler;
 pub use job::{JobChangeError, JobType};
 pub use login::LoginServer;
+pub use log::{ChatType, LogConfig, LogDetails, LogManager, LogEntry, LogType, PickSource};
+pub use path::{CollisionMap, Direction, PathConfig, PathResult, PathSearcher, Point};
 pub use mail::{MailAttachResult, MailError, MailItem, MailListEntry, MailMessage, MailSystem};
 pub use map::{
     MapAdjacency, MapDatabase, MapEdge, MapState, TeleportAction, TeleportManager, WarpError,
     WarpService,
 };
+pub use mapreg::{MapRegStore, VarValue};
 pub use mercenary::{Mercenary, MercenaryClass, MercenaryData, MercenaryDatabase, MercenaryError, MercenaryManager, MercenarySkill};
 pub use mob::{MobAI, MobSpawnManager};
 pub use mount::{Mount, MountDatabase, MountError, MountManager, MountType, PlayerMountState};
+pub use navi::{MapNode, NaviManager, NaviPath};
 pub use npc::NpcHandler;
+pub use npc_chat::{MatchResult, NpcChatManager, PatternEntry, PatternSet};
 pub use party::PartyManager;
+pub use pc_groups::{GroupLevel, PcGroupManager, PlayerGroup};
 pub use pet::{Pet, PetAI, PetAIManager, PetAIState, PetData, PetDatabase, PetError, PetManager};
 pub use quest::{
     ObjectiveType, PlayerQuestData, Quest, QuestDatabase, QuestError, QuestManager, QuestObjective,
@@ -102,6 +127,7 @@ pub use rand::{GameRng, thread_rng};
 pub use script::{
     DialogueResponse, NpcDialogueState, NpcScript, ScriptCommand, ScriptNode, parse_script,
 };
+pub use searchstore::{SearchFilter, SearchResult, SearchStoreManager, StoreType};
 pub use server_registry::{ServerInfo, ServerRegistry, ServerType};
 pub use skill::SkillHandler;
 pub use status::{
@@ -111,6 +137,7 @@ pub use status::{
 pub use storage::{Storage, StorageSlot};
 pub use token::{TOKEN_EXPIRY_SECS, TokenData, TokenStore};
 pub use trade::TradeManager;
+pub use unit::{MoveError, MoveState, MoveType, MovementValidator, UnitManager, UnitMovement};
 pub use vending::{
     ShopItem, ShopSearch, ShopSearchResult, VendingError, VendingManager, VendingShop,
 };
