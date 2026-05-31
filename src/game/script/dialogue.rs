@@ -572,6 +572,12 @@ impl NpcDialogueState {
                 self.current_index += 1;
                 DialogueResponse::Continue
             }
+            // 新增命令的处理（暂时跳过）
+            _ => {
+                tracing::debug!("execute_command: 暂未实现命令 {:?}", cmd);
+                self.current_index += 1;
+                DialogueResponse::Continue
+            }
         }
     }
 

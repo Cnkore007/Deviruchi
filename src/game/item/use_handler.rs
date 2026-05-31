@@ -362,14 +362,18 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level
             );
         }
-        // 天使之击 (AL_ANGELUS)
+        // 天使之击 (AL_ANGELUS) - 防御提升
         33 => {
-            // 暂时使用治愈术效果代替
-            let heal_amount = 50 + (level as u32 * 10);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::Shield,
+                duration as u64 * 1000,
+                StatusSource::Skill(33),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Angelus skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Angelus skill (level {}), defense buff for {}s",
+                player.id, level, duration
             );
         }
         // 祝福术 (AL_BLESSING)
@@ -380,22 +384,32 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level
             );
         }
-        // 天使之光 (AL_AGI)
+        // 天使之光 (AL_AGI) - 敏捷提升
         35 => {
-            // 暂时使用加速效果代替
-            player.apply_haste(level);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::IncreaseAgi,
+                duration as u64 * 1000,
+                StatusSource::Skill(35),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Angelus skill (level {}), haste (stub)",
-                player.id, level
+                "Player {} used Increase AGI skill (level {}), AGI buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_ASPERSIO) - 祝圣
+        // 治愈术 (PR_ASPERSIO) - 祝圣（武器附加圣属性）
         70 => {
-            let heal_amount = 100 + (level as u32 * 20);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::HolyBody,
+                duration as u64 * 1000,
+                StatusSource::Skill(70),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Aspersio skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Aspersio skill (level {}), holy weapon for {}s",
+                player.id, level, duration
             );
         }
         // 治愈术 (PR_BENEDICTIO) - 祝福
@@ -416,85 +430,130 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (PR_STRECOVERY) - 力量恢复
+        // 治愈术 (PR_STRECOVERY) - 力量恢复（SP 恢复）
         73 => {
-            let heal_amount = 50 + (level as u32 * 20);
-            player.apply_heal(heal_amount);
+            let sp_amount = 50 + (level as u32 * 20);
+            // 使用 SP 恢复状态效果
+            let effect = StatusEffect::new(
+                StatusChange::SpRegen,
+                30000, // 30 秒持续恢复
+                StatusSource::Skill(73),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Strength Recovery skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Strength Recovery skill (level {}), SP regen buff",
+                player.id, level
             );
         }
-        // 治愈术 (PR_MAGNIFICAT) - 赞美诗
+        // 治愈术 (PR_MAGNIFICAT) - 赞美诗（SP 恢复速度提升）
         74 => {
-            let heal_amount = 100 + (level as u32 * 30);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::SpRegen,
+                duration as u64 * 1000,
+                StatusSource::Skill(74),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Magnificat skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Magnificat skill (level {}), SP regen buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_GLORIA) - 荣耀颂
+        // 治愈术 (PR_GLORIA) - 荣耀颂（LUK 提升）
         75 => {
-            let heal_amount = 50 + (level as u32 * 10);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::IncreaseLuk,
+                duration as u64 * 1000,
+                StatusSource::Skill(75),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Gloria skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Gloria skill (level {}), LUK buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_SUFFRAGIUM) - 祈祷
+        // 治愈术 (PR_SUFFRAGIUM) - 祈祷（减少施法时间）
         76 => {
-            let heal_amount = 100 + (level as u32 * 20);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::Concentration,
+                duration as u64 * 1000,
+                StatusSource::Skill(76),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Suffragium skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Suffragium skill (level {}), cast time reduction for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_IMPOSITIO) - 奉献
+        // 治愈术 (PR_IMPOSITIO) - 奉献（ATK 提升）
         77 => {
-            let heal_amount = 50 + (level as u32 * 15);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::PowerUp,
+                duration as u64 * 1000,
+                StatusSource::Skill(77),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Impositio Manus skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Impositio Manus skill (level {}), ATK buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_LAUDAAGNUS) - 赞美诗
+        // 治愈术 (PR_LAUDAAGNUS) - 赞美诗（VIT 提升）
         78 => {
-            let heal_amount = 100 + (level as u32 * 25);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::IncreaseVit,
+                duration as u64 * 1000,
+                StatusSource::Skill(78),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Lauda Agnus skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Lauda Agnus skill (level {}), VIT buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_LAUDARAMUS) - 赞美诗
+        // 治愈术 (PR_LAUDARAMUS) - 赞美诗（LUK 提升）
         79 => {
-            let heal_amount = 100 + (level as u32 * 25);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::IncreaseLuk,
+                duration as u64 * 1000,
+                StatusSource::Skill(79),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Lauda Ramus skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Lauda Ramus skill (level {}), LUK buff for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_LEXDIVINA) - 神圣之言
+        // 治愈术 (PR_LEXDIVINA) - 神圣之言（沉默）
         80 => {
-            let heal_amount = 50 + (level as u32 * 10);
-            player.apply_heal(heal_amount);
+            let duration = 30 + level as u32 * 10;
+            let effect = StatusEffect::new(
+                StatusChange::Silence,
+                duration as u64 * 1000,
+                StatusSource::Skill(80),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Lex Divina skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Lex Divina skill (level {}), silence for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (PR_LEXAETERNA) - 永恒之言
+        // 治愈术 (PR_LEXAETERNA) - 永恒之言（受到伤害加倍）
         81 => {
-            let heal_amount = 100 + (level as u32 * 20);
-            player.apply_heal(heal_amount);
+            let effect = StatusEffect::new(
+                StatusChange::Weakness,
+                60000, // 60 秒
+                StatusSource::Skill(81),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Lex Aeterna skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Lex Aeterna skill (level {}), double damage debuff",
+                player.id, level
             );
         }
         // 治愈术 (PR_TURNUNDEAD) - 超度亡灵
@@ -506,31 +565,44 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (PR_KYRIE) - 主啊，请保佑我们
+        // 治愈术 (PR_KYRIE) - 主啊，请保佑我们（护盾）
         83 => {
-            let heal_amount = 150 + (level as u32 * 40);
-            player.apply_heal(heal_amount);
+            let duration = 60 + level as u32 * 30;
+            let effect = StatusEffect::new(
+                StatusChange::Shield,
+                duration as u64 * 1000,
+                StatusSource::Skill(83),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Kyrie Eleison skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Kyrie Eleison skill (level {}), shield for {}s",
+                player.id, level, duration
             );
         }
         // 治愈术 (MG_SRECOVERY) - SP 恢复
         84 => {
-            let heal_amount = 50 + (level as u32 * 15);
-            player.apply_heal(heal_amount);
+            let effect = StatusEffect::new(
+                StatusChange::SpRegen,
+                60000, // 60 秒持续恢复
+                StatusSource::Skill(84),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used SP Recovery skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used SP Recovery skill (level {}), SP regen buff",
+                player.id, level
             );
         }
-        // 治愈术 (MG_SIGHT) - 透视
+        // 治愈术 (MG_SIGHT) - 透视（检测隐形单位）
         85 => {
-            let heal_amount = 100 + (level as u32 * 20);
-            player.apply_heal(heal_amount);
+            let effect = StatusEffect::new(
+                StatusChange::Concentration,
+                30000, // 30 秒
+                StatusSource::Skill(85),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Sight skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Sight skill (level {}), detect hidden units",
+                player.id, level
             );
         }
         // 治愈术 (MG_NAPALMBEAT) - 火焰弹
@@ -542,13 +614,18 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (MG_SAFETYWALL) - 安全墙
+        // 治愈术 (MG_SAFETYWALL) - 安全墙（物理伤害吸收）
         87 => {
-            let heal_amount = 200 + (level as u32 * 40);
-            player.apply_heal(heal_amount);
+            let duration = 30 + level as u32 * 10;
+            let effect = StatusEffect::new(
+                StatusChange::Shield,
+                duration as u64 * 1000,
+                StatusSource::Skill(87),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Safety Wall skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Safety Wall skill (level {}), physical shield for {}s",
+                player.id, level, duration
             );
         }
         // 治愈术 (MG_SOULSTRIKE) - 灵魂打击
@@ -569,22 +646,32 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (MG_FROSTDIVER) - 冰冻术
+        // 治愈术 (MG_FROSTDIVER) - 冰冻术（冻结目标）
         90 => {
-            let heal_amount = 350 + (level as u32 * 70);
-            player.apply_heal(heal_amount);
+            let duration = 10 + level as u32 * 5;
+            let effect = StatusEffect::new(
+                StatusChange::Freeze,
+                duration as u64 * 1000,
+                StatusSource::Skill(90),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Frost Diver skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Frost Diver skill (level {}), freeze for {}s",
+                player.id, level, duration
             );
         }
-        // 治愈术 (MG_STONECURSE) - 石化术
+        // 治愈术 (MG_STONECURSE) - 石化术（石化目标）
         91 => {
-            let heal_amount = 400 + (level as u32 * 80);
-            player.apply_heal(heal_amount);
+            let duration = 10 + level as u32 * 5;
+            let effect = StatusEffect::new(
+                StatusChange::Stone,
+                duration as u64 * 1000,
+                StatusSource::Skill(91),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Stone Curse skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Stone Curse skill (level {}), petrify for {}s",
+                player.id, level, duration
             );
         }
         // 治愈术 (MG_FIREBALL) - 火球术
@@ -596,13 +683,17 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (MG_FIREWALL) - 火墙
+        // 治愈术 (MG_FIREWALL) - 火墙（火焰伤害区域）
         93 => {
-            let heal_amount = 500 + (level as u32 * 100);
-            player.apply_heal(heal_amount);
+            let effect = StatusEffect::new(
+                StatusChange::FireProperty,
+                20000, // 20 秒
+                StatusSource::Skill(93),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Fire Wall skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Fire Wall skill (level {}), fire damage zone",
+                player.id, level
             );
         }
         // 治愈术 (MG_FIREBOLT) - 火箭
@@ -623,13 +714,18 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
-        // 治愈术 (MG_THUNDERSTORM) - 雷暴
+        // 治愈术 (MG_THUNDERSTORM) - 雷暴（范围雷电伤害 + 眩晕）
         96 => {
-            let heal_amount = 650 + (level as u32 * 130);
-            player.apply_heal(heal_amount);
+            let duration = 5 + level as u32 * 2;
+            let effect = StatusEffect::new(
+                StatusChange::Stun,
+                duration as u64 * 1000,
+                StatusSource::Skill(96),
+            );
+            player.add_status(effect);
             log::info!(
-                "Player {} used Thunder Storm skill (level {}), healed {} HP (stub)",
-                player.id, level, heal_amount
+                "Player {} used Thunder Storm skill (level {}), stun for {}s",
+                player.id, level, duration
             );
         }
         _ => {
