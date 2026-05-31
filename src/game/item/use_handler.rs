@@ -362,12 +362,157 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level
             );
         }
+        // 天使之击 (AL_ANGELUS)
+        33 => {
+            // 暂时使用治愈术效果代替
+            let heal_amount = 50 + (level as u32 * 10);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Angelus skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
         // 祝福术 (AL_BLESSING)
         34 => {
             player.apply_blessing(level);
             log::info!(
                 "Player {} used Blessing skill (level {}) via item",
                 player.id, level
+            );
+        }
+        // 天使之光 (AL_AGI)
+        35 => {
+            // 暂时使用加速效果代替
+            player.apply_haste(level);
+            log::info!(
+                "Player {} used Angelus skill (level {}), haste (stub)",
+                player.id, level
+            );
+        }
+        // 治愈术 (PR_ASPERSIO) - 祝圣
+        70 => {
+            let heal_amount = 100 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Aspersio skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_BENEDICTIO) - 祝福
+        71 => {
+            let heal_amount = 200 + (level as u32 * 50);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Benedictio skill (level {}), healed {} HP",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_SANCTUARY) - 圣域
+        72 => {
+            let heal_amount = 100 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Sanctuary skill (level {}), healed {} HP",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_STRECOVERY) - 力量恢复
+        73 => {
+            let heal_amount = 50 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Strength Recovery skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_MAGNIFICAT) - 赞美诗
+        74 => {
+            let heal_amount = 100 + (level as u32 * 30);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Magnificat skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_GLORIA) - 荣耀颂
+        75 => {
+            let heal_amount = 50 + (level as u32 * 10);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Gloria skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_SUFFRAGIUM) - 祈祷
+        76 => {
+            let heal_amount = 100 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Suffragium skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_IMPOSITIO) - 奉献
+        77 => {
+            let heal_amount = 50 + (level as u32 * 15);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Impositio Manus skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_LAUDAAGNUS) - 赞美诗
+        78 => {
+            let heal_amount = 100 + (level as u32 * 25);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Lauda Agnus skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_LAUDARAMUS) - 赞美诗
+        79 => {
+            let heal_amount = 100 + (level as u32 * 25);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Lauda Ramus skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_LEXDIVINA) - 神圣之言
+        80 => {
+            let heal_amount = 50 + (level as u32 * 10);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Lex Divina skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_LEXAETERNA) - 永恒之言
+        81 => {
+            let heal_amount = 100 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Lex Aeterna skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_TURNUNDEAD) - 超度亡灵
+        82 => {
+            let heal_amount = 200 + (level as u32 * 50);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Turn Undead skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (PR_KYRIE) - 主啊，请保佑我们
+        83 => {
+            let heal_amount = 150 + (level as u32 * 40);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Kyrie Eleison skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
             );
         }
         _ => {

@@ -266,7 +266,10 @@ impl BuyingStoreManager {
         }
 
         // 计算总价
-        let item = store.items.iter().find(|i| i.item_id == item_id).unwrap();
+        let item = match store.items.iter().find(|i| i.item_id == item_id) {
+            Some(item) => item,
+            None => return BuyingStoreResult::ItemNotFound,
+        };
         let total_price = item.price * quantity as u32;
 
         // 检查金币

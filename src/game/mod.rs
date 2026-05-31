@@ -146,3 +146,12 @@ pub use woe::{
     WoESchedule, WoEState,
 };
 pub use zeny::ZenyManager;
+
+// 新增模块
+pub mod channel;
+pub mod char_logif;
+pub mod chrif;
+pub mod clif;
+pub mod ipban;
+pub mod loginlog;
+pub mod pc;

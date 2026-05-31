@@ -259,7 +259,7 @@ impl UnitManager {
         let unit = units.get(unit_id).ok_or(MoveError::UnitNotFound)?;
 
         let path_result = self.pathfinder.search(
-            &NullCollisionMap, // 需要实际的地图碰撞检测
+            &NullCollisionMap, // TODO: 替换为 RealCollisionMap，需要从地图服务器获取 MapData
             unit.position,
             target,
         );
@@ -371,6 +371,37 @@ pub enum MoveError {
     Blocked,
     /// 速度无效
     InvalidSpeed,
+}
+
+/// 空碰撞地图（用于测试）
+/// 真实碰撞地图实现
+/// 
+/// 使用 MapData 进行碰撞检测。
+pub struct RealCollisionMap {
+    map_data: std::sync::Arc<crate::game::map::data::MapData>,
+}
+
+impl RealCollisionMap {
+    pub fn new(map_data: std::sync::Arc<crate::game::map::data::MapData>) -> Self {
+        Self { map_data }
+    }
+}
+
+impl crate::game::path::CollisionMap for RealCollisionMap {
+    fn is_walkable(&self, x: i32, y: i32) -> bool {
+        if x < 0 || y < 0 {
+            return false;
+        }
+        self.map_data.is_walkable(x as u16, y as u16)
+    }
+
+    fn width(&self) -> i32 {
+        self.map_data.width as i32
+    }
+
+    fn height(&self) -> i32 {
+        self.map_data.height as i32
+    }
 }
 
 /// 空碰撞地图（用于测试）
