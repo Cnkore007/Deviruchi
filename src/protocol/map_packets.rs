@@ -730,3 +730,761 @@ pub mod id {
     #[allow(dead_code)]
     pub const CZ_ACK_CLOSE_DIALOG: u16 = 0x0146;
 }
+
+/// 客户端请求穿戴装备 (0x00A9)
+#[derive(Debug, Clone)]
+pub struct CzReqWearEquip {
+    /// 物品栏索引
+    pub index: u16,
+    /// 装备位置掩码
+    pub position: u16,
+}
+
+impl CzReqWearEquip {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let index = u16::from_le_bytes([data[0], data[1]]);
+        let position = u16::from_le_bytes([data[2], data[3]]);
+        Some(Self { index, position })
+    }
+}
+
+/// 客户端请求卸下装备 (0x00AB)
+#[derive(Debug, Clone)]
+pub struct CzReqTakeoffEquip {
+    /// 装备位置掩码
+    pub position: u16,
+}
+
+impl CzReqTakeoffEquip {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let position = u16::from_le_bytes([data[0], data[1]]);
+        Some(Self { position })
+    }
+}
+
+/// 服务器响应穿戴装备结果 (0x00AA)
+#[derive(Debug, Clone)]
+pub struct ZcReqWearEquipAck {
+    /// 物品栏索引
+    pub index: u16,
+    /// 装备位置掩码
+    pub position: u16,
+    /// 结果：0=成功, 1=失败
+    pub result: u8,
+}
+
+impl Packed for ZcReqWearEquipAck {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x00AA);
+        ctx = ctx
+            .put_u16(self.index)
+            .put_u16(self.position)
+            .put_u8(self.result);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 服务器响应卸下装备结果 (0x00AC)
+#[derive(Debug, Clone)]
+pub struct ZcReqTakeoffEquipAck {
+    /// 装备位置掩码
+    pub position: u16,
+    /// 结果：0=成功, 1=失败
+    pub result: u8,
+}
+
+impl Packed for ZcReqTakeoffEquipAck {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x00AC);
+        ctx = ctx
+            .put_u16(self.position)
+            .put_u8(self.result);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端请求购买NPC商店物品 (0x00C8)
+#[derive(Debug, Clone)]
+pub struct CzNpcBuyListSend {
+    /// 购买数量
+    pub count: u16,
+    /// 物品ID列表
+    pub item_ids: Vec<u16>,
+}
+
+impl CzNpcBuyListSend {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let count = u16::from_le_bytes([data[0], data[1]]);
+        let mut item_ids = Vec::new();
+        for i in 0..count as usize {
+            let offset = 2 + i * 2;
+            if offset + 2 <= data.len() {
+                let item_id = u16::from_le_bytes([data[offset], data[offset + 1]]);
+                item_ids.push(item_id);
+            }
+        }
+        Some(Self { count, item_ids })
+    }
+}
+
+/// 客户端请求出售物品给NPC (0x00C9)
+#[derive(Debug, Clone)]
+pub struct CzNpcSellListSend {
+    /// 出售数量
+    pub count: u16,
+    /// 物品信息列表（索引 + 数量）
+    pub items: Vec<(u16, u16)>,
+}
+
+impl CzNpcSellListSend {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let count = u16::from_le_bytes([data[0], data[1]]);
+        let mut items = Vec::new();
+        for i in 0..count as usize {
+            let offset = 2 + i * 4;
+            if offset + 4 <= data.len() {
+                let index = u16::from_le_bytes([data[offset], data[offset + 1]]);
+                let amount = u16::from_le_bytes([data[offset + 2], data[offset + 3]]);
+                items.push((index, amount));
+            }
+        }
+        Some(Self { count, items })
+    }
+}
+
+/// 服务器响应购买结果 (0x00CA)
+#[derive(Debug, Clone)]
+pub struct ZcPcPurchaseResult {
+    /// 结果：0=成功, 1=失败, 2=zeny不足, 3=超重
+    pub result: u8,
+}
+
+impl Packed for ZcPcPurchaseResult {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x00CA);
+        ctx = ctx.put_u8(self.result);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 服务器响应出售结果 (0x00CB)
+#[derive(Debug, Clone)]
+pub struct ZcPcSellResult {
+    /// 结果：0=成功, 1=失败
+    pub result: u8,
+}
+
+impl Packed for ZcPcSellResult {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x00CB);
+        ctx = ctx.put_u8(self.result);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端请求插入卡片 (0x017C)
+#[derive(Debug, Clone)]
+pub struct CzInsertCard {
+    /// 卡片索引
+    pub card_index: u16,
+    /// 装备索引
+    pub equip_index: u16,
+}
+
+impl CzInsertCard {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let card_index = u16::from_le_bytes([data[0], data[1]]);
+        let equip_index = u16::from_le_bytes([data[2], data[3]]);
+        Some(Self { card_index, equip_index })
+    }
+}
+
+/// 客户端请求鉴定物品 (0x01DD)
+#[derive(Debug, Clone)]
+pub struct CzItemIdentify {
+    /// 物品索引
+    pub index: u16,
+}
+
+impl CzItemIdentify {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let index = u16::from_le_bytes([data[0], data[1]]);
+        Some(Self { index })
+    }
+}
+
+/// 服务器响应鉴定结果 (0x01DC)
+#[derive(Debug, Clone)]
+pub struct ZcItemIdentifyAck {
+    /// 物品索引
+    pub index: u16,
+    /// 结果：0=成功, 1=失败
+    pub result: u8,
+}
+
+impl Packed for ZcItemIdentifyAck {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x01DC);
+        ctx = ctx
+            .put_u16(self.index)
+            .put_u8(self.result);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端请求精炼武器 (0x0222)
+#[derive(Debug, Clone)]
+pub struct CzWeaponRefine {
+    /// 物品索引
+    pub index: u16,
+}
+
+impl CzWeaponRefine {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let index = u16::from_le_bytes([data[0], data[1]]);
+        Some(Self { index })
+    }
+}
+
+/// 服务器响应精炼结果 (0x0223)
+#[derive(Debug, Clone)]
+pub struct ZcWeaponRefineAck {
+    /// 结果：0=成功, 1=失败, 2=已达上限
+    pub result: u8,
+    /// 物品索引
+    pub index: u16,
+}
+
+impl Packed for ZcWeaponRefineAck {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x0223);
+        ctx = ctx
+            .put_u8(self.result)
+            .put_u16(self.index);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端发送表情 (0x00BF)
+#[derive(Debug, Clone)]
+pub struct CzEmotion {
+    /// 表情ID
+    pub emotion: u8,
+}
+
+impl CzEmotion {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { emotion: data[0] })
+    }
+}
+
+/// 服务器广播表情 (0x00C0)
+#[derive(Debug, Clone)]
+pub struct ZcEmotion {
+    /// 实体ID
+    pub entity_id: u32,
+    /// 表情ID
+    pub emotion: u8,
+}
+
+impl Packed for ZcEmotion {
+    fn to_packet(&self) -> Vec<u8> {
+        let mut ctx = PacketBuilder::new(0x00C0);
+        ctx = ctx
+            .put_u32(self.entity_id)
+            .put_u8(self.emotion);
+        ctx.build()
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None
+    }
+}
+
+/// 客户端请求捕捉宠物 (0x019F)
+#[derive(Debug, Clone)]
+pub struct CzCatchPet {
+    /// 怪物实体ID
+    pub mob_id: u32,
+}
+
+impl CzCatchPet {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let mob_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { mob_id })
+    }
+}
+
+/// 客户端请求宠物菜单 (0x01A9)
+#[derive(Debug, Clone)]
+pub struct CzPetMenu {
+    /// 操作类型：0=信息, 1=喂食, 2=放生, 3=召回
+    pub action: u8,
+}
+
+impl CzPetMenu {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { action: data[0] })
+    }
+}
+
+/// 客户端选择宠物蛋 (0x01A7)
+#[derive(Debug, Clone)]
+pub struct CzSelectEgg {
+    /// 蛋索引
+    pub egg_index: u8,
+}
+
+impl CzSelectEgg {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { egg_index: data[0] })
+    }
+}
+
+/// 客户端半魔娘操作 (0x022D)
+#[derive(Debug, Clone)]
+pub struct CzHomMenu {
+    /// 操作类型：0=信息, 1=喂食, 2=放生, 3=召回, 4=攻击, 5=移动
+    pub action: u8,
+}
+
+impl CzHomMenu {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { action: data[0] })
+    }
+}
+
+/// 客户端佣兵操作 (0x022F)
+#[derive(Debug, Clone)]
+pub struct CzMercenaryAction {
+    /// 操作类型：0=信息, 1=召回, 2=放生
+    pub action: u8,
+}
+
+impl CzMercenaryAction {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { action: data[0] })
+    }
+}
+
+/// 客户端创建聊天室 (0x00D5)
+#[derive(Debug, Clone)]
+pub struct CzCreateChatRoom {
+    /// 聊天室大小
+    pub size: u16,
+    /// 是否公开
+    pub is_public: bool,
+    /// 密码（如果是私密聊天室）
+    pub password: String,
+    /// 聊天室标题
+    pub title: String,
+}
+
+impl CzCreateChatRoom {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let size = u16::from_le_bytes([data[0], data[1]]);
+        let is_public = data[2] != 0;
+        let password_len = data[3] as usize;
+        let mut password = String::new();
+        let mut title = String::new();
+
+        if data.len() > 4 + password_len {
+            password = String::from_utf8_lossy(&data[4..4 + password_len]).to_string();
+            if data.len() > 4 + password_len {
+                title = String::from_utf8_lossy(&data[4 + password_len..]).to_string();
+            }
+        }
+
+        Some(Self { size, is_public, password, title })
+    }
+}
+
+/// 客户端加入聊天室 (0x00D9)
+#[derive(Debug, Clone)]
+pub struct CzChatAddMember {
+    /// 聊天室ID
+    pub chat_id: u32,
+    /// 密码
+    pub password: String,
+}
+
+impl CzChatAddMember {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let chat_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let password = if data.len() > 4 {
+            String::from_utf8_lossy(&data[4..]).to_string()
+        } else {
+            String::new()
+        };
+        Some(Self { chat_id, password })
+    }
+}
+
+/// 客户端离开聊天室 (0x00E0)
+#[derive(Debug, Clone)]
+pub struct CzChatLeave;
+
+impl CzChatLeave {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求好友列表 (0x0201)
+#[derive(Debug, Clone)]
+pub struct CzFriendsListAdd {
+    /// 好友角色ID
+    pub char_id: u32,
+}
+
+impl CzFriendsListAdd {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let char_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { char_id })
+    }
+}
+
+/// 客户端删除好友 (0x0203)
+#[derive(Debug, Clone)]
+pub struct CzFriendsListRemove {
+    /// 好友角色ID
+    pub char_id: u32,
+}
+
+impl CzFriendsListRemove {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let char_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { char_id })
+    }
+}
+
+/// 客户端回复好友请求 (0x0208)
+#[derive(Debug, Clone)]
+pub struct CzFriendsListReply {
+    /// 请求者角色ID
+    pub char_id: u32,
+    /// 回复：0=拒绝, 1=接受
+    pub reply: u8,
+}
+
+impl CzFriendsListReply {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 5 {
+            return None;
+        }
+        let char_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let reply = data[4];
+        Some(Self { char_id, reply })
+    }
+}
+
+/// 客户端请求打开邮箱 (0x0260)
+#[derive(Debug, Clone)]
+pub struct CzMailOpen;
+
+impl CzMailOpen {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求发送邮件 (0x0261)
+#[derive(Debug, Clone)]
+pub struct CzMailSend {
+    /// 收件人名称
+    pub receiver: String,
+    /// 邮件标题
+    pub title: String,
+    /// 邮件内容
+    pub body: String,
+}
+
+impl CzMailSend {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 24 {
+            return None;
+        }
+        let receiver = String::from_utf8_lossy(&data[0..24]).trim_matches('\0').to_string();
+        let title_len = u16::from_le_bytes([data[24], data[25]]) as usize;
+        let title = if data.len() > 26 + title_len {
+            String::from_utf8_lossy(&data[26..26 + title_len]).to_string()
+        } else {
+            String::new()
+        };
+        let body = if data.len() > 26 + title_len {
+            String::from_utf8_lossy(&data[26 + title_len..]).to_string()
+        } else {
+            String::new()
+        };
+        Some(Self { receiver, title, body })
+    }
+}
+
+/// 客户端请求打开银行 (0x09B7)
+#[derive(Debug, Clone)]
+pub struct CzBankOpen;
+
+impl CzBankOpen {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求关闭银行 (0x09B8)
+#[derive(Debug, Clone)]
+pub struct CzBankClose;
+
+impl CzBankClose {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求存款 (0x09B9)
+#[derive(Debug, Clone)]
+pub struct CzBankDeposit {
+    /// 存款金额
+    pub amount: u32,
+}
+
+impl CzBankDeposit {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let amount = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { amount })
+    }
+}
+
+/// 客户端请求取款 (0x09BA)
+#[derive(Debug, Clone)]
+pub struct CzBankWithdraw {
+    /// 取款金额
+    pub amount: u32,
+}
+
+impl CzBankWithdraw {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let amount = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { amount })
+    }
+}
+
+/// 客户端请求打开商城 (0x0845)
+#[derive(Debug, Clone)]
+pub struct CzCashShopOpen;
+
+impl CzCashShopOpen {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求购买商城物品 (0x0848)
+#[derive(Debug, Clone)]
+pub struct CzCashShopBuy {
+    /// 物品ID
+    pub item_id: u32,
+    /// 数量
+    pub amount: u16,
+}
+
+impl CzCashShopBuy {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 6 {
+            return None;
+        }
+        let item_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let amount = u16::from_le_bytes([data[4], data[5]]);
+        Some(Self { item_id, amount })
+    }
+}
+
+/// 客户端请求关闭商城 (0x084A)
+#[derive(Debug, Clone)]
+pub struct CzCashShopClose;
+
+impl CzCashShopClose {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求任务状态 (0x02B5)
+#[derive(Debug, Clone)]
+pub struct CzQuestStateAck {
+    /// 任务ID
+    pub quest_id: u32,
+    /// 状态：0=进行中, 1=完成
+    pub state: u8,
+}
+
+impl CzQuestStateAck {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 5 {
+            return None;
+        }
+        let quest_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let state = data[4];
+        Some(Self { quest_id, state })
+    }
+}
+
+/// 客户端请求成就奖励 (0x0224)
+#[derive(Debug, Clone)]
+pub struct CzAchievementCheckReward {
+    /// 成就ID
+    pub achievement_id: u32,
+}
+
+impl CzAchievementCheckReward {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 4 {
+            return None;
+        }
+        let achievement_id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        Some(Self { achievement_id })
+    }
+}
+
+/// 客户端请求PVP信息 (0x0237)
+#[derive(Debug, Clone)]
+pub struct CzPVPInfo;
+
+impl CzPVPInfo {
+    pub fn from_slice(_data: &[u8]) -> Option<Self> {
+        Some(Self)
+    }
+}
+
+/// 客户端请求坐骑 (0x019C)
+#[derive(Debug, Clone)]
+pub struct CzChangeCart {
+    /// 坐骑类型
+    pub cart_type: u8,
+}
+
+impl CzChangeCart {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        Some(Self { cart_type: data[0] })
+    }
+}
+
+/// 客户端请求技能选择菜单 (0x0A35)
+#[derive(Debug, Clone)]
+pub struct CzSkillSelectMenu {
+    /// 技能ID
+    pub skill_id: u16,
+    /// 选择的等级
+    pub level: u8,
+}
+
+impl CzSkillSelectMenu {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 3 {
+            return None;
+        }
+        let skill_id = u16::from_le_bytes([data[0], data[1]]);
+        let level = data[2];
+        Some(Self { skill_id, level })
+    }
+}
+
+/// 客户端请求自动念咒 (0x01CF)
+#[derive(Debug, Clone)]
+pub struct CzAutoSpell {
+    /// 技能ID
+    pub skill_id: u16,
+}
+
+impl CzAutoSpell {
+    pub fn from_slice(data: &[u8]) -> Option<Self> {
+        if data.len() < 2 {
+            return None;
+        }
+        let skill_id = u16::from_le_bytes([data[0], data[1]]);
+        Some(Self { skill_id })
+    }
+}

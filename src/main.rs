@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use deviruchi::cli::{Cli, Commands};
 use deviruchi::core::Core;
+use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -11,8 +12,10 @@ async fn main() -> Result<()> {
     match &cli.command {
         Some(Commands::Setup) => {
             // 显式运行配置向导
-            deviruchi::core::config::Config::run_setup_wizard()?;
-            // 同时生成参考文档
+            let config = deviruchi::core::SetupWizard::run()?;
+            let config_path = "deviruchi.toml";
+            config.save(config_path)?;
+            println!("\n✓ 配置已保存到 {}", config_path);
             deviruchi::core::guide::generate_guide()?;
             return Ok(());
         }
@@ -23,10 +26,14 @@ async fn main() -> Result<()> {
         }
         None => {
             // 无子命令，检查配置文件是否存在
-            let config_path = deviruchi::core::config::Config::get_default_path();
-            if !deviruchi::core::config::Config::exists(&config_path) {
-                println!("检测到未配置，启动配置向导...\n");
-                deviruchi::core::config::Config::run_setup_wizard()?;
+            let config_path = "deviruchi.toml";
+            if !Path::new(config_path).exists() {
+                // 首次启动：运行配置向导
+                println!("检测到首次启动，运行配置向导...\n");
+                let config = deviruchi::core::SetupWizard::run()?;
+                config.save(config_path)?;
+                println!("\n✓ 配置已保存到 {}", config_path);
+                println!("✓ 正在启动服务器...\n");
                 deviruchi::core::guide::generate_guide()?;
             }
         }

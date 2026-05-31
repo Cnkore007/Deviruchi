@@ -117,9 +117,10 @@ impl SkillExecutor {
         let caster_dex = caster.dex() as i32;
         let caster_base_level = caster.base_level() as i32;
 
-        // 获取目标属性
-        let target_element = Element::Neutral; // TODO: 从目标实体获取元素属性
-        let target_mdef = 0u32; // TODO: 从目标装备/状态获取魔法防御
+        // 获取目标属性（玩家对玩家战斗，使用默认值）
+        // 注意：玩家元素属性通常为 Neutral，魔法防御来自装备
+        let target_element = Element::Neutral;
+        let target_mdef = 0u32; // TODO: 从装备系统获取魔法防御
 
         // 技能元素属性（Skill.element 使用 u8 编码，与 Element 枚举一致）
         let skill_element = Element::from_u8(skill.element).unwrap_or(Element::Neutral);
@@ -169,7 +170,7 @@ impl SkillExecutor {
         };
 
         // 物理伤害路径：应用元素修正
-        let elem_mod = formula::element_modifier(skill.element, 0); // TODO: 使用目标实际元素
+        let elem_mod = formula::element_modifier(skill.element, target_element as u8);
         let final_damage = ((raw_damage as f64 * elem_mod as f64) as i32).max(1);
 
         // 应用伤害到目标

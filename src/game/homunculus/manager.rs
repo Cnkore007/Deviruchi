@@ -299,7 +299,8 @@ impl HomunculusManager {
             .get_mut(homun_id)
             .ok_or(HomunculusError::NotFound(*homun_id))?;
 
-        // TODO: 检查食物类型是否匹配
+        // 食物类型检查（简化实现：接受所有食物）
+        // 完整实现需要检查食物 ID 是否与半魔娘偏好匹配
         homun.feed(20);
         homun.increase_intimacy(10);
 

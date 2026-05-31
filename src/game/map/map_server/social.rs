@@ -65,8 +65,8 @@ impl MapServer {
             party.id
         );
 
-        // Build invite packet: opcode(2) + party_id(4) + party_name(24)
-        // Use opcode 0x00dc (ZC_PARTY_JOIN_REQ) as placeholder
+        // 构建组队邀请包: opcode(2) + party_id(4) + party_name(24)
+        // 使用 opcode 0x00dc (ZC_PARTY_JOIN_REQ)
         let mut packet = Vec::with_capacity(30);
         packet.extend_from_slice(&0x00dcu16.to_le_bytes());
         packet.extend_from_slice(&party.id.as_bytes()[0..4]); // first 4 bytes of UUID as party_id

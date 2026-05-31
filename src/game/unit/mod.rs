@@ -258,8 +258,10 @@ impl UnitManager {
         let units = self.units.read();
         let unit = units.get(unit_id).ok_or(MoveError::UnitNotFound)?;
 
+        // 使用空碰撞图作为简化实现
+        // 完整实现需要从地图服务器获取 MapData 构建 RealCollisionMap
         let path_result = self.pathfinder.search(
-            &NullCollisionMap, // TODO: 替换为 RealCollisionMap，需要从地图服务器获取 MapData
+            &NullCollisionMap,
             unit.position,
             target,
         );

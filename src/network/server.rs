@@ -1,7 +1,7 @@
 use crate::network::{PacketCodec, PacketHandler, Session, SessionManager};
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio_util::codec::Framed;
 use tracing::{error, info, warn};
@@ -27,36 +27,54 @@ impl GameServer {
         }
     }
 
-    /// 设置新连接的初始会话阶段（Login/Char/Map）
     pub fn with_initial_stage(mut self, stage: crate::network::session::SessionStage) -> Self {
         self.initial_stage = stage;
         self
     }
 
     pub async fn listen(&self) -> anyhow::Result<()> {
-        let listener = TcpListener::bind(&self.addr).await?;
+        // 使用 std::net 绑定端口，绕过 tokio reactor 在 macOS 26.5 上的兼容问题
+        let std_listener = std::net::TcpListener::bind(&self.addr)?;
+        std_listener.set_nonblocking(false)?;
         info!("Server listening on {}", self.addr);
 
-        loop {
-            match listener.accept().await {
-                Ok((stream, addr)) => {
-                    let session_manager = self.session_manager.clone();
-                    let packet_handler = self.packet_handler.clone();
-                    let initial_stage = self.initial_stage.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) =
-                            Self::handle_connection(stream, addr, session_manager, packet_handler, initial_stage)
-                                .await
-                        {
-                            error!("Connection error: {}", e);
+        let session_manager = self.session_manager.clone();
+        let packet_handler = self.packet_handler.clone();
+        let initial_stage = self.initial_stage.clone();
+
+        // 在阻塞线程中运行 accept 循环，通过 channel 将连接传给 tokio 任务
+        let (tx, mut rx) = mpsc::unbounded_channel::<(std::net::TcpStream, std::net::SocketAddr)>();
+
+        std::thread::spawn(move || {
+            loop {
+                match std_listener.accept() {
+                    Ok((stream, addr)) => {
+                        info!("[ACCEPT] 接受到新连接: {}", addr);
+                        if tx.send((stream, addr)).is_err() {
+                            break;
                         }
-                    });
-                }
-                Err(e) => {
-                    error!("Accept error: {}", e);
+                    }
+                    Err(e) => {
+                        error!("[ACCEPT] 错误: {}", e);
+                    }
                 }
             }
+        });
+
+        // 在 tokio 任务中处理连接
+        while let Some((std_stream, addr)) = rx.recv().await {
+            let stream = TcpStream::from_std(std_stream)?;
+            let sm = session_manager.clone();
+            let ph = packet_handler.clone();
+            let stage = initial_stage.clone();
+            tokio::spawn(async move {
+                if let Err(e) = Self::handle_connection(stream, addr, sm, ph, stage).await {
+                    error!("Connection error: {}", e);
+                }
+            });
         }
+
+        Ok(())
     }
 
     async fn handle_connection(
@@ -72,7 +90,6 @@ impl GameServer {
         session.stage = initial_stage;
         let session_id = session.id;
 
-        // Create channel for game events from ChannelBus to client
         let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Vec<u8>>();
         session.map_event_tx = Some(event_tx);
 
@@ -82,7 +99,6 @@ impl GameServer {
 
         loop {
             tokio::select! {
-                // Handle incoming packets from client
                 result = framed.next() => {
                     match result {
                         Some(Ok(packet)) => {
@@ -101,7 +117,6 @@ impl GameServer {
                         None => break,
                     }
                 }
-                // Handle game events from ChannelBus
                 event_data = event_rx.recv() => {
                     if let Some(data) = event_data {
                         if !data.is_empty()
@@ -109,7 +124,6 @@ impl GameServer {
                                 warn!("Failed to send event to client: {}", e);
                             }
                     } else {
-                        // Channel closed - client disconnected from event bus
                         warn!("Event channel closed for session {}", session_id);
                         break;
                     }
@@ -117,7 +131,6 @@ impl GameServer {
             }
         }
 
-        // 断连时保存玩家数据并从地图移除
         packet_handler.handle_disconnect(&session);
 
         session_manager.remove(&session_id);

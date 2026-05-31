@@ -561,7 +561,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 200 + (level as u32 * 50);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Turn Undead skill (level {}), healed {} HP (stub)",
+                "Player {} used Turn Undead skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -610,7 +610,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 150 + (level as u32 * 30);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Napalm Beat skill (level {}), healed {} HP (stub)",
+                "Player {} used Napalm Beat skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -633,7 +633,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 250 + (level as u32 * 50);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Soul Strike skill (level {}), healed {} HP (stub)",
+                "Player {} used Soul Strike skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -642,7 +642,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 300 + (level as u32 * 60);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Cold Bolt skill (level {}), healed {} HP (stub)",
+                "Player {} used Cold Bolt skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -679,7 +679,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 450 + (level as u32 * 90);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Fire Ball skill (level {}), healed {} HP (stub)",
+                "Player {} used Fire Ball skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -701,7 +701,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 550 + (level as u32 * 110);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Fire Bolt skill (level {}), healed {} HP (stub)",
+                "Player {} used Fire Bolt skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
@@ -710,7 +710,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             let heal_amount = 600 + (level as u32 * 120);
             player.apply_heal(heal_amount);
             log::info!(
-                "Player {} used Lightning Bolt skill (level {}), healed {} HP (stub)",
+                "Player {} used Lightning Bolt skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }

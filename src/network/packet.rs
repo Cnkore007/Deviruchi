@@ -82,7 +82,7 @@ pub mod id {
     pub const PACKET_CZ_ENTER: PacketId = 0x007C;
     pub const PACKET_ZC_ACCEPT_ENTER: PacketId = 0x02D3;
     pub const PACKET_ZC_NOTIFY_ACT: PacketId = 0x02D5;
-    pub const PACKET_CZ_REQUEST_TIME: PacketId = 0x00A7;
+    pub const PACKET_CZ_REQUEST_TIME: PacketId = 0x007E;
     pub const PACKET_ZC_ACK_TIME: PacketId = 0x007F;
     pub const PACKET_CZ_REQUEST_QUIT: PacketId = 0x00F3;
     pub const PACKET_ZC_ACK_REQ_DISCONNECT: PacketId = 0x018A;
@@ -108,7 +108,7 @@ pub mod id {
     pub const CZ_TRADE_LOCK: PacketId = 0x00EF;
 
     // 方向改变
-    pub const CZ_REQUEST_CHANGE_DIRECTION: PacketId = 0x00D9;
+    pub const CZ_REQUEST_CHANGE_DIRECTION: PacketId = 0x009B;
 
     // 私聊/密语
     pub const CZ_WHISPER: PacketId = 0x00F7;

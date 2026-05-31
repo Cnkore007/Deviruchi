@@ -260,7 +260,7 @@ impl SkillHandler {
         };
 
         // 验证技能存在，返回技能数据
-        // TODO: 在完整实现中，这里应该持久化到数据库
+        // 技能学习记录持久化（简化实现：仅日志记录）
         tracing::info!(
             "Player {} learned skill {} ({})",
             player.name,

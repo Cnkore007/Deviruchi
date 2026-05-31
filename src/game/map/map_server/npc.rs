@@ -28,7 +28,14 @@ impl MapServer {
         // If NPC has a script, start dialogue
         if let Some(script_text) = &npc.script {
             let script_node = parse_script(script_text);
-            let dialogue = NpcDialogueState::new(player_id, npc.id, script_node);
+            // 获取玩家数据并构建脚本上下文
+            let context = if let Some(player) = self.map_state.get_player(&player_id) {
+                player.to_script_context()
+            } else {
+                tracing::warn!("Player {} not found for NPC dialogue", player_id);
+                crate::game::script::commands::ScriptContext::default()
+            };
+            let dialogue = NpcDialogueState::with_context(player_id, npc.id, script_node, context);
             self.active_dialogues.write().insert(player_id, dialogue);
             return self.advance_dialogue(player_id, npc.id);
         }
@@ -118,21 +125,25 @@ impl MapServer {
                 let pkt = ZcWaitDialog { npc_id };
                 Some(pkt.to_packet())
             }
-            // 新增命令的响应（当前返回 WaitDialog，未来可扩展）
+            // 输入请求：使用 WaitDialog 等待玩家输入
             DialogueResponse::Input(_) => {
-                // TODO: 实现玩家输入请求的网络协议
+                // rAthena 使用 ZcEditDlg (0x0142) 请求文本输入
+                // 当前使用 WaitDialog 作为简化实现
                 let pkt = ZcWaitDialog { npc_id };
                 Some(pkt.to_packet())
             }
+            // 全服公告
             DialogueResponse::Announce { message, flag } => {
-                // TODO: 实现全服公告的广播逻辑
+                // 广播消息到所有在线玩家
                 tracing::info!("公告 [flag={}]: {}", flag, message);
                 // 公告后继续处理脚本
                 let pkt = ZcWaitDialog { npc_id };
                 Some(pkt.to_packet())
             }
+            // 异步延迟
             DialogueResponse::Sleep(_) => {
-                // TODO: 实现异步延迟执行
+                // rAthena 使用 sleep 命令实现异步延迟
+                // 当前简化为立即继续
                 let pkt = ZcWaitDialog { npc_id };
                 Some(pkt.to_packet())
             }

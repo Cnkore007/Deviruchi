@@ -666,7 +666,7 @@ impl MobAI {
                 );
 
                 // 分发 Zeny 掉落
-                // TODO: 从掉落表或 mob 数据中获取 zeny_amount
+                // 从怪物数据中获取 zeny 掉落量
                 let zeny_amount = mob.zeny.unwrap_or(0);
                 if zeny_amount > 0 {
                     ExpDistributor::distribute_zeny(

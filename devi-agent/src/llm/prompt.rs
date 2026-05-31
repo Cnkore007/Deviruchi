@@ -119,5 +119,99 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
                 }),
             },
         },
+        ToolDefinition {
+            tool_type: "function".to_string(),
+            function: FunctionDefinition {
+                name: "database".to_string(),
+                description: "查询或修改游戏数据库（物品、怪物、技能等）".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "操作类型：query（查询）或 update（更新）",
+                            "enum": ["query", "update"]
+                        },
+                        "table": {
+                            "type": "string",
+                            "description": "表名：items, mobs, skills, drops 等"
+                        },
+                        "filter": {
+                            "type": "object",
+                            "description": "查询过滤条件"
+                        },
+                        "id": {
+                            "description": "更新时的记录ID"
+                        },
+                        "data": {
+                            "type": "object",
+                            "description": "更新时的新数据"
+                        }
+                    },
+                    "required": ["action", "table"]
+                }),
+            },
+        },
+        ToolDefinition {
+            tool_type: "function".to_string(),
+            function: FunctionDefinition {
+                name: "log".to_string(),
+                description: "搜索或查看服务器日志".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "操作类型：search（搜索）或 tail（查看最近日志）",
+                            "enum": ["search", "tail"]
+                        },
+                        "keyword": {
+                            "type": "string",
+                            "description": "搜索关键词"
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "返回日志条数（默认50）"
+                        },
+                        "level": {
+                            "type": "string",
+                            "description": "日志级别过滤：info, warn, error, all",
+                            "enum": ["info", "warn", "error", "all"]
+                        },
+                        "lines": {
+                            "type": "integer",
+                            "description": "tail 操作时显示的行数（默认20）"
+                        }
+                    },
+                    "required": ["action"]
+                }),
+            },
+        },
+        ToolDefinition {
+            tool_type: "function".to_string(),
+            function: FunctionDefinition {
+                name: "script".to_string(),
+                description: "NPC 脚本工具：查看帮助、验证语法、重载脚本".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "操作类型：help（帮助）、validate（验证）、reload（重载）",
+                            "enum": ["help", "validate", "reload"]
+                        },
+                        "script": {
+                            "type": "string",
+                            "description": "validate 时要验证的脚本内容"
+                        },
+                        "npc_id": {
+                            "type": "integer",
+                            "description": "reload 时要重载的 NPC ID"
+                        }
+                    },
+                    "required": ["action"]
+                }),
+            },
+        },
     ]
 }

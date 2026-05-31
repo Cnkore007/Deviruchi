@@ -7,12 +7,22 @@
 //! - `gm`     — GM 命令、传送、重生
 //! - `guild`  — 公会操作
 
+mod chatroom;
+mod emotion;
+mod equip;
+mod friends;
 mod gm;
 mod guild;
+mod homunculus_mercenary;
+mod item_ops;
 mod job;
+mod mail_bank_shop;
 mod movement;
 mod npc;
+mod pet;
 mod player;
+mod quest_achievement_pvp;
+mod shop;
 mod social;
 
 use crate::game::battle::BattleHandler;
@@ -124,7 +134,7 @@ impl MapServer {
             0x0085 => self.handle_move(data, session),
             0x0112 => self.handle_use_skill(data, session),
             0x0089 => self.handle_attack(data, session),
-            0x009B => self.handle_use_item(data, session),
+            0x00A7 => self.handle_use_item(data, session),
             0x0090 => self.handle_pickup_item(data, session),
             0x0190 => self.handle_npc_interact(data, session),
             0x00B9 => self.handle_npc_next(data, session),
@@ -166,6 +176,53 @@ impl MapServer {
             CZ_STATUS_CHANGE => self.handle_status_change(data, session),
             CZ_SKILL_UP => self.handle_skill_up(data, session),
             CZ_REQ_CHANGEJOB => self.handle_job_change(data, session),
+            // 装备系统
+            0x00A9 => self.handle_equip_item(data, session),
+            0x00AB => self.handle_unequip_item(data, session),
+            // NPC商店
+            0x00C8 => self.handle_npc_buy(data, session),
+            0x00C9 => self.handle_npc_sell(data, session),
+            // 物品操作
+            0x017C => self.handle_insert_card(data, session),
+            0x01DD => self.handle_item_identify(data, session),
+            0x0222 => self.handle_weapon_refine(data, session),
+            // 表情
+            0x00BF => self.handle_emotion(data, session),
+            // 宠物
+            0x019F => self.handle_catch_pet(data, session),
+            0x01A9 => self.handle_pet_menu(data, session),
+            0x01A7 => self.handle_select_egg(data, session),
+            // 半魔娘/佣兵
+            0x022D => self.handle_homunculus_menu(data, session),
+            0x022F => self.handle_mercenary_action(data, session),
+            // 聊天室
+            0x00D5 => self.handle_create_chat_room(data, session),
+            0x00D9 => self.handle_chat_add_member(data, session),
+            0x00E0 => self.handle_chat_leave(data, session),
+            // 好友
+            0x0201 => self.handle_friends_list_add(data, session),
+            0x0203 => self.handle_friends_list_remove(data, session),
+            0x0208 => self.handle_friends_list_reply(data, session),
+            // 邮件
+            0x0260 => self.handle_mail_open(data, session),
+            0x0261 => self.handle_mail_send(data, session),
+            // 银行
+            0x09B7 => self.handle_bank_open(data, session),
+            0x09B8 => self.handle_bank_close(data, session),
+            0x09B9 => self.handle_bank_deposit(data, session),
+            0x09BA => self.handle_bank_withdraw(data, session),
+            // 商城
+            0x0845 => self.handle_cash_shop_open(data, session),
+            0x0848 => self.handle_cash_shop_buy(data, session),
+            0x084A => self.handle_cash_shop_close(data, session),
+            // 任务/成就/PVP
+            0x02B5 => self.handle_quest_state(data, session),
+            0x0224 => self.handle_achievement_reward(data, session),
+            0x0237 => self.handle_pvp_info(data, session),
+            // 坐骑/技能
+            0x019C => self.handle_change_cart(data, session),
+            0x0A35 => self.handle_skill_select_menu(data, session),
+            0x01CF => self.handle_auto_spell(data, session),
             unknown_id => {
                 tracing::warn!(
                     "Unknown packet ID 0x{:04X} from session {}",

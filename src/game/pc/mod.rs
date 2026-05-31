@@ -113,7 +113,7 @@ impl StatCalculator {
     pub fn calculate_max_hp(base_level: u16, vit: u16, job_class: u16) -> u32 {
         let base_hp = 100 + (base_level as u32 * 10);
         let vit_bonus = vit as u32 * 5;
-        let job_bonus = (job_class as u32 * 50);
+        let job_bonus = job_class as u32 * 50;
         base_hp + vit_bonus + job_bonus
     }
 
@@ -121,7 +121,7 @@ impl StatCalculator {
     pub fn calculate_max_sp(base_level: u16, int: u16, job_class: u16) -> u32 {
         let base_sp = 50 + (base_level as u32 * 5);
         let int_bonus = int as u32 * 3;
-        let job_bonus = (job_class as u32 * 20);
+        let job_bonus = job_class as u32 * 20;
         base_sp + int_bonus + job_bonus
     }
 

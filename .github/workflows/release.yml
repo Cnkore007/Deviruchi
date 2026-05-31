@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - platform: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-x64
+            os: macos-13
+            target: x86_64-apple-darwin
+          - platform: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p package/deviruchi-${{ matrix.platform }}
+          cp target/${{ matrix.target }}/release/deviruchi package/deviruchi-${{ matrix.platform }}/
+          cp target/${{ matrix.target }}/release/devi-agent package/deviruchi-${{ matrix.platform }}/
+          cp deviruchi.toml package/deviruchi-${{ matrix.platform }}/ 2>/dev/null || true
+          cp README.md package/deviruchi-${{ matrix.platform }}/
+          cp -r db package/deviruchi-${{ matrix.platform }}/ 2>/dev/null || true
+          cd package
+          tar -czf ../deviruchi-${{ matrix.platform }}.tar.gz deviruchi-${{ matrix.platform }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package/deviruchi-${{ matrix.platform }}
+          Copy-Item target/${{ matrix.target }}/release/deviruchi.exe package/deviruchi-${{ matrix.platform }}/
+          Copy-Item target/${{ matrix.target }}/release/devi-agent.exe package/deviruchi-${{ matrix.platform }}/
+          Copy-Item deviruchi.toml package/deviruchi-${{ matrix.platform }}/ -ErrorAction SilentlyContinue
+          Copy-Item README.md package/deviruchi-${{ matrix.platform }}/
+          Copy-Item -Recurse db package/deviruchi-${{ matrix.platform }}/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path package/deviruchi-${{ matrix.platform }} -DestinationPath deviruchi-${{ matrix.platform }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: deviruchi-${{ matrix.platform }}
+          path: deviruchi-${{ matrix.platform }}.*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

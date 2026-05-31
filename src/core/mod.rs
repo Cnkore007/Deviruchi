@@ -4,6 +4,7 @@ pub mod config;
 pub mod guide;
 pub mod logging;
 pub mod panic;
+pub mod setup_wizard;
 pub mod timer;
 pub mod version;
 
@@ -17,6 +18,7 @@ use crate::game::GameLoop;
 pub use crate::game::AtCommandHandler;
 pub use config::{Config, HotReloadConfig};
 pub use logging::{LogCategory, LogConfig, LogLevel, LogManager};
+pub use setup_wizard::SetupWizard;
 pub use version::VERSION;
 
 use crate::cli::Cli;
@@ -24,7 +26,7 @@ use crate::game::map::{ChannelBus, DropManager, MapState};
 use crate::game::party::PartyManager;
 use crate::game::token::TokenStore;
 use crate::game::AgentApi;
-use crate::network::{AgentServer, GameServer, ModernServer, PacketHandler, SessionManager};
+use crate::network::{AgentServer, GameServer, PacketHandler, SessionManager};
 use crate::storage::{Database, init_schema};
 use std::sync::Arc;
 
@@ -232,15 +234,6 @@ impl Core {
                 }));
             }
         }
-
-        // Modern Server (WebSocket for Devi client)
-        let modern_addr = format!("0.0.0.0:{}", self.config.network.modern_port);
-        let sm = session_manager.clone();
-        handles.push(tokio::spawn(async move {
-            tracing::info!("启动 Modern Server (WebSocket): {}", modern_addr);
-            let server = ModernServer::new(modern_addr, sm);
-            server.listen().await
-        }));
 
         // Agent API 服务器（Unix Socket）
         handles.push(tokio::spawn(async move {

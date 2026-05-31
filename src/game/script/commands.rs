@@ -3175,17 +3175,23 @@ pub struct LoopContext {
 // ============================================================
 
 /// NPC 脚本可访问的玩家上下文信息
-/// 当前为 stub 实现，未来将连接到真实的玩家数据系统
+/// 通过 Player::to_script_context() 从真实玩家数据构建
 #[derive(Debug, Clone)]
 pub struct ScriptContext {
     /// 角色 ID
     pub char_id: u32,
+    /// 账户 ID
+    pub account_id: u32,
     /// 角色名
     pub char_name: String,
     /// 公会名
     pub guild_name: String,
+    /// 公会 ID
+    pub guild_id: u32,
     /// 队伍名
     pub party_name: String,
+    /// 队伍 ID
+    pub party_id: u32,
     /// Base Level
     pub base_level: u16,
     /// Job Level
@@ -3208,15 +3214,30 @@ pub struct ScriptContext {
     pub need_broadcast: bool,
     /// 广播消息
     pub broadcast_message: String,
+    /// 力量
+    pub str: u16,
+    /// 敏捷
+    pub agi: u16,
+    /// 体力
+    pub vit: u16,
+    /// 智力
+    pub int_: u16,
+    /// 灵巧
+    pub dex: u16,
+    /// 幸运
+    pub luk: u16,
 }
 
 impl Default for ScriptContext {
     fn default() -> Self {
         Self {
             char_id: 100001,
+            account_id: 2000001,
             char_name: "Player".to_string(),
             guild_name: String::new(),
+            guild_id: 0,
             party_name: String::new(),
+            party_id: 0,
             base_level: 1,
             job_level: 1,
             zeny: 0,
@@ -3228,6 +3249,12 @@ impl Default for ScriptContext {
             npc_variables: std::collections::HashMap::new(),
             need_broadcast: false,
             broadcast_message: String::new(),
+            str: 1,
+            agi: 1,
+            vit: 1,
+            int_: 1,
+            dex: 1,
+            luk: 1,
         }
     }
 }

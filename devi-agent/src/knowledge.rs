@@ -152,7 +152,6 @@ impl KnowledgeIndex {
 - login_port: u16 — 登录服务器端口 (默认 6900)
 - char_port: u16 — 角色服务器端口 (默认 6000)
 - map_port: u16 — 地图服务器端口 (默认 6121)
-- modern_port: u16 — WebSocket 端口 (默认 16121)
 - max_connections: usize — 最大连接数
 
 ## [game]

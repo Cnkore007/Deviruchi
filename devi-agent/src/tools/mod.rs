@@ -46,6 +46,9 @@ impl ToolRegistry {
             Arc::new(server::ServerTool::new(ipc.clone())),
             Arc::new(config::ConfigTool::new(ipc.clone())),
             Arc::new(player::PlayerTool::new(ipc.clone())),
+            Arc::new(database::DatabaseTool::new(ipc.clone())),
+            Arc::new(log::LogTool::new(ipc.clone())),
+            Arc::new(script::ScriptTool::new(ipc.clone())),
         ];
         Self { tools }
     }

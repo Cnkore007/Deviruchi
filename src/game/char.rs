@@ -144,7 +144,7 @@ impl CharServer {
                 "Character creation rejected: stat out of range 1-9 for account_id={}",
                 account_id
             );
-            return Some(vec![0x00]);
+            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
 
         let total: u16 = stats.iter().map(|&s| s as u16).sum();
@@ -153,7 +153,7 @@ impl CharServer {
                 "Character creation rejected: total stats {} > {} for account_id={}",
                 total, constants::MAX_TOTAL_STATS, account_id
             );
-            return Some(vec![0x00]);
+            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
 
         // 校验角色名称（长度 + 特殊字符 + 重复检查）
@@ -162,7 +162,7 @@ impl CharServer {
                 "Character creation rejected: {} (account_id={})",
                 err_msg, account_id
             );
-            return Some(vec![0x00]);
+            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
         let name = make_char.name.trim_matches('\0');
 
@@ -185,11 +185,64 @@ impl CharServer {
                     "Character created: char_id={}, name={}",
                     char_id, make_char.name
                 );
-                Some(vec![0x01]) // 成功响应
+                // 构建成功响应：marker(0) + padding(3) + char_info(110)
+                let character = self.db.get_character_by_id(char_id).ok()??;
+                let char_info = self.db.character_to_char_info(&character);
+                let mut resp = Vec::with_capacity(8 + 110);
+                // marker = 0 (成功)
+                resp.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+                // char_info (110 bytes)
+                resp.extend_from_slice(&char_info.char_id.to_le_bytes());
+                resp.extend_from_slice(&char_info.exp.to_le_bytes());
+                resp.extend_from_slice(&char_info.gold.to_le_bytes());
+                resp.extend_from_slice(&char_info.job_exp.to_le_bytes());
+                resp.extend_from_slice(&char_info.job_level.to_le_bytes());
+                resp.extend_from_slice(&char_info.body_state.to_le_bytes());
+                resp.extend_from_slice(&char_info.health_state.to_le_bytes());
+                resp.extend_from_slice(&char_info.effect_state.to_le_bytes());
+                resp.extend_from_slice(&(char_info.virtue as u16).to_le_bytes());
+                resp.extend_from_slice(&(char_info.honor as u16).to_le_bytes());
+                resp.extend_from_slice(&char_info.job.to_le_bytes());
+                resp.extend_from_slice(&char_info.hair.to_le_bytes());
+                resp.extend_from_slice(&char_info.hair_color.to_le_bytes());
+                resp.extend_from_slice(&char_info.clothes_color.to_le_bytes());
+                resp.extend_from_slice(&char_info.body.to_le_bytes());
+                resp.extend_from_slice(&char_info.weapon.to_le_bytes());
+                resp.extend_from_slice(&char_info.head_bottom.to_le_bytes());
+                resp.extend_from_slice(&char_info.shield.to_le_bytes());
+                resp.extend_from_slice(&char_info.head_top.to_le_bytes());
+                resp.extend_from_slice(&char_info.head_mid.to_le_bytes());
+                resp.extend_from_slice(&char_info.hair_color2.to_le_bytes());
+                resp.extend_from_slice(&char_info.clothes_color2.to_le_bytes());
+                let mut name_bytes = vec![0u8; 24];
+                let name_len = char_info.name.len().min(23);
+                name_bytes[..name_len].copy_from_slice(&char_info.name.as_bytes()[..name_len]);
+                resp.extend_from_slice(&name_bytes);
+                resp.extend_from_slice(&char_info.base_level.to_le_bytes());
+                resp.extend_from_slice(&char_info.str.to_le_bytes());
+                resp.extend_from_slice(&char_info.agi.to_le_bytes());
+                resp.extend_from_slice(&char_info.vit.to_le_bytes());
+                resp.extend_from_slice(&char_info.int.to_le_bytes());
+                resp.extend_from_slice(&char_info.dex.to_le_bytes());
+                resp.extend_from_slice(&char_info.luk.to_le_bytes());
+                resp.extend_from_slice(&char_info.slot.to_le_bytes());
+                resp.extend_from_slice(&char_info.delete_timer.to_le_bytes());
+                resp.extend_from_slice(&char_info.rename.to_le_bytes());
+                let mut map_bytes = vec![0u8; 24];
+                let map_len = char_info.map_name.len().min(23);
+                map_bytes[..map_len].copy_from_slice(&char_info.map_name.as_bytes()[..map_len]);
+                resp.extend_from_slice(&map_bytes);
+                // 用 PacketBuilder 添加包头
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D)
+                    .put_slice(&resp)
+                    .build())
             }
             Err(e) => {
                 error!("Failed to create character: {}", e);
-                Some(vec![0x00]) // 失败响应
+                // 失败响应：marker(1) + padding(3)
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build())
             }
         }
     }
@@ -268,7 +321,9 @@ impl CharServer {
                 "Delete char rejected: char_id={} not owned by account_id={}",
                 delete_req.char_id, account_id
             );
-            return Some(vec![0x00]); // 失败响应
+            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                .build());
         }
 
         // 标记角色删除（24小时后删除）
@@ -290,11 +345,15 @@ impl CharServer {
                     "Failed to mark character {} for deletion (already marked or not found)",
                     delete_req.char_id
                 );
-                Some(vec![0x00]) // 失败响应
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build())
             }
             Err(e) => {
                 error!("Database error deleting character {}: {}", delete_req.char_id, e);
-                Some(vec![0x00]) // 失败响应
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build())
             }
         }
     }
@@ -319,7 +378,9 @@ impl CharServer {
                 "Cancel delete rejected: char_id={} not owned by account_id={}",
                 cancel_req.char_id, account_id
             );
-            return Some(vec![0x00]); // 失败响应
+            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                .build());
         }
 
         match self.db.cancel_character_deletion(cancel_req.char_id, account_id) {
@@ -340,14 +401,18 @@ impl CharServer {
                     "Failed to cancel deletion for character {} (not marked)",
                     cancel_req.char_id
                 );
-                Some(vec![0x00]) // 失败响应
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build())
             }
             Err(e) => {
                 error!(
                     "Database error cancelling deletion for {}: {}",
                     cancel_req.char_id, e
                 );
-                Some(vec![0x00]) // 失败响应
+                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build())
             }
         }
     }
@@ -560,9 +625,11 @@ mod tests {
 
         let result = server.handle_make_char(&data[4..], &mut session);
         assert!(result.is_some());
-        // 成功时返回 vec![0x01]
+        // 成功时返回 0x006D 包，marker=0
         let packet_data = result.unwrap();
-        assert_eq!(packet_data, vec![0x01], "角色创建成功应返回 0x01");
+        assert!(packet_data.len() > 8, "成功响应应包含角色信息");
+        assert_eq!(packet_data[2], 0x6D, "包 ID 应为 0x006D");
+        assert_eq!(packet_data[4], 0x00, "成功 marker 应为 0");
     }
 
     #[test]
@@ -751,7 +818,7 @@ mod tests {
 
         let result = server.handle_delete_char(&data[4..], &mut wrong_session);
         assert!(result.is_some(), "错误账户删除应返回失败响应");
-        assert_eq!(result.unwrap(), vec![0x00], "应返回失败字节");
+        let r = result.unwrap(); assert_eq!(r[4], 0x01, "应返回失败");
     }
 
     #[test]
@@ -792,7 +859,7 @@ mod tests {
         let data = CHCancelDelete { char_id }.to_packet();
         let result = server.handle_cancel_delete(&data[4..], &mut session);
         assert!(result.is_some(), "未标记删除时取消应返回失败响应");
-        assert_eq!(result.unwrap(), vec![0x00], "应返回失败字节");
+        let r = result.unwrap(); assert_eq!(r[4], 0x01, "应返回失败");
     }
 
     #[test]
@@ -833,7 +900,7 @@ mod tests {
         }
         .to_packet();
         let result1 = server.handle_make_char(&data1[4..], &mut session1);
-        assert_eq!(result1.unwrap(), vec![0x01], "第一个角色应创建成功");
+        let r1 = result1.unwrap(); assert_eq!(r1[4], 0x00, "第一个角色应创建成功");
 
         // 尝试创建同名角色
         let mut session2 = create_session_with_account(1);
@@ -844,7 +911,7 @@ mod tests {
         }
         .to_packet();
         let result2 = server.handle_make_char(&data2[4..], &mut session2);
-        assert_eq!(result2.unwrap(), vec![0x00], "重复名称应返回失败");
+        let r2 = result2.unwrap(); assert_eq!(r2[4], 0x01, "重复名称应返回失败");
     }
 
     #[test]
@@ -860,7 +927,7 @@ mod tests {
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        assert_eq!(result.unwrap(), vec![0x00], "过短名称应返回失败");
+        let r = result.unwrap(); assert_eq!(r[4], 0x01, "过短名称应返回失败");
     }
 
     #[test]
@@ -876,7 +943,7 @@ mod tests {
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        assert_eq!(result.unwrap(), vec![0x00], "含特殊字符的名称应返回失败");
+        let r = result.unwrap(); assert_eq!(r[4], 0x01, "含特殊字符的名称应返回失败");
     }
 
     #[test]
@@ -892,7 +959,7 @@ mod tests {
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        assert_eq!(result.unwrap(), vec![0x01], "中文名称应创建成功");
+        let r = result.unwrap(); assert_eq!(r[4], 0x00, "中文名称应创建成功");
     }
 
     #[test]
