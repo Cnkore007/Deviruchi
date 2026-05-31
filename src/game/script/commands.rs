@@ -210,8 +210,22 @@ pub struct ScriptContext {
     pub job_level: u16,
     /// Zeny 数量
     pub zeny: u32,
-    /// TODO: 背包系统引用（当前为 None，等待背包系统集成）
-    pub inventory_stub: (),
+    /// 当前 HP
+    pub current_hp: u32,
+    /// 最大 HP
+    pub max_hp: u32,
+    /// 当前 SP
+    pub current_sp: u32,
+    /// 最大 SP
+    pub max_sp: u32,
+    /// 物品数量映射（item_id -> amount）
+    pub inventory: std::collections::HashMap<u16, u16>,
+    /// NPC 变量映射（variable_name -> value）
+    pub npc_variables: std::collections::HashMap<String, i32>,
+    /// 是否需要广播
+    pub need_broadcast: bool,
+    /// 广播消息
+    pub broadcast_message: String,
 }
 
 impl Default for ScriptContext {
@@ -224,7 +238,14 @@ impl Default for ScriptContext {
             base_level: 1,
             job_level: 1,
             zeny: 0,
-            inventory_stub: (),
+            current_hp: 100,
+            max_hp: 100,
+            current_sp: 50,
+            max_sp: 50,
+            inventory: std::collections::HashMap::new(),
+            npc_variables: std::collections::HashMap::new(),
+            need_broadcast: false,
+            broadcast_message: String::new(),
         }
     }
 }

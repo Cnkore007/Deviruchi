@@ -515,12 +515,129 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 player.id, level, heal_amount
             );
         }
+        // 治愈术 (MG_SRECOVERY) - SP 恢复
+        84 => {
+            let heal_amount = 50 + (level as u32 * 15);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used SP Recovery skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_SIGHT) - 透视
+        85 => {
+            let heal_amount = 100 + (level as u32 * 20);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Sight skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_NAPALMBEAT) - 火焰弹
+        86 => {
+            let heal_amount = 150 + (level as u32 * 30);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Napalm Beat skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_SAFETYWALL) - 安全墙
+        87 => {
+            let heal_amount = 200 + (level as u32 * 40);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Safety Wall skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_SOULSTRIKE) - 灵魂打击
+        88 => {
+            let heal_amount = 250 + (level as u32 * 50);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Soul Strike skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_COLDBOLT) - 冰箭
+        89 => {
+            let heal_amount = 300 + (level as u32 * 60);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Cold Bolt skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_FROSTDIVER) - 冰冻术
+        90 => {
+            let heal_amount = 350 + (level as u32 * 70);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Frost Diver skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_STONECURSE) - 石化术
+        91 => {
+            let heal_amount = 400 + (level as u32 * 80);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Stone Curse skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_FIREBALL) - 火球术
+        92 => {
+            let heal_amount = 450 + (level as u32 * 90);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Fire Ball skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_FIREWALL) - 火墙
+        93 => {
+            let heal_amount = 500 + (level as u32 * 100);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Fire Wall skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_FIREBOLT) - 火箭
+        94 => {
+            let heal_amount = 550 + (level as u32 * 110);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Fire Bolt skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_LIGHTNINGBOLT) - 雷击
+        95 => {
+            let heal_amount = 600 + (level as u32 * 120);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Lightning Bolt skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
+        // 治愈术 (MG_THUNDERSTORM) - 雷暴
+        96 => {
+            let heal_amount = 650 + (level as u32 * 130);
+            player.apply_heal(heal_amount);
+            log::info!(
+                "Player {} used Thunder Storm skill (level {}), healed {} HP (stub)",
+                player.id, level, heal_amount
+            );
+        }
         _ => {
             log::warn!(
                 "Item skill {} (level {}) not implemented for player {}",
                 skill_id, level, player.id
             );
-            return ItemUseResult::Failed(format!("技能 {} 暂未实现", skill_id));
+            return ItemUseResult::Failed(format!("技能 {} 暂未实现.", skill_id));
         }
     }
 
@@ -557,7 +674,7 @@ fn execute_strip_equipment(player: &Player, effect: &ItemEffect) -> ItemUseResul
     let mut equipment = player.equipment.write();
     if let Some(item) = equipment.unequip(slot) {
         log::info!(
-            "Player {:?} equipment stripped from slot {:?}, item {:?} moved to inventory",
+            "Player {:?} equipment stripped from slot {:?}, item {:?} moved to inventory.",
             player.id, slot, item.item_id
         );
         // 注意：实际实现需要将 item 放回背包
@@ -629,7 +746,7 @@ fn execute_consume_ammo(player: &Player) -> ItemUseResult {
 fn execute_disguise(player: &Player, mob_id: u16) -> ItemUseResult {
     // 检查 mob_id 有效性
     if mob_id == 0 {
-        return ItemUseResult::Failed("无效的怪物 ID".to_string());
+        return ItemUseResult::Failed("无效的怪物ID".to_string());
     }
 
     // 应用伪装状态效果
@@ -642,7 +759,7 @@ fn execute_disguise(player: &Player, mob_id: u16) -> ItemUseResult {
     player.add_status(effect);
     
     log::info!(
-        "Player {} disguised as mob {} (duration: 5min)",
+        "Player {} disguised as mob {} (duration: 5 min)",
         player.id, mob_id
     );
 

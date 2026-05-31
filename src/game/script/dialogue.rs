@@ -339,23 +339,47 @@ impl NpcDialogueState {
             // ============================================================
 
             ScriptCommand::GetItem(item_id, amount) => {
-                // TODO: 连接到真实的背包系统
-                // 当前为 stub，记录日志
+                // 添加物品到背包
+                let current = self.context.inventory.entry(*item_id).or_insert(0);
+                *current = current.saturating_add(*amount);
                 tracing::info!(
-                    "NPC {} 给予玩家 {} 个物品 {} (TODO: 背包系统集成)",
-                    self.npc_id, amount, item_id
+                    "NPC {} 给予玩家 {} 个物品 {}，当前数量: {}",
+                    self.npc_id, amount, item_id, current
                 );
                 self.current_index += 1;
                 DialogueResponse::Continue
             }
 
             ScriptCommand::DelItem(item_id, amount) => {
-                // TODO: 连接到真实的背包系统
-                tracing::info!(
-                    "NPC {} 从玩家背包删除 {} 个物品 {} (TODO: 背包系统集成)",
-                    self.npc_id, amount, item_id
-                );
-                self.current_index += 1;
+                // 从背包删除物品
+                let mut should_remove = false;
+                let mut remaining = 0;
+                if let Some(current) = self.context.inventory.get_mut(item_id) {
+                    if *current >= *amount {
+                        *current -= *amount;
+                        remaining = *current;
+                        if *current == 0 {
+                            should_remove = true;
+                        }
+                        tracing::info!(
+                            "NPC {} 从玩家背包删除 {} 个物品 {}，剩余: {}",
+                            self.npc_id, amount, item_id, remaining
+                        );
+                    } else {
+                        tracing::warn!(
+                            "NPC {} 尝试删除 {} 个物品 {}，但玩家只有 {} 个",
+                            self.npc_id, amount, item_id, current
+                        );
+                    }
+                } else {
+                    tracing::warn!(
+                        "NPC {} 尝试删除物品 {}，但玩家没有该物品",
+                        self.npc_id, item_id
+                    );
+                }
+                if should_remove {
+                    self.context.inventory.remove(item_id);
+                }
                 DialogueResponse::Continue
             }
 
@@ -473,10 +497,14 @@ impl NpcDialogueState {
             // ============================================================
 
             ScriptCommand::Heal(hp, sp) => {
-                // TODO: 连接到真实的 HP/SP 系统
+                // 恢复 HP/SP
+                self.context.current_hp = (self.context.current_hp + hp).min(self.context.max_hp);
+                self.context.current_sp = (self.context.current_sp + sp).min(self.context.max_sp);
                 tracing::info!(
-                    "NPC {} 恢复玩家 HP+{} SP+{} (TODO: HP/SP 系统集成)",
-                    self.npc_id, hp, sp
+                    "NPC {} 恢复玩家 HP+{} SP+{}，当前 HP: {}/{}, SP: {}/{}",
+                    self.npc_id, hp, sp, 
+                    self.context.current_hp, self.context.max_hp,
+                    self.context.current_sp, self.context.max_sp
                 );
                 self.current_index += 1;
                 DialogueResponse::Continue
