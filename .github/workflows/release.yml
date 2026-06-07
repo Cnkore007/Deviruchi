@@ -38,7 +38,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -76,7 +76,7 @@ jobs:
           Compress-Archive -Path package/deviruchi-${{ matrix.platform }} -DestinationPath deviruchi-${{ matrix.platform }}.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deviruchi-${{ matrix.platform }}
           path: deviruchi-${{ matrix.platform }}.*
@@ -87,15 +87,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
-          generate_release_notes: true
           draft: false
           prerelease: false
         env:
