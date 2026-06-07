@@ -48,7 +48,7 @@ pub struct IpBanManager {
     /// 最大尝试次数
     max_attempts: u32,
     /// 尝试重置时间（秒）
-    attempt_reset_time: u64,
+    _attempt_reset_time: u64,
 }
 
 impl IpBanManager {
@@ -58,7 +58,7 @@ impl IpBanManager {
             bans: RwLock::new(HashMap::new()),
             attempts: RwLock::new(HashMap::new()),
             max_attempts,
-            attempt_reset_time,
+            _attempt_reset_time: attempt_reset_time,
         }
     }
 
@@ -72,7 +72,7 @@ impl IpBanManager {
             if let Some(expires_at) = ban.expires_at {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs();
                 return now < expires_at;
             }
@@ -92,7 +92,7 @@ impl IpBanManager {
     ) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         let ban = IpBan {
@@ -156,7 +156,7 @@ impl IpBanManager {
     pub fn cleanup_expired(&self) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_secs();
 
         let mut bans = self.bans.write();

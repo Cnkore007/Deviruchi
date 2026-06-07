@@ -96,7 +96,7 @@ impl AuctionHouse {
                     amount: buyout,
                     time: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs(),
                 };
                 entry.current_bid = buyout;
@@ -120,7 +120,7 @@ impl AuctionHouse {
             amount: bid_amount,
             time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 
@@ -168,7 +168,7 @@ impl AuctionHouse {
             amount: buyout_price,
             time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 

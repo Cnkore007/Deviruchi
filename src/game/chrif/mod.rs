@@ -115,7 +115,7 @@ impl CharServerManager {
             status: CharServerStatus::Connecting,
             last_heartbeat: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             registered_chars: Vec::new(),
         };
@@ -136,7 +136,7 @@ impl CharServerManager {
             if status == CharServerStatus::Authenticated {
                 conn.last_heartbeat = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs();
             }
             true
@@ -169,7 +169,7 @@ impl CharServerManager {
             map_server_id,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             data: Vec::new(),
         };
@@ -188,7 +188,7 @@ impl CharServerManager {
             map_server_id: 0,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             data: Vec::new(),
         };
@@ -210,7 +210,7 @@ impl CharServerManager {
             map_server_id: 0,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             data,
         };
@@ -263,7 +263,7 @@ impl CharServerManager {
         if let Some(conn) = connections.get_mut(&connection_id) {
             conn.last_heartbeat = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
             true
         } else {

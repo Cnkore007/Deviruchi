@@ -100,8 +100,8 @@ impl PacketHandler {
             SessionStage::Char => {
                 if matches!(packet_id, 0x0065..=0x0068 | 0x01F8) {
                     let result = self.char_server.handle_packet(packet_id, data, session);
-                    // Advance to Map stage on successful char selection
-                    if packet_id == 0x0065 && result.is_some() && session.char_id.is_some() {
+                    // 0x0066 = 选择角色成功后，推进到 Map 阶段
+                    if packet_id == 0x0066 && result.is_some() && session.char_id.is_some() {
                         session.stage = SessionStage::Map;
                     }
                     result

@@ -17,7 +17,8 @@ impl MapServer {
         );
 
         // 广播表情给周围玩家（简化实现）
-        let player = self.map_state.get_player(&player_id)?;
+        // TODO: 广播表情给周围玩家（当前仅发回发送者）
+        let _player = self.map_state.get_player(&player_id)?;
 
         // 使用 UUID 的前 4 字节作为实体 ID
         let entity_id = u32::from_le_bytes([

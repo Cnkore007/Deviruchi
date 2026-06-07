@@ -31,7 +31,8 @@ impl BattleHandler {
         let crit_chance = BattleFormula::crit_rate(attacker, defender);
         let is_crit = self.rand_chance(crit_chance);
 
-        let base_damage = BattleFormula::physical_damage(attacker, defender, 100, 1);
+        let rng_guard = self.rng.lock();
+        let base_damage = BattleFormula::physical_damage(attacker, defender, 100, 1, &**rng_guard);
 
         let damage = if is_crit {
             // 使用 i64 中间值防止高基础伤害 * 140 溢出 i32
@@ -65,7 +66,8 @@ impl BattleHandler {
         let crit_chance = BattleFormula::crit_rate(attacker, defender);
         let is_crit = self.rand_chance(crit_chance) && skill_id != 25;
 
-        let base_damage = BattleFormula::physical_damage(attacker, defender, skill_damage, 1);
+        let rng_guard = self.rng.lock();
+        let base_damage = BattleFormula::physical_damage(attacker, defender, skill_damage, 1, &**rng_guard);
 
         let damage = if is_crit {
             ((base_damage as i64 * BattleFormula::crit_multiplier() as i64) / 100) as i32
@@ -90,7 +92,8 @@ impl BattleHandler {
         skill_damage: i32,
     ) -> AttackResult {
         let matk = (attacker.int() as i32) * 2 + (attacker.dex() as i32) / 3;
-        let damage = BattleFormula::magical_damage(attacker, defender, skill_damage, matk);
+        let rng_guard = self.rng.lock();
+        let damage = BattleFormula::magical_damage(attacker, defender, skill_damage, matk, &**rng_guard);
 
         let killed = defender.take_damage(safe_damage(damage));
 

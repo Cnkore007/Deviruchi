@@ -75,6 +75,7 @@ struct ItemEntry {
     #[serde(rename = "Buy", default)]
     buy: u32,
     #[serde(rename = "Sell", default)]
+    #[allow(dead_code)]
     sell: u32,
     #[serde(rename = "Attack", default)]
     attack: u16,
@@ -84,6 +85,7 @@ struct ItemEntry {
 
 /// 简化物品条目（来自 item_db.yml）
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct SimpleItemEntry {
     Id: u32,
     Name: String,
@@ -217,6 +219,7 @@ struct MobFile {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct MobEntry {
     Id: u16,
     #[serde(rename = "AegisName")]

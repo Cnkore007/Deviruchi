@@ -130,7 +130,7 @@ impl Channel {
             owner_id,
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             is_active: true,
         }
@@ -149,7 +149,7 @@ impl Channel {
             is_muted: false,
             joined_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 
@@ -186,7 +186,7 @@ impl Channel {
             content,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             message_type,
         };

@@ -98,15 +98,47 @@ impl Packed for SCCharList {
     }
 }
 
-/// 客户端选择角色进入游戏 (0x0065)
+/// 客户端进入角色服务器 (0x0065)
+/// 连接 Char Server 后发送的第一个包，用于身份验证
 #[derive(Debug, Clone)]
-pub struct CHEnter {
+pub struct CHEnterCharServer {
+    pub account_id: u32,
+    pub login_id1: u32,
+    pub login_id2: u32,
+    pub sex: u8,
+}
+
+impl Packed for CHEnterCharServer {
+    fn to_packet(&self) -> Vec<u8> {
+        PacketBuilder::new(0x0065)
+            .put_u32(self.account_id)
+            .put_u32(self.login_id1)
+            .put_u32(self.login_id2)
+            .put_u8(self.sex)
+            .build()
+    }
+
+    fn from_slice(slice: &[u8]) -> Option<Self> {
+        if slice.len() < 13 {
+            return None;
+        }
+        let account_id = u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]);
+        let login_id1 = u32::from_le_bytes([slice[4], slice[5], slice[6], slice[7]]);
+        let login_id2 = u32::from_le_bytes([slice[8], slice[9], slice[10], slice[11]]);
+        let sex = slice[12];
+        Some(Self { account_id, login_id1, login_id2, sex })
+    }
+}
+
+/// 客户端选择角色 (0x0066)
+#[derive(Debug, Clone)]
+pub struct CHSelectChar {
     pub char_id: u32,
 }
 
-impl Packed for CHEnter {
+impl Packed for CHSelectChar {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0065).put_u32(self.char_id).build()
+        PacketBuilder::new(0x0066).put_u32(self.char_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -117,6 +149,9 @@ impl Packed for CHEnter {
         Some(Self { char_id })
     }
 }
+
+/// 向后兼容别名
+pub type CHEnter = CHSelectChar;
 
 /// 客户端创建角色 (0x0067)
 #[derive(Debug, Clone)]

@@ -7,6 +7,7 @@ use crate::network::session::{Session, SessionManager};
 use crate::protocol::login_packets::{ACAceptLogin, ACRefuseLogin, CALogin};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
+use crate::game::ipban::IpBanManager;
 
 /// Char Server 连接信息
 #[derive(Debug, Clone)]
@@ -22,6 +23,8 @@ pub struct LoginServer {
     db: Arc<Database>,
     session_manager: Arc<SessionManager>,
     char_server: CharServerInfo,
+    /// IP 封禁管理器，用于暴力破解防护
+    ip_ban_manager: Arc<IpBanManager>,
 }
 
 impl LoginServer {
@@ -34,7 +37,14 @@ impl LoginServer {
                 port: 6000,
                 name: "Deviruchi".to_string(),
             },
+            ip_ban_manager: Arc::new(IpBanManager::default()),
         }
+    }
+
+    /// 设置 IP 封禁管理器
+    pub fn with_ip_ban_manager(mut self, manager: Arc<IpBanManager>) -> Self {
+        self.ip_ban_manager = manager;
+        self
     }
 
     /// 设置 Char Server 连接信息
@@ -61,6 +71,14 @@ impl LoginServer {
 
     /// 处理 CALogin (0x0064)
     fn handle_ca_login(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        // IP 封禁检查：拦截被封禁 IP 的登录请求
+        if let Some(ref addr) = session.client_addr {
+            if self.ip_ban_manager.is_banned(addr) {
+                warn!("Login rejected: IP {} is banned", addr);
+                return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+            }
+        }
+
         // 解析登录包
         let login = CALogin::from_slice(data)?;
 
@@ -85,7 +103,18 @@ impl LoginServer {
         // 验证密码 (Argon2 哈希验证)
         if !crate::storage::password::verify_password(&login.password, &account.password_hash) {
             warn!("Login failed: invalid password for user={}", login.username);
+            // 暴力破解检测：记录失败尝试，超过阈值自动封禁 IP
+            if let Some(ref addr) = session.client_addr {
+                if self.ip_ban_manager.record_attempt(addr) {
+                    error!("IP {} auto-banned due to brute force attempts", addr);
+                }
+            }
             return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+        }
+
+        // 登录成功，重置该 IP 的失败计数
+        if let Some(ref addr) = session.client_addr {
+            self.ip_ban_manager.reset_attempts(addr);
         }
 
         // 检查封禁过期（自动解除已过期的封禁）

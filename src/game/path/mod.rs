@@ -313,10 +313,10 @@ impl PathSearcher {
 
         match diff {
             0 => from,
-            1 | 2 => Direction::from_u8((from_val + 1) % 8).unwrap(),
-            3 | 4 => Direction::from_u8((from_val + 2) % 8).unwrap(),
-            5 | 6 => Direction::from_u8((from_val + 3) % 8).unwrap(),
-            _ => Direction::from_u8((from_val + 4) % 8).unwrap(),
+            1 | 2 => Direction::from_u8((from_val + 1) % 8).unwrap_or(from),
+            3 | 4 => Direction::from_u8((from_val + 2) % 8).unwrap_or(from),
+            5 | 6 => Direction::from_u8((from_val + 3) % 8).unwrap_or(from),
+            _ => Direction::from_u8((from_val + 4) % 8).unwrap_or(from),
         }
     }
 

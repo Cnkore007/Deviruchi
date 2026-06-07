@@ -42,6 +42,7 @@ pub struct CharacterHotkeyData {
 }
 
 /// 辅助函数：构建 Character 结构体的参数数组
+#[allow(dead_code)]
 fn character_row_params() -> Vec<&'static dyn IntoValue> {
     vec![]
 }

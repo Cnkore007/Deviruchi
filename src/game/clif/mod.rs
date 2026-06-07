@@ -129,11 +129,11 @@ impl ClientManager {
             account_id: None,
             last_activity: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
             connected_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs(),
         };
 
@@ -148,7 +148,7 @@ impl ClientManager {
             conn.status = status;
             conn.last_activity = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
             true
         } else {
@@ -229,7 +229,7 @@ impl ClientManager {
         if let Some(conn) = connections.get_mut(&connection_id) {
             conn.last_activity = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_secs();
             true
         } else {
@@ -258,7 +258,7 @@ impl ClientManager {
                     player_id: conn.player_id.unwrap_or(0),
                     timestamp: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_secs(),
                     packet: packet.clone(),
                 };

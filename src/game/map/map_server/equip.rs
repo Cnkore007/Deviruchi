@@ -49,7 +49,7 @@ impl MapServer {
         // 穿戴装备到第一个槽位
         let slot = slots[0];
         let mut equipment = player.equipment.write();
-        let old_item = equipment.equip(slot, item);
+        let _old_item = equipment.equip(slot, item);
 
         tracing::info!(
             "Player {} 成功穿戴装备到 {:?}",
@@ -109,6 +109,7 @@ impl MapServer {
     }
 
     /// 处理卸下所有装备请求
+    #[allow(dead_code)]
     pub(super) fn handle_unequip_all(&self, _data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
 

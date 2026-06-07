@@ -33,7 +33,7 @@ use std::sync::Arc;
 #[allow(dead_code)]
 pub struct Core {
     cli: Cli,
-    config: Config,
+    config: Arc<Config>,
     db: Option<Arc<Database>>,
     session_manager: Arc<SessionManager>,
     token_store: Arc<TokenStore>,
@@ -48,6 +48,7 @@ pub struct Core {
 impl Core {
     pub fn new(cli: Cli) -> Self {
         let config = Config::load(&cli.config).unwrap_or_default();
+        let config = Arc::new(config);
         let config_for_heal = config.clone();
         let at_command_handler = Arc::new({
             let handler = AtCommandHandler::new();
@@ -64,7 +65,7 @@ impl Core {
             channel_bus: Arc::new(ChannelBus::new()),
             drop_manager: Arc::new(DropManager::new()),
             party_manager: Arc::new(PartyManager::new()),
-            heal_service: Arc::new(heal::HealService::new(Arc::new(config_for_heal))),
+            heal_service: Arc::new(heal::HealService::new(config_for_heal)),
             at_command_handler,
         }
     }
@@ -171,6 +172,31 @@ impl Core {
         game_loop.clone().start();
         tracing::info!("GameLoop 已启动");
 
+        // 启动数据库定时备份任务
+        {
+            let db_for_backup = db.clone();
+            let backup_interval = self.config.database.auto_backup_interval_hours;
+            let backup_path = self.config.database.path.clone();
+            if backup_interval > 0 {
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(
+                        std::time::Duration::from_secs(backup_interval as u64 * 3600)
+                    );
+                    interval.tick().await; // 跳过首次立即触发
+                    loop {
+                        interval.tick().await;
+                        let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+                        let dest = format!("{}.bak_{}", backup_path, ts);
+                        match db_for_backup.backup(&dest) {
+                            Ok(()) => tracing::info!("定时备份完成: {}", dest),
+                            Err(e) => tracing::error!("定时备份失败: {}", e),
+                        }
+                    }
+                });
+                tracing::info!("数据库定时备份已启用，间隔 {} 小时", backup_interval);
+            }
+        }
+
         tracing::info!("运行模式: {}", self.cli.mode);
 
         // 根据模式启动服务器 (并发运行)
@@ -243,13 +269,58 @@ impl Core {
             Ok::<(), anyhow::Error>(())
         }));
 
-        // 等待所有服务器
-        for handle in handles {
-            if let Err(e) = handle.await {
-                tracing::error!("Server task failed: {}", e);
+        // 优雅关机：监听 SIGINT/SIGTERM，收到信号后通知所有任务退出
+        let shutdown = async {
+            let ctrl_c = tokio::signal::ctrl_c();
+            #[cfg(unix)]
+            {
+                let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                    .expect("无法注册 SIGTERM 处理器");
+                tokio::select! {
+                    _ = ctrl_c => tracing::info!("收到 SIGINT 信号，开始优雅关机..."),
+                    _ = sigterm.recv() => tracing::info!("收到 SIGTERM 信号，开始优雅关机..."),
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                ctrl_c.await.ok();
+                tracing::info!("收到中断信号，开始优雅关机...");
+            }
+        };
+
+        // 等待所有服务器或关机信号
+        let mut abort_handles = Vec::new();
+        for handle in &handles {
+            abort_handles.push(handle);
+        }
+
+        tokio::select! {
+            // 正常退出：所有服务器任务完成
+            _ = async {
+                for handle in handles {
+                    if let Err(e) = handle.await {
+                        tracing::error!("Server task failed: {}", e);
+                    }
+                }
+            } => {
+                tracing::info!("所有服务器任务已完成");
+            }
+            // 信号退出：取消所有任务
+            _ = shutdown => {
+                tracing::info!("正在关闭所有服务器连接...");
+                // 任务在 drop 时自动取消
             }
         }
 
+        // 执行数据库最终备份（如有需要）
+        if let Some(ref db) = self.db {
+            tracing::info!("正在执行关机前数据库清理...");
+            if let Err(e) = db.execute("PRAGMA wal_checkpoint(TRUNCATE)") {
+                tracing::warn!("WAL checkpoint 失败: {}", e);
+            }
+        }
+
+        tracing::info!("服务器已安全关闭");
         Ok(())
     }
 }

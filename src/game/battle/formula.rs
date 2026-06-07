@@ -45,6 +45,7 @@ impl BattleFormula {
         defender: &Mob,
         skill_damage_bonus: i32,
         weapon_type: i32,
+        rng: &dyn GameRng,
     ) -> i32 {
         let base_atk = {
             let base_level = attacker.base_level() as i32;
@@ -83,8 +84,8 @@ impl BattleFormula {
         // 最低伤害保证放在所有修正之后
         let damage = damage.max(1);
 
-        // Note: variance needs RNG injection - using fixed value for now
-        let variance = 100; // 100% (no variance)
+        // 物理伤害方差：90%-110%，模拟 rAthena 的随机波动
+        let variance = 90 + (rng.rand_range(0, 20) as i32);
         (damage * variance) / 100
     }
 
@@ -143,6 +144,7 @@ impl BattleFormula {
         defender: &Mob,
         skill_damage_bonus: i32,
         matk: i32,
+        rng: &dyn GameRng,
     ) -> i32 {
         let base_matk = {
             let int = attacker.int() as i32;
@@ -160,8 +162,8 @@ impl BattleFormula {
         let damage = ((magic_atk.saturating_sub(magic_defense)).max(1)
             .saturating_mul(skill_damage_bonus))
             / 100;
-        // Note: variance needs RNG injection - using fixed value for now
-        let variance = 100; // 100% (no variance)
+        // 魔法伤害方差：90%-110%，与物理伤害保持一致
+        let variance = 90 + (rng.rand_range(0, 20) as i32);
         (damage * variance) / 100
     }
 
@@ -606,8 +608,9 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1);
-        assert_eq!(damage, 30);
+        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
+        // 基础伤害 30，方差 90%-110%（27-33）
+        assert!(damage >= 27 && damage <= 33, "damage {} not in range 27-33", damage);
     }
 
     #[test]
@@ -623,8 +626,9 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 10, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1);
-        assert_eq!(damage, 22);
+        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
+        // 基础伤害 22，方差 90%-110%（19-24）
+        assert!(damage >= 19 && damage <= 24, "damage {} not in range 19-24", damage);
     }
 
     #[test]
@@ -636,8 +640,9 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 150, 1);
-        assert_eq!(damage, 45);
+        let damage = BattleFormula::physical_damage(&player, &mob, 150, 1, crate::game::rand::thread_rng().as_ref());
+        // 基础伤害 45，方差 90%-110%（40-49）
+        assert!(damage >= 40 && damage <= 49, "damage {} not in range 40-49", damage);
     }
 
     #[test]
@@ -663,7 +668,7 @@ mod tests {
         // Base ATK = 1*2 + 1 + 1/2 + 1/3 = 2 + 1 + 0 + 0 = 3
         // Defense = 100
         // Damage = ((3 - 100).max(1) * 100) / 100 = 1
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1);
+        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
         assert_eq!(damage, 1);
     }
 
@@ -674,11 +679,11 @@ mod tests {
         let player = make_player(10, 1, 15, 1, 20, 1);
         let mob = make_mob(5, 0, 5, 0, 0);
 
-        let damage = BattleFormula::magical_damage(&player, &mob, 100, 50);
+        let damage = BattleFormula::magical_damage(&player, &mob, 100, 50, crate::game::rand::thread_rng().as_ref());
         // magic_atk = max(50, 47) = 50
         // magic_defense = 5
-        // Damage = ((50 - 5).max(1) * 100) / 100 = 45
-        assert_eq!(damage, 45);
+        // Damage = ((50 - 5).max(1) * 100) / 100 = 45, 方差 90%-110%（40-49）
+        assert!(damage >= 40 && damage <= 49, "damage {} not in range 40-49", damage);
     }
 
     #[test]

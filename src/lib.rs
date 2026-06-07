@@ -1,4 +1,5 @@
-#![allow(dead_code, unused_variables, non_snake_case)]
+// 允许非 snake_case 命名：rAthena 兼容字段名使用驼峰命名
+#![allow(non_snake_case)]
 
 //! Deviruchi - High-performance MMORPG game server
 

@@ -124,7 +124,7 @@ pub struct MovementValidator {
     /// 最小移动速度
     min_speed: u32,
     /// 允许飞行
-    allow_fly: bool,
+    _allow_fly: bool,
 }
 
 impl MovementValidator {
@@ -133,7 +133,7 @@ impl MovementValidator {
         Self {
             max_speed: 100, // 最快 100ms/格
             min_speed: 1000, // 最慢 1000ms/格
-            allow_fly: false,
+            _allow_fly: false,
         }
     }
 

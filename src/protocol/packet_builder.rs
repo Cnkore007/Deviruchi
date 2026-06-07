@@ -68,9 +68,9 @@ impl PacketBuilderCtx {
 
     pub fn put_fixed_str(mut self, s: &str, len: usize) -> Self {
         let bytes = s.as_bytes();
-        let write_len = bytes.len().min(len - 1);
+        let write_len = bytes.len().min(len);
         self.data.put_slice(&bytes[..write_len]);
-        // Pad with null bytes
+        // 不足部分用 null 填充
         for _ in write_len..len {
             self.data.put_u8(0);
         }

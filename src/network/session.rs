@@ -26,6 +26,8 @@ pub struct Session {
     /// 登录会话标识符，由 LoginServer 生成，用于 Char/Map 阶段身份验证
     pub login_id1: u32,
     pub login_id2: u32,
+    /// 客户端 IP 地址（用于 IP 封禁检测）
+    pub client_addr: Option<String>,
 }
 
 impl Default for Session {
@@ -48,6 +50,7 @@ impl Session {
             map_event_tx: None,
             login_id1: 0,
             login_id2: 0,
+            client_addr: None,
         }
     }
 

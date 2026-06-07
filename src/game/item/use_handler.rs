@@ -440,9 +440,10 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 StatusSource::Skill(73),
             );
             player.add_status(effect);
+            player.apply_sp_heal(sp_amount);
             log::info!(
-                "Player {} used Strength Recovery skill (level {}), SP regen buff",
-                player.id, level
+                "Player {} used Strength Recovery skill (level {}), restored {} SP",
+                player.id, level, sp_amount
             );
         }
         // 治愈术 (PR_MAGNIFICAT) - 赞美诗（SP 恢复速度提升）

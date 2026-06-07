@@ -117,6 +117,14 @@ impl Database {
     ) -> Result<usize> {
         self.backend.upsert(table, columns, params, conflict_cols)
     }
+
+    /// 备份数据库到指定路径（通过 VACUUM INTO 实现在线热备份）
+    pub fn backup(&self, dest_path: &str) -> Result<()> {
+        let sql = format!("VACUUM INTO '{}'", dest_path.replace('\'', "\'\'"));
+        self.backend.execute_batch(&sql)?;
+        tracing::info!("数据库备份完成: {}", dest_path);
+        Ok(())
+    }
 }
 
 impl Clone for Database {

@@ -11,6 +11,8 @@ pub struct GameServer {
     session_manager: Arc<SessionManager>,
     packet_handler: Arc<PacketHandler>,
     initial_stage: crate::network::session::SessionStage,
+    /// 最大并发连接数，超出时拒绝新连接
+    max_connections: usize,
 }
 
 impl GameServer {
@@ -24,7 +26,14 @@ impl GameServer {
             session_manager,
             packet_handler,
             initial_stage: crate::network::session::SessionStage::Login,
+            max_connections: 10000,
         }
+    }
+
+    /// 设置最大并发连接数
+    pub fn with_max_connections(mut self, max: usize) -> Self {
+        self.max_connections = max;
+        self
     }
 
     pub fn with_initial_stage(mut self, stage: crate::network::session::SessionStage) -> Self {
@@ -61,8 +70,17 @@ impl GameServer {
             }
         });
 
+        let max_conn = self.max_connections;
+
         // 在 tokio 任务中处理连接
         while let Some((std_stream, addr)) = rx.recv().await {
+            // 连接数限制检查：超过阈值时拒绝新连接
+            if session_manager.count() >= max_conn {
+                warn!("连接数已满 ({}/{}), 拒绝新连接: {}", session_manager.count(), max_conn, addr);
+                drop(std_stream);
+                continue;
+            }
+
             let stream = TcpStream::from_std(std_stream)?;
             let sm = session_manager.clone();
             let ph = packet_handler.clone();
@@ -77,6 +95,9 @@ impl GameServer {
         Ok(())
     }
 
+    /// 空闲连接超时时间（秒），超过此时间未收到数据包则断开
+    const IDLE_TIMEOUT_SECS: u64 = 300;
+
     async fn handle_connection(
         stream: TcpStream,
         addr: std::net::SocketAddr,
@@ -88,6 +109,7 @@ impl GameServer {
 
         let mut session = Session::new();
         session.stage = initial_stage;
+        session.client_addr = Some(addr.ip().to_string());
         let session_id = session.id;
 
         let (event_tx, mut event_rx) = mpsc::unbounded_channel::<Vec<u8>>();
@@ -99,7 +121,17 @@ impl GameServer {
 
         loop {
             tokio::select! {
-                result = framed.next() => {
+                result = tokio::time::timeout(
+                    std::time::Duration::from_secs(Self::IDLE_TIMEOUT_SECS),
+                    framed.next(),
+                ) => {
+                    let result = match result {
+                        Ok(r) => r,
+                        Err(_) => {
+                            warn!("Connection idle timeout: {}", addr);
+                            break;
+                        }
+                    };
                     match result {
                         Some(Ok(packet)) => {
                             info!("Received packet: id=0x{:04X}, len={}", packet.header.packet_id, packet.header.length);

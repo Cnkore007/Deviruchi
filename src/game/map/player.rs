@@ -657,6 +657,13 @@ impl Player {
         c.hp += heal_amount;
     }
 
+    /// 恢复 SP，不超过上限
+    pub fn apply_sp_heal(&self, amount: u32) {
+        let mut c = self.combat.write();
+        let heal_amount = amount.min(c.max_sp - c.sp);
+        c.sp += heal_amount;
+    }
+
     pub fn can_act(&self) -> bool {
         if !self.is_alive() {
             return false;

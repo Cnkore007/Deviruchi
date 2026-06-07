@@ -7,7 +7,7 @@ use crate::game::constants;
 use crate::game::token::TokenStore;
 use crate::network::session::{Session, SessionManager};
 use crate::protocol::map_packets::{
-    CHEnter, CHDeleteChar, CHCancelDelete, CHMakeChar, CharInfo,
+    CHEnterCharServer, CHSelectChar, CHDeleteChar, CHCancelDelete, CHMakeChar, CharInfo,
     HCNotifyZoneServer, HCDeleteCharOk, HCCancelDeleteOk, SCCharList,
 };
 use crate::protocol::packet_builder::Packed;
@@ -63,9 +63,9 @@ impl CharServer {
         session: &mut Session,
     ) -> Option<Vec<u8>> {
         match packet_id {
-            0x0066 => self.handle_request_char_list(session),
+            0x0065 => self.handle_enter(data, session),
+            0x0066 => self.handle_select_char(data, session),
             0x0067 => self.handle_make_char(data, session),
-            0x0065 => self.handle_select_char(data, session),
             0x0068 => self.handle_delete_char(data, session),
             0x01F8 => self.handle_cancel_delete(data, session),
             _ => {
@@ -75,7 +75,32 @@ impl CharServer {
         }
     }
 
-    /// 处理请求角色列表 (0x0066)
+    /// 处理进入角色服务器 (0x0065)
+    /// 客户端连接 Char Server 后发送的第一个包，包含登录服务器颁发的身份信息
+    fn handle_enter(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+        let enter = CHEnterCharServer::from_slice(data)?;
+
+        info!(
+            "Char server enter: account_id={}, login_id1=0x{:08X}, login_id2=0x{:08X}, sex={}",
+            enter.account_id, enter.login_id1, enter.login_id2, enter.sex
+        );
+
+        // 验证账户是否存在
+        let _account = self.db.get_account_by_id(enter.account_id).ok()??;
+
+        // 设置 session 身份信息
+        session.account_id = Some(enter.account_id);
+        session.authenticated = true;
+        session.login_id1 = enter.login_id1;
+        session.login_id2 = enter.login_id2;
+
+        info!("Char server: account_id={} authenticated", enter.account_id);
+
+        // 自动发送角色列表
+        self.handle_request_char_list(session)
+    }
+
+    /// 处理请求角色列表 (内部方法，由 handle_enter 调用)
     fn handle_request_char_list(&self, session: &mut Session) -> Option<Vec<u8>> {
         let account_id = session.account_id?;
 
@@ -252,7 +277,7 @@ impl CharServer {
         let account_id = session.account_id?;
 
         // 解析选择角色包
-        let enter = CHEnter::from_slice(data)?;
+        let enter = CHSelectChar::from_slice(data)?;
 
         info!(
             "Select char request: char_id={}, account_id={}",
@@ -486,7 +511,7 @@ impl CharServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::map_packets::{CHEnter, CHDeleteChar, CHCancelDelete, CHMakeChar};
+    use crate::protocol::map_packets::{CHEnter, CHEnterCharServer, CHDeleteChar, CHCancelDelete, CHMakeChar};
 
     fn create_test_server() -> CharServer {
         let db = Arc::new(Database::open_memory().unwrap());
@@ -740,8 +765,16 @@ mod tests {
         let result = server.handle_packet(0xFFFF, &[], &mut session);
         assert!(result.is_none());
 
-        // 测试 0x0066 (请求角色列表)
-        let result = server.handle_packet(0x0066, &[], &mut session);
+        // 测试 0x0065 (进入角色服务器，自动发送角色列表)
+        // to_packet() 包含 4 字节 header，handle_packet 只接收 body
+        let full_packet = CHEnterCharServer {
+            account_id: 1,
+            login_id1: 0x12345678,
+            login_id2: 0x9ABCDEF0,
+            sex: 1,
+        }.to_packet();
+        let enter_body = &full_packet[4..]; // 跳过 header (len_lo, len_hi, id_lo, id_hi)
+        let result = server.handle_packet(0x0065, enter_body, &mut session);
         assert!(result.is_some());
     }
 

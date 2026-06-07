@@ -36,27 +36,26 @@ impl WhisperRateLimiter {
     /// Returns `true` if the message is allowed, `false` if rate limited.
     pub fn check(&self, player_id: &Uuid) -> bool {
         let mut limits = self.limits.write();
-
         let now = Instant::now();
         let window_duration = Duration::from_secs(self.window_secs);
 
-        // Check if player exists and get values
-        if let Some((count, start)) = limits.get(player_id).copied() {
-            if now.duration_since(start) < window_duration {
-                // Within the current window
-                if count >= self.max_messages {
-                    return false; // Rate limited
+        use std::collections::hash_map::Entry;
+        match limits.entry(*player_id) {
+            Entry::Occupied(mut entry) => {
+                let (count, start) = entry.get();
+                if now.duration_since(*start) < window_duration {
+                    if *count >= self.max_messages {
+                        return false; // Rate limited
+                    }
+                    entry.insert((*count + 1, *start));
+                } else {
+                    // Window has expired, reset
+                    entry.insert((1, now));
                 }
-                // Increment count - remove and re-insert to update
-                limits.remove(player_id);
-                limits.insert(*player_id, (count + 1, start));
-            } else {
-                // Window has expired, reset
-                limits.insert(*player_id, (1, now));
             }
-        } else {
-            // First message from this player
-            limits.insert(*player_id, (1, now));
+            Entry::Vacant(entry) => {
+                entry.insert((1, now));
+            }
         }
 
         true

@@ -94,6 +94,21 @@ impl Default for DatabaseConfig {
     }
 }
 
+impl DatabaseConfig {
+    /// 获取 MySQL 密码，优先使用环境变量 DEVIRUCHI_MYSQL_PASSWORD
+    /// 环境变量优先级高于配置文件，避免明文密码存储在磁盘上
+    pub fn resolved_password(&self) -> &str {
+        // 环境变量覆盖配置文件中的密码
+        // 使用 leak() 避免生命周期问题，仅在服务器启动时调用一次
+        if let Ok(env_pw) = std::env::var("DEVIRUCHI_MYSQL_PASSWORD") {
+            if !env_pw.is_empty() {
+                return Box::leak(env_pw.into_boxed_str());
+            }
+        }
+        &self.mysql_password
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct NetworkConfig {
     pub login_port: u16,
@@ -478,8 +493,22 @@ impl Config {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("读取配置文件失败: {:?}", path))?;
 
-        let config: Config =
+        let mut config: Config =
             toml::from_str(&content).with_context(|| format!("解析配置文件失败: {:?}", path))?;
+
+        // 环境变量覆盖敏感配置，避免明文密码存储在配置文件中
+        if let Ok(host) = std::env::var("DEVIRUCHI_MYSQL_HOST") {
+            config.database.mysql_host = host;
+        }
+        if let Ok(port) = std::env::var("DEVIRUCHI_MYSQL_PORT") {
+            if let Ok(p) = port.parse() { config.database.mysql_port = p; }
+        }
+        if let Ok(user) = std::env::var("DEVIRUCHI_MYSQL_USER") {
+            config.database.mysql_user = user;
+        }
+        if let Ok(pw) = std::env::var("DEVIRUCHI_MYSQL_PASSWORD") {
+            config.database.mysql_password = pw;
+        }
 
         Ok(config)
     }
