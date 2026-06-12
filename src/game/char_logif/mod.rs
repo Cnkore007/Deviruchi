@@ -84,10 +84,7 @@ impl CharLogManager {
             account_id,
             char_name,
             event,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: crate::util::unix_timestamp_secs(),
             message,
         };
 

@@ -81,12 +81,12 @@ impl BattleFormula {
         let size_mod = super::element::get_size_modifier(weapon, defender.size);
         let damage = (damage as i64 * size_mod as i64 / 100) as i32;
 
-        // 最低伤害保证放在所有修正之后
-        let damage = damage.max(1);
-
         // 物理伤害方差：90%-110%，模拟 rAthena 的随机波动
         let variance = 90 + (rng.rand_range(0, 20) as i32);
-        (damage * variance) / 100
+        let damage = (damage * variance) / 100;
+
+        // 最低伤害保证放在最后
+        damage.max(1)
     }
 
     /// 计算物理攻击伤害 (带随机波动)
@@ -131,11 +131,12 @@ impl BattleFormula {
         let size_mod = super::element::get_size_modifier(weapon, defender.size);
         let damage = (damage as i64 * size_mod as i64 / 100) as i32;
 
-        // 最低伤害保证放在所有修正之后
-        let damage = damage.max(1);
-
+        // 物理伤害方差：90%-110%，模拟 rAthena 的随机波动
         let variance = 90 + (rng.rand_range(0, 20) as i32);
-        (damage * variance) / 100
+        let damage = (damage * variance) / 100;
+
+        // 最低伤害保证放在最后
+        damage.max(1)
     }
 
     /// 计算魔法攻击伤害

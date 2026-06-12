@@ -7,6 +7,7 @@ use crate::game::guild::{Guild, GuildMember, GuildPosition};
 use crate::storage::Database;
 use crate::storage::backend::IntoValue;
 use crate::storage::chrono_now;
+use crate::storage::{safe_u32_from_i64, safe_u16_from_i64, safe_u8_from_i64, safe_u64_from_i64};
 
 /// 公会数据库持久化
 pub struct GuildStorage {
@@ -132,14 +133,14 @@ impl GuildStorage {
                     row.get_i64(0)?,
                     row.get_string(1)?,
                     row.get_string(2)?,
-                    row.get_i64(3)? as u8,
-                    row.get_i64(4)? as u64,
-                    row.get_i64(5)? as u64,
-                    row.get_i64(6)? as u32,
-                    row.get_i64(7)? as u32,
-                    row.get_i64(8)? as u16,
+                    safe_u8_from_i64(row.get_i64(3)?),
+                    safe_u64_from_i64(row.get_i64(4)?),
+                    safe_u64_from_i64(row.get_i64(5)?),
+                    safe_u32_from_i64(row.get_i64(6)?),
+                    safe_u32_from_i64(row.get_i64(7)?),
+                    safe_u16_from_i64(row.get_i64(8)?),
                     row.get_string(9)?,
-                    row.get_i64(10)? as u32,
+                    safe_u32_from_i64(row.get_i64(10)?),
                 ))
             },
         )?;
@@ -171,7 +172,7 @@ impl GuildStorage {
         let mut positions = Vec::new();
         for row in &position_rows {
             positions.push(GuildPosition {
-                id: row.get_i64(0)? as u8,
+                id: safe_u8_from_i64(row.get_i64(0)?),
                 name: row.get_string(1)?,
                 can_invite: row.get_i64(2)? != 0,
                 can_expel: row.get_i64(3)? != 0,
@@ -191,12 +192,12 @@ impl GuildStorage {
         for row in &member_rows {
             let member = GuildMember {
                 player_id: Uuid::parse_str(&row.get_string(0)?).unwrap_or_default(),
-                char_id: row.get_i64(1)? as u32,
+                char_id: safe_u32_from_i64(row.get_i64(1)?),
                 name: row.get_string(2)?,
-                position_id: row.get_i64(3)? as u8,
-                level: row.get_i64(4)? as u16,
-                job: row.get_i64(5)? as u16,
-                contribution: row.get_i64(6)? as u32,
+                position_id: safe_u8_from_i64(row.get_i64(3)?),
+                level: safe_u16_from_i64(row.get_i64(4)?),
+                job: safe_u16_from_i64(row.get_i64(5)?),
+                contribution: safe_u32_from_i64(row.get_i64(6)?),
                 online: row.get_i64(7)? != 0,
                 map_name: row.get_string(8)?,
             };

@@ -31,3 +31,14 @@ devi-agent/config.toml
 .claude-flow/
 .swarm/
 .mcp.json
+
+# 构建产物和生成文件
+releases/
+config/guide.md
+config/server.toml
+deviruchi.toml
+
+# AI 工具状态
+.agents/
+.codex/
+.mimocode/

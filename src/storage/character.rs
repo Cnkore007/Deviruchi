@@ -7,6 +7,7 @@ use crate::protocol::map_packets::CharInfo;
 use crate::storage::Database;
 use crate::storage::backend::IntoValue;
 use crate::storage::chrono_now;
+use crate::storage::{safe_u8, safe_u16, safe_u32};
 
 /// 角色状态效果数据（用于数据库存储）
 #[derive(Debug, Clone)]
@@ -94,42 +95,42 @@ impl Database {
     /// 从 Row 构建 Character 结构体（减少重复代码）
     fn character_from_row(row: &crate::storage::backend::Row) -> Result<Character> {
         Ok(Character {
-            char_id: row.get_i32(0)? as u32,
-            char_num: row.get_i32(1)? as u8,
+            char_id: safe_u32(row.get_i32(0)?),
+            char_num: safe_u8(row.get_i32(1)?),
             name: row.get_string(2)?,
-            class: row.get_i32(3)? as u16,
-            base_level: row.get_i32(4)? as u16,
-            job_level: row.get_i32(5)? as u16,
-            base_exp: row.get_i32(6)? as u32,
-            job_exp: row.get_i32(7)? as u32,
-            zeny: row.get_i32(8)? as u32,
-            str: row.get_i32(9)? as u16,
-            agi: row.get_i32(10)? as u16,
-            vit: row.get_i32(11)? as u16,
-            int: row.get_i32(12)? as u16,
-            dex: row.get_i32(13)? as u16,
-            luk: row.get_i32(14)? as u16,
-            hp: row.get_i32(15)? as u32,
-            max_hp: row.get_i32(16)? as u32,
-            sp: row.get_i32(17)? as u32,
-            max_sp: row.get_i32(18)? as u32,
-            hair: row.get_i32(19)? as u16,
-            hair_color: row.get_i32(20)? as u16,
-            clothes_color: row.get_i32(21)? as u16,
-            weapon: row.get_i32(22)? as u16,
-            shield: row.get_i32(23)? as u16,
-            head_top: row.get_i32(24)? as u16,
-            head_mid: row.get_i32(25)? as u16,
-            head_bottom: row.get_i32(26)? as u16,
+            class: safe_u16(row.get_i32(3)?),
+            base_level: safe_u16(row.get_i32(4)?),
+            job_level: safe_u16(row.get_i32(5)?),
+            base_exp: safe_u32(row.get_i32(6)?),
+            job_exp: safe_u32(row.get_i32(7)?),
+            zeny: safe_u32(row.get_i32(8)?),
+            str: safe_u16(row.get_i32(9)?),
+            agi: safe_u16(row.get_i32(10)?),
+            vit: safe_u16(row.get_i32(11)?),
+            int: safe_u16(row.get_i32(12)?),
+            dex: safe_u16(row.get_i32(13)?),
+            luk: safe_u16(row.get_i32(14)?),
+            hp: safe_u32(row.get_i32(15)?),
+            max_hp: safe_u32(row.get_i32(16)?),
+            sp: safe_u32(row.get_i32(17)?),
+            max_sp: safe_u32(row.get_i32(18)?),
+            hair: safe_u16(row.get_i32(19)?),
+            hair_color: safe_u16(row.get_i32(20)?),
+            clothes_color: safe_u16(row.get_i32(21)?),
+            weapon: safe_u16(row.get_i32(22)?),
+            shield: safe_u16(row.get_i32(23)?),
+            head_top: safe_u16(row.get_i32(24)?),
+            head_mid: safe_u16(row.get_i32(25)?),
+            head_bottom: safe_u16(row.get_i32(26)?),
             last_map: row.get_string(27)?,
             last_x: row.get_i32(28)?,
             last_y: row.get_i32(29)?,
             save_map: row.get_string(30)?,
             save_x: row.get_i32(31)?,
             save_y: row.get_i32(32)?,
-            delete_timer: row.get_i32(33)? as u32,
-            status_point: row.get_i32(34)? as u16,
-            skill_point: row.get_i32(35)? as u16,
+            delete_timer: safe_u32(row.get_i32(33)?),
+            status_point: safe_u16(row.get_i32(34)?),
+            skill_point: safe_u16(row.get_i32(35)?),
             created_at: row.get_i64(36)?,
             updated_at: row.get_i64(37)?,
         })
@@ -480,10 +481,7 @@ impl Database {
 
     /// 加载角色状态效果
     pub fn load_character_status(&self, char_id: u32) -> Result<Vec<StatusEffect>> {
-        let now_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis() as u64;
+        let now_ms = crate::util::unix_timestamp_millis();
 
         let rows = self.query_rows(
             "SELECT status_type, val1, val2, val3, stack, duration_ms, started_at, source_type, source_id
@@ -493,15 +491,15 @@ impl Database {
 
         let mut results = Vec::new();
         for row in &rows {
-            let status_type: u32 = row.get_i32(0)? as u32;
+            let status_type: u32 = safe_u32(row.get_i32(0)?);
             let val1: i32 = row.get_i32(1)?;
             let val2: i32 = row.get_i32(2)?;
             let val3: i32 = row.get_i32(3)?;
-            let stack: u8 = row.get_i32(4)? as u8;
+            let stack: u8 = safe_u8(row.get_i32(4)?);
             let duration_ms: u64 = row.get_i64(5)? as u64;
             let started_at_ms: u64 = row.get_i64(6)? as u64;
-            let source_type: u8 = row.get_i32(7)? as u8;
-            let source_id: u16 = row.get_i32(8)? as u16;
+            let source_type: u8 = safe_u8(row.get_i32(7)?);
+            let source_id: u16 = safe_u16(row.get_i32(8)?);
 
             let source = match source_type {
                 0 => StatusSource::Skill(source_id),
@@ -594,16 +592,16 @@ impl Database {
         let mut items = Vec::new();
         for row in &rows {
             items.push(CharacterInventoryData {
-                index: row.get_i32(0)? as u8,
-                item_id: row.get_i32(1)? as u16,
-                amount: row.get_i32(2)? as u16,
+                index: safe_u8(row.get_i32(0)?),
+                item_id: safe_u16(row.get_i32(1)?),
+                amount: safe_u16(row.get_i32(2)?),
                 identified: row.get_i32(3)? != 0,
-                refine: row.get_i32(4)? as u8,
+                refine: safe_u8(row.get_i32(4)?),
                 cards: [
-                    row.get_i32(5)? as u16,
-                    row.get_i32(6)? as u16,
-                    row.get_i32(7)? as u16,
-                    row.get_i32(8)? as u16,
+                    safe_u16(row.get_i32(5)?),
+                    safe_u16(row.get_i32(6)?),
+                    safe_u16(row.get_i32(7)?),
+                    safe_u16(row.get_i32(8)?),
                 ],
             });
         }
@@ -738,9 +736,9 @@ impl Database {
         let mut hotkeys = Vec::new();
         for row in &rows {
             hotkeys.push(CharacterHotkeyData {
-                hotkey_id: row.get_i32(0)? as u8,
-                type_: row.get_i32(1)? as u8,
-                item_or_skill_id: row.get_i32(2)? as u32,
+                hotkey_id: safe_u8(row.get_i32(0)?),
+                type_: safe_u8(row.get_i32(1)?),
+                item_or_skill_id: safe_u32(row.get_i32(2)?),
             });
         }
 

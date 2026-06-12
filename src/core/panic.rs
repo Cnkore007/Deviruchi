@@ -59,8 +59,5 @@ impl PanicHandler {
 }
 
 fn chrono_lite_now() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap();
-    format!("{}", now.as_secs())
+    format!("{}", crate::util::unix_timestamp_secs())
 }

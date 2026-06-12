@@ -1,7 +1,7 @@
 //! 公会 handler：创建、邀请、加入、离开、踢人、公告、信息、聊天
 
 use super::MapServer;
-use crate::game::map::channel::{ChatType, GameEvent};
+use crate::game::map::channel::{ChatType, GameEvent, guild_channel_name};
 use crate::network::session::Session;
 use crate::protocol::guild_packets::*;
 use crate::protocol::packet_builder::Packed;
@@ -218,7 +218,7 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
         let guild = self.guild_manager.get_player_guild(&player_id)?;
 
-        let channel_name = format!("guild:{}", guild.id);
+        let channel_name = guild_channel_name(guild.id);
         let event = GameEvent::PlayerChat {
             player_id,
             message: pkt.message.clone(),

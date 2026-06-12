@@ -4,7 +4,7 @@ use std::time::Instant;
 use parking_lot::RwLock;
 use uuid::Uuid;
 
-use super::channel::{ChannelBus, GameEvent};
+use super::channel::{ChannelBus, GameEvent, map_channel_name};
 
 const DROP_TTL_SECS: u64 = 300; // 5 minutes
 
@@ -65,7 +65,7 @@ impl DropManager {
         let id = self.add(item_id, amount, x, y, map_name);
 
         // Broadcast item drop event
-        let channel_name = format!("map:{}", map_name);
+        let channel_name = map_channel_name(map_name);
         let event = GameEvent::ItemDrop {
             item_id,
             x,
@@ -94,7 +94,7 @@ impl DropManager {
         let item = self.pickup(drop_id);
         if let Some(ref drop) = item {
             // Broadcast item pickup event
-            let channel_name = format!("map:{}", map_name);
+            let channel_name = map_channel_name(map_name);
             let event = GameEvent::ItemPickup {
                 player_id,
                 item_id: drop.item_id,
@@ -162,7 +162,7 @@ impl DropManager {
 
         // Broadcast despawn events
         for (_drop_id, item_id, x, y, map_name) in expired_info {
-            let channel_name = format!("map:{}", map_name);
+            let channel_name = map_channel_name(&map_name);
             let event = GameEvent::ItemDespawn { item_id, x, y };
             let packet = event.to_packet_bytes();
             channel_bus.publish(&channel_name, &event, packet);

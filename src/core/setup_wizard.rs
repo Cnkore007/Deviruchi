@@ -266,25 +266,28 @@ impl SetupWizard {
         };
 
         // 数据库类型
-        let db_options = vec![
-            "SQLite — 单服务器，无需安装 (推荐)",
-            "MySQL — 大型服务器，需提前安装",
-        ];
-        let db_idx = Self::select("数据库类型", &db_options, 0)?;
-        config.database.backend = if db_idx == 0 {
-            "sqlite".to_string()
-        } else {
-            "mysql".to_string()
-        };
+        #[cfg(feature = "mysql-backend")]
+        {
+            let db_options = vec![
+                "SQLite — 单服务器，无需安装 (推荐)",
+                "MySQL — 大型服务器，需提前安装",
+            ];
+            let db_idx = Self::select("数据库类型", &db_options, 0)?;
+            config.database.backend = if db_idx == 0 {
+                "sqlite".to_string()
+            } else {
+                "mysql".to_string()
+            };
 
-        // MySQL 配置
-        if db_idx == 1 {
-            println!("\n  MySQL 配置:");
-            config.database.mysql_host = Self::input("主机地址", "127.0.0.1", None)?;
-            config.database.mysql_port = Self::input_u16("端口", 3306)?;
-            config.database.mysql_user = Self::input("用户名", "deviruchi", None)?;
-            config.database.mysql_password = Self::input("密码", "", Some("（留空表示无密码）"))?;
-            config.database.mysql_database = Self::input("数据库名", "deviruchi", None)?;
+            // MySQL 配置
+            if db_idx == 1 {
+                println!("\n  MySQL 配置:");
+                config.database.mysql_host = Self::input("主机地址", "127.0.0.1", None)?;
+                config.database.mysql_port = Self::input_u16("端口", 3306)?;
+                config.database.mysql_user = Self::input("用户名", "deviruchi", None)?;
+                config.database.mysql_password = Self::input("密码", "", Some("（留空表示无密码）"))?;
+                config.database.mysql_database = Self::input("数据库名", "deviruchi", None)?;
+            }
         }
 
         // 自动保存
@@ -388,6 +391,7 @@ impl SetupWizard {
         println!("│                                                             │");
         println!("│ [database]                                                  │");
         println!("│ backend = \"{}\" {:<44}│", config.database.backend, "");
+        #[cfg(feature = "mysql-backend")]
         if config.database.backend == "mysql" {
             println!("│ mysql_host = \"{}\" {:<41}│", config.database.mysql_host, "");
         }

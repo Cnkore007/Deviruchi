@@ -1,6 +1,6 @@
 use crate::game::battle::{BattleHandler, ExpDistributor};
 use crate::game::map::data::MapDatabase;
-use crate::game::map::{ChannelBus, DropManager, GameEvent, MapState};
+use crate::game::map::{ChannelBus, DropManager, GameEvent, MapState, map_channel_name};
 use crate::game::mob::data::{MobSkill, MobSkillCondition, MobSkillTarget};
 use crate::game::mob::droptable::{DropResolver, MVPResolver, MobDropTable};
 use crate::game::mob::{Mob, MobAIState, MobBehavior, MobSpawnManager};
@@ -349,7 +349,7 @@ impl MobAI {
 
                         if killed {
                             // 发布玩家死亡事件
-                            let channel_name = format!("map:{}", target.map_name);
+                            let channel_name = map_channel_name(&target.map_name);
                             let event = GameEvent::PlayerDeath {
                                 player_id: target_id,
                             };
@@ -555,7 +555,7 @@ impl MobAI {
                 );
 
                 if killed {
-                    let channel_name = format!("map:{}", target.map_name);
+                    let channel_name = map_channel_name(&target.map_name);
                     let event = GameEvent::PlayerDeath {
                         player_id: target_id,
                     };
@@ -636,7 +636,7 @@ impl MobAI {
             let killer_id = mob.target_id.read().unwrap_or(Uuid::nil());
 
             // 发布 MobDeath 事件
-            let channel_name = format!("map:{}", mob.spawn_map);
+            let channel_name = map_channel_name(&mob.spawn_map);
             let event = GameEvent::MobDeath {
                 mob_id: mob.id,
                 killer_id,
@@ -702,7 +702,7 @@ impl MobAI {
         }
 
         let (mob_x, mob_y) = mob.get_position();
-        let channel_name = format!("map:{}", mob.spawn_map);
+        let channel_name = map_channel_name(&mob.spawn_map);
 
         for drop in &mob.drops {
             let roll = self.rand_u32() % 10000;

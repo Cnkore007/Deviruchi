@@ -64,14 +64,19 @@ pub struct DatabaseConfig {
     pub busy_timeout_ms: u32,
     pub auto_backup_interval_hours: u32,
     /// MySQL 主机地址
+    #[cfg(feature = "mysql-backend")]
     pub mysql_host: String,
     /// MySQL 端口
+    #[cfg(feature = "mysql-backend")]
     pub mysql_port: u16,
     /// MySQL 用户名
+    #[cfg(feature = "mysql-backend")]
     pub mysql_user: String,
     /// MySQL 密码
+    #[cfg(feature = "mysql-backend")]
     pub mysql_password: String,
     /// MySQL 数据库名称
+    #[cfg(feature = "mysql-backend")]
     pub mysql_database: String,
 }
 
@@ -85,10 +90,15 @@ impl Default for DatabaseConfig {
             wal_mode: true,
             busy_timeout_ms: 5000,
             auto_backup_interval_hours: 24,
+            #[cfg(feature = "mysql-backend")]
             mysql_host: "127.0.0.1".to_string(),
+            #[cfg(feature = "mysql-backend")]
             mysql_port: 3306,
+            #[cfg(feature = "mysql-backend")]
             mysql_user: "deviruchi".to_string(),
+            #[cfg(feature = "mysql-backend")]
             mysql_password: String::new(),
+            #[cfg(feature = "mysql-backend")]
             mysql_database: "deviruchi".to_string(),
         }
     }
@@ -97,6 +107,7 @@ impl Default for DatabaseConfig {
 impl DatabaseConfig {
     /// 获取 MySQL 密码，优先使用环境变量 DEVIRUCHI_MYSQL_PASSWORD
     /// 环境变量优先级高于配置文件，避免明文密码存储在磁盘上
+    #[cfg(feature = "mysql-backend")]
     pub fn resolved_password(&self) -> &str {
         // 环境变量覆盖配置文件中的密码
         // 使用 leak() 避免生命周期问题，仅在服务器启动时调用一次
@@ -497,17 +508,20 @@ impl Config {
             toml::from_str(&content).with_context(|| format!("解析配置文件失败: {:?}", path))?;
 
         // 环境变量覆盖敏感配置，避免明文密码存储在配置文件中
-        if let Ok(host) = std::env::var("DEVIRUCHI_MYSQL_HOST") {
-            config.database.mysql_host = host;
-        }
-        if let Ok(port) = std::env::var("DEVIRUCHI_MYSQL_PORT") {
-            if let Ok(p) = port.parse() { config.database.mysql_port = p; }
-        }
-        if let Ok(user) = std::env::var("DEVIRUCHI_MYSQL_USER") {
-            config.database.mysql_user = user;
-        }
-        if let Ok(pw) = std::env::var("DEVIRUCHI_MYSQL_PASSWORD") {
-            config.database.mysql_password = pw;
+        #[cfg(feature = "mysql-backend")]
+        {
+            if let Ok(host) = std::env::var("DEVIRUCHI_MYSQL_HOST") {
+                config.database.mysql_host = host;
+            }
+            if let Ok(port) = std::env::var("DEVIRUCHI_MYSQL_PORT") {
+                if let Ok(p) = port.parse() { config.database.mysql_port = p; }
+            }
+            if let Ok(user) = std::env::var("DEVIRUCHI_MYSQL_USER") {
+                config.database.mysql_user = user;
+            }
+            if let Ok(pw) = std::env::var("DEVIRUCHI_MYSQL_PASSWORD") {
+                config.database.mysql_password = pw;
+            }
         }
 
         Ok(config)
@@ -559,9 +573,9 @@ impl Config {
         // 辅助函数：读取用户输入，空输入返回默认值
         let mut read_input = |prompt: &str, default: &str| -> String {
             print!("{} [{}]: ", prompt, default);
-            stdout.flush().unwrap();
+            let _ = stdout.flush();
             let mut input = String::new();
-            stdin.lock().read_line(&mut input).unwrap();
+            let _ = stdin.lock().read_line(&mut input);
             let input = input.trim().to_string();
             if input.is_empty() { default.to_string() } else { input }
         };

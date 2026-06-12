@@ -190,10 +190,7 @@ impl PetAI {
     /// AI主循环更新
     pub fn update(&self, owner: &Player, _pet: &Pet) {
         // 更新时间戳
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         self.update_timestamp(now);
 
         // 更新攻击冷却

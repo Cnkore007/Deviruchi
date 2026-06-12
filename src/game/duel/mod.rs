@@ -192,7 +192,7 @@ impl DuelManager {
         self.duels.write().insert(duel_id, duel);
         self.player_duels.write().insert(creator_id, duel_id);
 
-        log::info!("Duel {} created by player {:?}", duel_id, creator_id);
+        tracing::info!("Duel {} created by player {:?}", duel_id, creator_id);
         Ok(duel_id)
     }
 
@@ -231,7 +231,7 @@ impl DuelManager {
 
         self.player_invites.write().insert(target_id, duel_id);
 
-        log::info!(
+        tracing::info!(
             "Player {:?} invited {:?} to duel {}",
             inviter_id,
             target_id,
@@ -268,7 +268,7 @@ impl DuelManager {
         self.player_duels.write().insert(player_id, invite_duel_id);
         self.player_invites.write().remove(&player_id);
 
-        log::info!(
+        tracing::info!(
             "Player {:?} accepted duel {} invitation",
             player_id,
             invite_duel_id
@@ -289,7 +289,7 @@ impl DuelManager {
             duel.invites_count = duel.invites_count.saturating_sub(1);
         }
 
-        log::info!(
+        tracing::info!(
             "Player {:?} rejected duel {} invitation",
             player_id,
             invite_duel_id
@@ -326,9 +326,9 @@ impl DuelManager {
                     player_invites.remove(&invitee);
                 }
 
-                log::info!("Duel {} ended (no members left)", duel_id);
+                tracing::info!("Duel {} ended (no members left)", duel_id);
             } else {
-                log::info!("Player {:?} left duel {}", player_id, duel_id);
+                tracing::info!("Player {:?} left duel {}", player_id, duel_id);
             }
         }
 

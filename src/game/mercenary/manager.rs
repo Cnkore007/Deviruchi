@@ -356,14 +356,18 @@ impl MercenaryManager {
             if let Some(mercenary_id) = self.summoned.write().remove(char_id) {
                 self.mercenaries.write().remove(&mercenary_id);
                 // 从数据库删除
-                let _ = self.db.execute_params(
+                if let Err(e) = self.db.execute_params(
                     "DELETE FROM mercenaries WHERE mercenary_id = ?",
                     &[&mercenary_id as &dyn crate::storage::backend::IntoValue],
-                );
-                let _ = self.db.execute_params(
+                ) {
+                    tracing::warn!("Failed to delete mercenary {}: {}", mercenary_id, e);
+                }
+                if let Err(e) = self.db.execute_params(
                     "DELETE FROM mercenary_skills WHERE mercenary_id = ?",
                     &[&mercenary_id as &dyn crate::storage::backend::IntoValue],
-                );
+                ) {
+                    tracing::warn!("Failed to delete mercenary skills {}: {}", mercenary_id, e);
+                }
             }
         }
 

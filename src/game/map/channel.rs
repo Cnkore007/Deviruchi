@@ -1,8 +1,47 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use tokio::sync::mpsc;
 use uuid::Uuid;
+
+static ENTITY_ID_MAP: Lazy<DashMap<Uuid, u32>> = Lazy::new(DashMap::new);
+static ENTITY_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+pub fn get_entity_id(uuid: &Uuid) -> u32 {
+    *ENTITY_ID_MAP
+        .entry(*uuid)
+        .or_insert_with(|| ENTITY_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
+}
+
+pub fn remove_entity_id(uuid: &Uuid) {
+    ENTITY_ID_MAP.remove(uuid);
+}
+
+pub fn map_channel_name(map_name: &str) -> String {
+    let mut s = String::with_capacity(4 + map_name.len());
+    s.push_str("map:");
+    s.push_str(map_name);
+    s
+}
+
+pub fn party_channel_name(party_id: Uuid) -> String {
+    let id_str = party_id.to_string();
+    let mut s = String::with_capacity(7 + id_str.len());
+    s.push_str("party:");
+    s.push_str(&id_str);
+    s
+}
+
+pub fn guild_channel_name(guild_id: Uuid) -> String {
+    let id_str = guild_id.to_string();
+    let mut s = String::with_capacity(6 + id_str.len());
+    s.push_str("guild:");
+    s.push_str(&id_str);
+    s
+}
 
 #[derive(Debug, Clone)]
 pub enum ChatType {
@@ -130,15 +169,14 @@ impl GameEvent {
             GameEvent::PlayerEnter {
                 player_id, x, y, ..
             } => {
-                // 使用 player_id 的前 4 字节作为客户端实体 ID
-                let entity_id = uuid_to_entity_id(player_id);
+                let entity_id = get_entity_id(player_id);
                 build_entity_appear_packet(entity_id, 0, *x, *y, 0, 0)
             }
 
             // ==================== 玩家离开：0x007a EntityDisappear ====================
             // 格式：packet_id(u16) + entity_id(u32) + reason(u8)
             GameEvent::PlayerLeave { player_id } => {
-                let entity_id = uuid_to_entity_id(player_id);
+                let entity_id = get_entity_id(player_id);
                 build_entity_disappear_packet(entity_id)
             }
 
@@ -153,7 +191,7 @@ impl GameEvent {
                 to_x,
                 to_y,
             } => {
-                let entity_id = uuid_to_entity_id(player_id);
+                let entity_id = get_entity_id(player_id);
                 build_entity_move_packet(entity_id, *from_x, *from_y, *to_x, *to_y)
             }
 
@@ -162,14 +200,14 @@ impl GameEvent {
             GameEvent::MobSpawn {
                 mob_id, mob_type, x, y,
             } => {
-                let entity_id = uuid_to_entity_id(mob_id);
+                let entity_id = get_entity_id(mob_id);
                 // mob_type 作为 job 字段传入，entity_type=6
                 build_entity_appear_packet(entity_id, 6, *x, *y, *mob_type as u16, 0)
             }
 
             // ==================== 怪物死亡：0x007a EntityDisappear ====================
             GameEvent::MobDeath { mob_id, .. } => {
-                let entity_id = uuid_to_entity_id(mob_id);
+                let entity_id = get_entity_id(mob_id);
                 build_entity_disappear_packet(entity_id)
             }
 
@@ -179,7 +217,7 @@ impl GameEvent {
                 to_x,
                 to_y,
             } => {
-                let entity_id = uuid_to_entity_id(mob_id);
+                let entity_id = get_entity_id(mob_id);
                 // 怪物移动没有 from 信息，使用 to 作为起始点（客户端会插值）
                 build_entity_move_packet(entity_id, *to_x, *to_y, *to_x, *to_y)
             }
@@ -227,14 +265,6 @@ impl GameEvent {
 }
 
 const VISION_RADIUS: u16 = 14;
-
-/// 将 UUID 转换为客户端可见的 u32 实体 ID
-///
-/// 取 UUID 的前 4 字节作为实体 ID，保证同一 UUID 始终映射到同一值
-pub fn uuid_to_entity_id(uuid: &Uuid) -> u32 {
-    let bytes = uuid.as_bytes();
-    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
-}
 
 /// 构建 0x0078 EntityAppear 包（实体出现）
 ///
@@ -628,10 +658,9 @@ mod tests {
         // 验证 packet_id = 0x0078
         assert_eq!(pkt[0], 0x78);
         assert_eq!(pkt[1], 0x00);
-        // 验证 entity_id（UUID 前 4 字节）
-        let expected_eid = uuid_to_entity_id(&player_id);
+        // 验证 entity_id
         let actual_eid = u32::from_le_bytes([pkt[2], pkt[3], pkt[4], pkt[5]]);
-        assert_eq!(actual_eid, expected_eid);
+        assert!(actual_eid > 0);
         // 验证 walk_speed = 150
         let walk_speed = u16::from_le_bytes([pkt[6], pkt[7]]);
         assert_eq!(walk_speed, 150);
@@ -743,11 +772,20 @@ mod tests {
     }
 
     #[test]
-    fn uuid_to_entity_id_is_deterministic() {
+    fn get_entity_id_is_consistent_for_same_uuid() {
         let uuid = Uuid::new_v4();
-        let eid1 = uuid_to_entity_id(&uuid);
-        let eid2 = uuid_to_entity_id(&uuid);
+        let eid1 = get_entity_id(&uuid);
+        let eid2 = get_entity_id(&uuid);
         assert_eq!(eid1, eid2);
+    }
+
+    #[test]
+    fn get_entity_id_returns_unique_ids_for_different_uuids() {
+        let uuid1 = Uuid::new_v4();
+        let uuid2 = Uuid::new_v4();
+        let eid1 = get_entity_id(&uuid1);
+        let eid2 = get_entity_id(&uuid2);
+        assert_ne!(eid1, eid2);
     }
 
     #[test]

@@ -122,7 +122,9 @@ impl AgentApi {
 
         // 备份原文件，防止修改失败导致数据丢失
         let backup_path = format!("{}.bak", self.config_path);
-        let _ = std::fs::copy(&self.config_path, &backup_path);
+        if let Err(e) = std::fs::copy(&self.config_path, &backup_path) {
+            tracing::warn!("Failed to backup config: {}", e);
+        }
 
         self.set_config_field(&mut config, section, key, value)?;
 

@@ -2,7 +2,7 @@
 
 use super::MapServer;
 use crate::game::item::ItemUseResult;
-use crate::game::map::channel::GameEvent;
+use crate::game::map::channel::{GameEvent, map_channel_name};
 use crate::network::packet::id::*;
 use crate::network::session::Session;
 use crate::protocol::char_packets::{CZRequestMove, CZUseSkill};
@@ -67,7 +67,7 @@ impl MapServer {
 
         // Subscribe to map channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
-            let channel_name = format!("map:{}", map_name);
+            let channel_name = map_channel_name(&map_name);
             self.channel_bus
                 .subscribe(&channel_name, player_id, tx.clone(), pos_x, pos_y);
         }
@@ -86,7 +86,7 @@ impl MapServer {
                 let other_x = other.pos_x();
                 let other_y = other.pos_y();
                 let other_dir = other.direction() as u8;
-                let other_eid = crate::game::map::channel::uuid_to_entity_id(&other.id);
+                let other_eid = crate::game::map::channel::get_entity_id(&other.id);
                 let appear_pkt = crate::game::map::channel::build_entity_appear_packet(
                     other_eid, 0, other_x, other_y, 0, other_dir,
                 );
@@ -171,7 +171,7 @@ impl MapServer {
         player.move_to(move_pkt.pos_x, move_pkt.pos_y);
 
         // Update channel position
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
         self.channel_bus
             .update_position(&channel_name, &player_id, move_pkt.pos_x, move_pkt.pos_y);
 
@@ -240,7 +240,7 @@ impl MapServer {
 
         // 发布技能使用事件（仅在成功后）
         // target_id 来自客户端是 account_id，需查找实际 player UUID
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
         let target_uuid = if skill_pkt.target_id != 0 {
             self.map_state
                 .find_player_by_account_id(skill_pkt.target_id)
@@ -293,7 +293,7 @@ impl MapServer {
             | crate::game::battle::AttackResult::Immune => (0, false, false),
         };
 
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
         let event = GameEvent::PlayerAttack {
             attacker_id: player_id,
             target_id,
@@ -401,7 +401,7 @@ impl MapServer {
         {
             self.drop_manager.pickup(&drop.id);
 
-            let channel_name = format!("map:{}", player.map_name);
+            let channel_name = map_channel_name(&player.map_name);
             let event = GameEvent::ItemPickup {
                 player_id,
                 item_id: drop.item_id,

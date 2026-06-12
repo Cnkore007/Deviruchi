@@ -14,7 +14,7 @@ pub mod respawn;
 pub mod teleport;
 
 pub use cell::{Cell, CellType};
-pub use channel::{ChannelBus, ChatType, GameEvent};
+pub use channel::{ChannelBus, ChatType, GameEvent, guild_channel_name, map_channel_name, party_channel_name};
 pub use data::{CharacterData, MapData, MapDatabase};
 pub use gat::{GatError, GatParser};
 pub use drop_item::{DropItem, DropManager};

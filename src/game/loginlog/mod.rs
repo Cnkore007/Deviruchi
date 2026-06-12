@@ -88,10 +88,7 @@ impl LoginLogManager {
             username,
             ip,
             event,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            timestamp: crate::util::unix_timestamp_secs(),
             message,
         };
 

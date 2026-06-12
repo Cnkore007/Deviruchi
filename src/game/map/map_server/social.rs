@@ -2,7 +2,7 @@
 
 use super::MapServer;
 use crate::game::item::ItemDatabase;
-use crate::game::map::channel::{ChatType, GameEvent};
+use crate::game::map::channel::{ChatType, GameEvent, map_channel_name, party_channel_name};
 use crate::game::map::Player;
 use crate::game::trade::TradeItem;
 use crate::game::zeny::ZenyManager;
@@ -34,7 +34,7 @@ impl MapServer {
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
-            let channel_name = format!("party:{}", party.id);
+            let channel_name = party_channel_name(party.id);
             let (x, y) = player.get_position();
             self.channel_bus
                 .subscribe(&channel_name, player_id, tx.clone(), x, y);
@@ -98,7 +98,7 @@ impl MapServer {
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
-            let channel_name = format!("party:{}", party.id);
+            let channel_name = party_channel_name(party.id);
             let (x, y) = player.get_position();
             self.channel_bus
                 .subscribe(&channel_name, player_id, tx.clone(), x, y);
@@ -111,7 +111,7 @@ impl MapServer {
     pub(super) fn handle_party_leave(&self, session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let party = self.party_manager.get_player_party(&player_id)?;
-        let channel_name = format!("party:{}", party.id);
+        let channel_name = party_channel_name(party.id);
         self.party_manager.leave_party(&player_id);
         self.channel_bus.unsubscribe(&channel_name, &player_id);
         None
@@ -124,7 +124,7 @@ impl MapServer {
 
         if let Some(party) = self.party_manager.get_player_party(&player_id) {
             let _player = self.map_state.get_player(&player_id)?;
-            let channel_name = format!("party:{}", party.id);
+            let channel_name = party_channel_name(party.id);
 
             let event = GameEvent::PlayerChat {
                 player_id,
@@ -144,7 +144,7 @@ impl MapServer {
         let pkt = CZChatMessage::from_slice(data)?;
 
         let player = self.map_state.get_player(&player_id)?;
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
 
         let event = GameEvent::PlayerChat {
             player_id,

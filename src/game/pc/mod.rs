@@ -105,68 +105,84 @@ impl Default for PlayerStats {
     }
 }
 
+const BASE_HP: u32 = 100;
+const HP_PER_LEVEL: u32 = 10;
+const VIT_HP_BONUS: u32 = 5;
+const HIT_BASE: u16 = 175;
+const FLEE_BASE: u16 = 100;
+const ASPD_BASE: u16 = 150;
+
 /// 属性计算器
 pub struct StatCalculator;
 
 impl StatCalculator {
     /// 计算最大 HP
     pub fn calculate_max_hp(base_level: u16, vit: u16, job_class: u16) -> u32 {
-        let base_hp = 100 + (base_level as u32 * 10);
-        let vit_bonus = vit as u32 * 5;
-        let job_bonus = job_class as u32 * 50;
-        base_hp + vit_bonus + job_bonus
+        let base_hp = BASE_HP.saturating_add((base_level as u32).saturating_mul(HP_PER_LEVEL));
+        let vit_bonus = (vit as u32).saturating_mul(VIT_HP_BONUS);
+        let job_bonus = (job_class as u32).saturating_mul(50);
+        base_hp.saturating_add(vit_bonus).saturating_add(job_bonus)
     }
 
     /// 计算最大 SP
     pub fn calculate_max_sp(base_level: u16, int: u16, job_class: u16) -> u32 {
-        let base_sp = 50 + (base_level as u32 * 5);
-        let int_bonus = int as u32 * 3;
-        let job_bonus = job_class as u32 * 20;
-        base_sp + int_bonus + job_bonus
+        let base_sp = 50u32.saturating_add((base_level as u32).saturating_mul(5));
+        let int_bonus = (int as u32).saturating_mul(3);
+        let job_bonus = (job_class as u32).saturating_mul(20);
+        base_sp.saturating_add(int_bonus).saturating_add(job_bonus)
     }
 
     /// 计算攻击力
     pub fn calculate_attack(str: u16, dex: u16, level: u16) -> u16 {
-        let base_attack = str as u16 + (level / 4);
+        let base_attack = str.saturating_add(level / 4);
         let dex_bonus = dex / 10;
-        base_attack + dex_bonus
+        base_attack.saturating_add(dex_bonus)
     }
 
     /// 计算魔法攻击力
     pub fn calculate_magic_attack(int: u16, dex: u16, level: u16) -> u16 {
-        let base_attack = int as u16 + (level / 4);
+        let base_attack = int.saturating_add(level / 4);
         let dex_bonus = dex / 10;
-        base_attack + dex_bonus
+        base_attack.saturating_add(dex_bonus)
     }
 
     /// 计算防御力
     pub fn calculate_defense(vit: u16, agi: u16) -> u16 {
-        vit + (agi / 5)
+        vit.saturating_add(agi / 5)
     }
 
     /// 计算魔法防御力
     pub fn calculate_magic_defense(int: u16, vit: u16) -> u16 {
-        int + (vit / 5)
+        int.saturating_add(vit / 5)
     }
 
     /// 计算命中率
     pub fn calculate_hit(dex: u16, luk: u16, level: u16) -> u16 {
-        175 + dex + (luk / 3) + (level / 2)
+        HIT_BASE
+            .saturating_add(dex)
+            .saturating_add(luk / 3)
+            .saturating_add(level / 2)
     }
 
     /// 计算闪避率
     pub fn calculate_flee(agi: u16, luk: u16, level: u16) -> u16 {
-        100 + agi + (luk / 5) + (level / 2)
+        FLEE_BASE
+            .saturating_add(agi)
+            .saturating_add(luk / 5)
+            .saturating_add(level / 2)
     }
 
     /// 计算暴击率
     pub fn calculate_critical(luk: u16) -> u16 {
-        1 + (luk / 3)
+        1u16.saturating_add(luk / 3)
     }
 
     /// 计算攻击速度
     pub fn calculate_attack_speed(agi: u16, dex: u16) -> u16 {
-        150 - (agi / 2) - (dex / 5)
+        ASPD_BASE
+            .saturating_sub(agi / 2)
+            .saturating_sub(dex / 5)
+            .max(100)
     }
 }
 

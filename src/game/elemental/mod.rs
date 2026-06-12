@@ -269,7 +269,7 @@ impl ElementalManager {
         self.elementals.write().insert(id, elemental);
         self.player_elementals.write().insert(owner_id, id);
 
-        log::info!("Elemental {} summoned for player {:?}", id, owner_id);
+        tracing::info!("Elemental {} summoned for player {:?}", id, owner_id);
         id
     }
 
@@ -288,7 +288,7 @@ impl ElementalManager {
         self.elementals.write().remove(&elemental_id);
         self.player_elementals.write().remove(&owner_id);
 
-        log::info!("Elemental {} dismissed", elemental_id);
+        tracing::info!("Elemental {} dismissed", elemental_id);
         true
     }
 
@@ -315,7 +315,7 @@ impl ElementalManager {
         for (id, owner_id) in to_remove {
             self.elementals.write().remove(&id);
             self.player_elementals.write().remove(&owner_id);
-            log::info!("Elemental {} expired", id);
+            tracing::info!("Elemental {} expired", id);
         }
     }
 

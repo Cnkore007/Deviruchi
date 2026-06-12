@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 /// 拍卖物品条目
@@ -46,10 +45,7 @@ impl AuctionEntry {
         buyout_price: Option<u64>,
         duration_hours: u64,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         Self {
             auction_id: Uuid::new_v4(),
             seller_id,
@@ -66,18 +62,12 @@ impl AuctionEntry {
     }
 
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         now > self.end_time
     }
 
     pub fn time_remaining_secs(&self) -> u64 {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         self.end_time.saturating_sub(now)
     }
 

@@ -55,7 +55,7 @@ impl StatusTickProcessor {
     }
 
     /// 处理玩家状态Tick
-    pub fn tick_player(&mut self, player: &Arc<Player>, status: &PlayerStatus) -> StatusTickResult {
+    pub fn tick_player(&mut self, player: &Player, status: &PlayerStatus) -> StatusTickResult {
         let mut result = StatusTickResult::default();
 
         // 1. 清理过期状态
@@ -123,7 +123,7 @@ impl StatusTickProcessor {
     /// 处理持续伤害效果（DOT: Damage Over Time）
     fn process_dot_effects(
         &self,
-        player: &Arc<Player>,
+        player: &Player,
         status: &PlayerStatus,
         result: &mut StatusTickResult,
     ) {
@@ -171,7 +171,7 @@ impl StatusTickProcessor {
     /// 处理回复效果
     fn process_regen_effects(
         &self,
-        player: &Arc<Player>,
+        player: &Player,
         status: &PlayerStatus,
         result: &mut StatusTickResult,
     ) {
@@ -209,7 +209,7 @@ impl StatusTickProcessor {
     }
 
     /// 计算基础HP回复量
-    fn calculate_base_hp_regen(&self, player: &Arc<Player>) -> i32 {
+    fn calculate_base_hp_regen(&self, player: &Player) -> i32 {
         let vit = player.vit() as i32;
         let max_hp = player.max_hp() as i32;
 
@@ -218,7 +218,7 @@ impl StatusTickProcessor {
     }
 
     /// 计算基础SP回复量
-    fn calculate_base_sp_regen(&self, player: &Arc<Player>) -> i32 {
+    fn calculate_base_sp_regen(&self, player: &Player) -> i32 {
         let int = player.int() as i32;
         let max_sp = player.max_sp() as i32;
 
@@ -229,7 +229,7 @@ impl StatusTickProcessor {
     /// 处理隐身效果
     fn process_stealth_effects(
         &self,
-        player: &Arc<Player>,
+        player: &Player,
         status: &PlayerStatus,
         result: &mut StatusTickResult,
     ) {
@@ -337,7 +337,6 @@ impl StatusTickService {
                         continue;
                     }
 
-                    let player = Arc::new(player);
                     let result = processor.tick_player(&player, &player.status);
 
                     if result.player_died {

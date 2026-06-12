@@ -1,7 +1,7 @@
 use crate::game::battle::BattleHandler;
 use crate::game::guild::GuildManager;
 use crate::game::map::teleport::{SavePointManager, TeleportManager, WarpService};
-use crate::game::map::{ChannelBus, DropManager, MapServer, MapState};
+use crate::game::map::{ChannelBus, DropManager, MapServer, MapState, map_channel_name};
 use crate::game::mob::MobSpawnManager;
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -124,7 +124,7 @@ impl PacketHandler {
             // 从地图移除
             if let Some(player) = self.map_server.map_state.get_player(&player_id) {
                 let map_name = player.map_name.clone();
-                let channel_name = format!("map:{}", map_name);
+                let channel_name = map_channel_name(&map_name);
                 self.map_server.channel_bus.unsubscribe(&channel_name, &player_id);
                 self.map_server.map_state.remove_player(&player_id);
             }

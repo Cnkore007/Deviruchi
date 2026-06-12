@@ -8,6 +8,18 @@ use crate::game::status::{StatusChange, StatusEffect, StatusSource};
 use std::sync::Arc;
 use uuid::Uuid;
 
+fn skill_duration_secs(level: u32) -> u32 {
+    60 + level * 30
+}
+
+fn skill_heal_amount(level: u32, base: u32, per_level: u32) -> u32 {
+    base.saturating_add(level.saturating_mul(per_level))
+}
+
+fn secs_to_ms(secs: u32) -> u64 {
+    secs as u64 * 1000
+}
+
 /// 物品使用验证器
 #[allow(dead_code)]
 pub struct ItemUseValidator {
@@ -123,14 +135,14 @@ impl ItemUseHandler {
                 if item.hp_restore > 0 {
                     let current = player.hp();
                     let max = player.max_hp();
-                    let new_hp = (current + item.hp_restore as u32).min(max);
+                    let new_hp = current.saturating_add(item.hp_restore as u32).min(max);
                     player.combat_mut().hp = new_hp;
                 }
                 // 恢复SP
                 if item.sp_restore > 0 {
                     let current = player.sp();
                     let max = player.max_sp();
-                    let new_sp = (current + item.sp_restore as u32).min(max);
+                    let new_sp = current.saturating_add(item.sp_restore as u32).min(max);
                     player.combat_mut().sp = new_sp;
                 }
             }
@@ -191,7 +203,7 @@ pub fn apply_item_effect(
         ItemEffect::Produce(item_id) => execute_produce(player, inventory, *item_id),
 
         // 使用技能
-        ItemEffect::UseSkill { skill_id, level } => execute_use_skill(player, *skill_id, *level),
+        ItemEffect::UseSkill { skill_id, level } => execute_use_skill(player, None, *skill_id, *level),
 
         // 剥离装备
         ItemEffect::StripArmor | ItemEffect::StripWeapon | ItemEffect::StripAccessory => {
@@ -238,7 +250,7 @@ fn execute_teleport(player: &Player, map: &str, x: i32, y: i32) -> ItemUseResult
         let save_map = player.get_save_map();
         let (save_x, save_y) = player.get_save_point();
         player.move_to(save_x, save_y);
-        log::info!(
+        tracing::info!(
             "Player {} teleported to save point {} ({}, {})",
             player.id, save_map, save_x, save_y
         );
@@ -253,7 +265,7 @@ fn execute_teleport(player: &Player, map: &str, x: i32, y: i32) -> ItemUseResult
     // 执行传送
     player.move_to(x as u16, y as u16);
     
-    log::info!(
+    tracing::info!(
         "Player {} teleported to {} ({}, {})",
         player.id, map, x, y
     );
@@ -300,7 +312,7 @@ fn execute_get_item(
     if roll < rate {
         // 检查背包空间
         if inventory.can_add_item(item_id, count) && inventory.add_item(item_id, count) {
-            log::info!("Player {} got item {} x{}", player.id, item_id, count);
+            tracing::info!("Player {} got item {} x{}", player.id, item_id, count);
             return ItemUseResult::Success;
         }
         return ItemUseResult::Failed("背包空间不足".to_string());
@@ -321,7 +333,7 @@ fn execute_produce(player: &Player, inventory: &mut Inventory, item_id: i32) -> 
 
     // 添加物品
     if inventory.add_item(item_id, 1) {
-        log::info!("Player {} produced item {}", player.id, item_id);
+        tracing::info!("Player {} produced item {}", player.id, item_id);
         ItemUseResult::Success
     } else {
         ItemUseResult::Failed("制作失败".to_string())
@@ -332,7 +344,7 @@ fn execute_produce(player: &Player, inventory: &mut Inventory, item_id: i32) -> 
 ///
 /// 模拟玩家使用指定技能。对应 rAthena 的技能卷轴、技能书等物品效果。
 /// 注意：此函数仅触发技能效果，不消耗 SP。
-fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult {
+fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, level: u8) -> ItemUseResult {
     // 检查玩家是否可以施法
     if !player.can_cast() {
         return ItemUseResult::Failed("当前状态无法施法".to_string());
@@ -347,9 +359,9 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
     match skill_id {
         // 治愈术 (AL_HEAL)
         28 => {
-            let heal_amount = 100 + (level as u32 * 30);
+            let heal_amount = skill_heal_amount(level as u32, 100, 30);
             player.apply_heal(heal_amount);
-            log::info!(
+            tracing::info!(
                 "Player {} used Heal skill (level {}) via item, healed {} HP",
                 player.id, level, heal_amount
             );
@@ -357,21 +369,21 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
         // 加速术 (AL_INCAGI)
         29 => {
             player.apply_haste(level);
-            log::info!(
+            tracing::info!(
                 "Player {} used Increase AGI skill (level {}) via item",
                 player.id, level
             );
         }
         // 天使之击 (AL_ANGELUS) - 防御提升
         33 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::Shield,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(33),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Angelus skill (level {}), defense buff for {}s",
                 player.id, level, duration
             );
@@ -379,60 +391,60 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
         // 祝福术 (AL_BLESSING)
         34 => {
             player.apply_blessing(level);
-            log::info!(
+            tracing::info!(
                 "Player {} used Blessing skill (level {}) via item",
                 player.id, level
             );
         }
         // 天使之光 (AL_AGI) - 敏捷提升
         35 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::IncreaseAgi,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(35),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Increase AGI skill (level {}), AGI buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_ASPERSIO) - 祝圣（武器附加圣属性）
         70 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::HolyBody,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(70),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Aspersio skill (level {}), holy weapon for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_BENEDICTIO) - 祝福
         71 => {
-            let heal_amount = 200 + (level as u32 * 50);
+            let heal_amount = skill_heal_amount(level as u32, 200, 50);
             player.apply_heal(heal_amount);
-            log::info!(
+            tracing::info!(
                 "Player {} used Benedictio skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
         // 治愈术 (PR_SANCTUARY) - 圣域
         72 => {
-            let heal_amount = 100 + (level as u32 * 20);
+            let heal_amount = skill_heal_amount(level as u32, 100, 20);
             player.apply_heal(heal_amount);
-            log::info!(
+            tracing::info!(
                 "Player {} used Sanctuary skill (level {}), healed {} HP",
                 player.id, level, heal_amount
             );
         }
         // 治愈术 (PR_STRECOVERY) - 力量恢复（SP 恢复）
         73 => {
-            let sp_amount = 50 + (level as u32 * 20);
+            let sp_amount = skill_heal_amount(level as u32, 50, 20);
             // 使用 SP 恢复状态效果
             let effect = StatusEffect::new(
                 StatusChange::SpRegen,
@@ -441,108 +453,116 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
             );
             player.add_status(effect);
             player.apply_sp_heal(sp_amount);
-            log::info!(
+            tracing::info!(
                 "Player {} used Strength Recovery skill (level {}), restored {} SP",
                 player.id, level, sp_amount
             );
         }
         // 治愈术 (PR_MAGNIFICAT) - 赞美诗（SP 恢复速度提升）
         74 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::SpRegen,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(74),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Magnificat skill (level {}), SP regen buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_GLORIA) - 荣耀颂（LUK 提升）
         75 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::IncreaseLuk,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(75),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Gloria skill (level {}), LUK buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_SUFFRAGIUM) - 祈祷（减少施法时间）
         76 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::Concentration,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(76),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Suffragium skill (level {}), cast time reduction for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_IMPOSITIO) - 奉献（ATK 提升）
         77 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::PowerUp,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(77),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Impositio Manus skill (level {}), ATK buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_LAUDAAGNUS) - 赞美诗（VIT 提升）
         78 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::IncreaseVit,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(78),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Lauda Agnus skill (level {}), VIT buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_LAUDARAMUS) - 赞美诗（LUK 提升）
         79 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::IncreaseLuk,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(79),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Lauda Ramus skill (level {}), LUK buff for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (PR_LEXDIVINA) - 神圣之言（沉默）
         80 => {
-            let duration = 30 + level as u32 * 10;
+            let duration = skill_heal_amount(level as u32, 30, 10);
             let effect = StatusEffect::new(
                 StatusChange::Silence,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(80),
             );
-            player.add_status(effect);
-            log::info!(
-                "Player {} used Lex Divina skill (level {}), silence for {}s",
-                player.id, level, duration
-            );
+            if let Some(t) = target {
+                t.add_status(effect);
+                tracing::info!(
+                    "Player {} used Lex Divina (level {}), silenced target {} for {}s",
+                    player.id, level, t.id, duration
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Lex Divina (level {}) but no target, effect ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (PR_LEXAETERNA) - 永恒之言（受到伤害加倍）
         81 => {
@@ -551,31 +571,47 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 60000, // 60 秒
                 StatusSource::Skill(81),
             );
-            player.add_status(effect);
-            log::info!(
-                "Player {} used Lex Aeterna skill (level {}), double damage debuff",
-                player.id, level
-            );
+            if let Some(t) = target {
+                t.add_status(effect);
+                tracing::info!(
+                    "Player {} used Lex Aeterna (level {}), double damage debuff on target {}",
+                    player.id, level, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Lex Aeterna (level {}) but no target, effect ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (PR_TURNUNDEAD) - 超度亡灵
         82 => {
-            let heal_amount = 200 + (level as u32 * 50);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Turn Undead skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 200, 50);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Turn Undead (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Turn Undead (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (PR_KYRIE) - 主啊，请保佑我们（护盾）
         83 => {
-            let duration = 60 + level as u32 * 30;
+            let duration = skill_duration_secs(level as u32);
             let effect = StatusEffect::new(
                 StatusChange::Shield,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(83),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Kyrie Eleison skill (level {}), shield for {}s",
                 player.id, level, duration
             );
@@ -588,7 +624,7 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 StatusSource::Skill(84),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used SP Recovery skill (level {}), SP regen buff",
                 player.id, level
             );
@@ -601,88 +637,136 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 StatusSource::Skill(85),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Sight skill (level {}), detect hidden units",
                 player.id, level
             );
         }
         // 治愈术 (MG_NAPALMBEAT) - 火焰弹
         86 => {
-            let heal_amount = 150 + (level as u32 * 30);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Napalm Beat skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 150, 30);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Napalm Beat (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Napalm Beat (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_SAFETYWALL) - 安全墙（物理伤害吸收）
         87 => {
-            let duration = 30 + level as u32 * 10;
+            let duration = skill_heal_amount(level as u32, 30, 10);
             let effect = StatusEffect::new(
                 StatusChange::Shield,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(87),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Safety Wall skill (level {}), physical shield for {}s",
                 player.id, level, duration
             );
         }
         // 治愈术 (MG_SOULSTRIKE) - 灵魂打击
         88 => {
-            let heal_amount = 250 + (level as u32 * 50);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Soul Strike skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 250, 50);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Soul Strike (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Soul Strike (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_COLDBOLT) - 冰箭
         89 => {
-            let heal_amount = 300 + (level as u32 * 60);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Cold Bolt skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 300, 60);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Cold Bolt (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Cold Bolt (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_FROSTDIVER) - 冰冻术（冻结目标）
         90 => {
-            let duration = 10 + level as u32 * 5;
+            let duration = skill_heal_amount(level as u32, 10, 5);
             let effect = StatusEffect::new(
                 StatusChange::Freeze,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(90),
             );
-            player.add_status(effect);
-            log::info!(
-                "Player {} used Frost Diver skill (level {}), freeze for {}s",
-                player.id, level, duration
-            );
+            if let Some(t) = target {
+                t.add_status(effect);
+                tracing::info!(
+                    "Player {} used Frost Diver (level {}), froze target {} for {}s",
+                    player.id, level, t.id, duration
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Frost Diver (level {}) but no target, effect ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_STONECURSE) - 石化术（石化目标）
         91 => {
-            let duration = 10 + level as u32 * 5;
+            let duration = skill_heal_amount(level as u32, 10, 5);
             let effect = StatusEffect::new(
                 StatusChange::Stone,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(91),
             );
-            player.add_status(effect);
-            log::info!(
-                "Player {} used Stone Curse skill (level {}), petrify for {}s",
-                player.id, level, duration
-            );
+            if let Some(t) = target {
+                t.add_status(effect);
+                tracing::info!(
+                    "Player {} used Stone Curse (level {}), petrified target {} for {}s",
+                    player.id, level, t.id, duration
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Stone Curse (level {}) but no target, effect ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_FIREBALL) - 火球术
         92 => {
-            let heal_amount = 450 + (level as u32 * 90);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Fire Ball skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 450, 90);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Fire Ball (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Fire Ball (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_FIREWALL) - 火墙（火焰伤害区域）
         93 => {
@@ -692,45 +776,69 @@ fn execute_use_skill(player: &Player, skill_id: u16, level: u8) -> ItemUseResult
                 StatusSource::Skill(93),
             );
             player.add_status(effect);
-            log::info!(
+            tracing::info!(
                 "Player {} used Fire Wall skill (level {}), fire damage zone",
                 player.id, level
             );
         }
         // 治愈术 (MG_FIREBOLT) - 火箭
         94 => {
-            let heal_amount = 550 + (level as u32 * 110);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Fire Bolt skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 550, 110);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Fire Bolt (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Fire Bolt (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_LIGHTNINGBOLT) - 雷击
         95 => {
-            let heal_amount = 600 + (level as u32 * 120);
-            player.apply_heal(heal_amount);
-            log::info!(
-                "Player {} used Lightning Bolt skill (level {}), healed {} HP",
-                player.id, level, heal_amount
-            );
+            let damage = skill_heal_amount(level as u32, 600, 120);
+            if let Some(t) = target {
+                t.take_damage(damage);
+                tracing::info!(
+                    "Player {} used Lightning Bolt (level {}), dealt {} damage to target {}",
+                    player.id, level, damage, t.id
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Lightning Bolt (level {}) but no target, damage ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         // 治愈术 (MG_THUNDERSTORM) - 雷暴（范围雷电伤害 + 眩晕）
         96 => {
-            let duration = 5 + level as u32 * 2;
+            let duration = skill_heal_amount(level as u32, 5, 2);
             let effect = StatusEffect::new(
                 StatusChange::Stun,
-                duration as u64 * 1000,
+                secs_to_ms(duration),
                 StatusSource::Skill(96),
             );
-            player.add_status(effect);
-            log::info!(
-                "Player {} used Thunder Storm skill (level {}), stun for {}s",
-                player.id, level, duration
-            );
+            if let Some(t) = target {
+                t.add_status(effect);
+                tracing::info!(
+                    "Player {} used Thunder Storm (level {}), stunned target {} for {}s",
+                    player.id, level, t.id, duration
+                );
+            } else {
+                tracing::warn!(
+                    "Player {} used Thunder Storm (level {}) but no target, effect ignored",
+                    player.id, level
+                );
+                return ItemUseResult::Failed("没有目标".to_string());
+            }
         }
         _ => {
-            log::warn!(
+            tracing::warn!(
                 "Item skill {} (level {}) not implemented for player {}",
                 skill_id, level, player.id
             );
@@ -770,7 +878,7 @@ fn execute_strip_equipment(player: &Player, effect: &ItemEffect) -> ItemUseResul
     // 执行剥离（将装备从装备栏移除）
     let mut equipment = player.equipment.write();
     if let Some(item) = equipment.unequip(slot) {
-        log::info!(
+        tracing::info!(
             "Player {:?} equipment stripped from slot {:?}, item {:?} moved to inventory.",
             player.id, slot, item.item_id
         );
@@ -822,7 +930,7 @@ fn execute_consume_ammo(player: &Player) -> ItemUseResult {
     let left_hand = equipment.get(EquipSlot::LeftHand);
     
     if let Some(ammo) = left_hand {
-        log::info!(
+        tracing::info!(
             "Player {} consumed 1 ammo from left hand (item {})",
             player.id, ammo.item_id
         );
@@ -830,7 +938,7 @@ fn execute_consume_ammo(player: &Player) -> ItemUseResult {
         // 当前简化处理：仅记录日志
     } else {
         // 如果没有装备弹药，直接返回成功（某些技能不需要弹药）
-        log::debug!("Player {} ammo consumption skipped (no ammo equipped)", player.id);
+        tracing::debug!("Player {} ammo consumption skipped (no ammo equipped)", player.id);
     }
 
     ItemUseResult::Success
@@ -855,7 +963,7 @@ fn execute_disguise(player: &Player, mob_id: u16) -> ItemUseResult {
     
     player.add_status(effect);
     
-    log::info!(
+    tracing::info!(
         "Player {} disguised as mob {} (duration: 5 min)",
         player.id, mob_id
     );

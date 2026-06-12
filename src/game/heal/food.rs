@@ -232,10 +232,7 @@ impl FoodManager {
             .entry(player.id)
             .or_insert_with(|| PlayerFoodState::new(player.id));
 
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let current_time = crate::util::unix_timestamp_millis();
 
         if player_state.use_food(item_id, &effect, current_time) {
             Some(effect)
@@ -249,10 +246,7 @@ impl FoodManager {
         let mut states = self.player_states.write();
 
         if let Some(state) = states.get_mut(&player.id) {
-            let current_time = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            let current_time = crate::util::unix_timestamp_millis();
 
             state.process_effects(current_time)
         } else {

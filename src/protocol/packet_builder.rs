@@ -84,8 +84,9 @@ impl PacketBuilderCtx {
 
     pub fn build(self) -> Vec<u8> {
         let len = self.data.len() + 4; // header size
+        let len_u16: u16 = len.try_into().unwrap_or(u16::MAX);
         let mut buf = BytesMut::with_capacity(len);
-        buf.put_u16_le(len as u16);
+        buf.put_u16_le(len_u16);
         buf.put_u16_le(self.packet_id);
         buf.put_slice(&self.data);
         buf.to_vec()

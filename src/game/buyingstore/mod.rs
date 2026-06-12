@@ -193,7 +193,7 @@ impl BuyingStoreManager {
         self.stores.write().insert(store_id, store);
         self.player_stores.write().insert(owner_id, store_id);
 
-        log::info!(
+        tracing::info!(
             "BuyingStore {} created by player {:?}",
             store_id,
             owner_id
@@ -237,7 +237,7 @@ impl BuyingStoreManager {
         stores.remove(&store_id);
         self.player_stores.write().remove(owner_id);
 
-        log::info!("BuyingStore {} closed", store_id);
+        tracing::info!("BuyingStore {} closed", store_id);
         BuyingStoreResult::Success
     }
 
@@ -280,7 +280,7 @@ impl BuyingStoreManager {
         // 执行收购
         store.buy_item(item_id, quantity, total_price);
 
-        log::info!(
+        tracing::info!(
             "Player {:?} sold {}x item {} to BuyingStore {} for {} zeny",
             seller_id,
             quantity,

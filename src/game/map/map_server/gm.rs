@@ -1,7 +1,7 @@
 //! GM 命令与传送 handler：warp/goto/summon/savepoint、return 传送、重生
 
 use super::MapServer;
-use crate::game::map::channel::GameEvent;
+use crate::game::map::channel::{GameEvent, map_channel_name};
 use crate::game::map::teleport::{SavePoint, TeleportAction};
 use crate::network::session::Session;
 use crate::protocol::packet_builder::Packed;
@@ -305,7 +305,7 @@ impl MapServer {
             .respawn_player(&player_id, save_point.x, save_point.y, &save_point.map_name);
 
         // 更新 ChannelBus 中的位置
-        let new_channel = format!("map:{}", save_point.map_name);
+        let new_channel = map_channel_name(&save_point.map_name);
         self.channel_bus
             .update_position(&new_channel, &player_id, save_point.x, save_point.y);
 
@@ -366,7 +366,7 @@ impl MapServer {
         // 从地图移除玩家
         if let Some(player) = self.map_state.get_player(&player_id) {
             let map_name = player.map_name.clone();
-            let channel_name = format!("map:{}", map_name);
+            let channel_name = map_channel_name(&map_name);
             self.channel_bus.unsubscribe(&channel_name, &player_id);
             self.map_state.remove_player(&player_id);
         }

@@ -1,5 +1,3 @@
-pub mod data;
-
 use crate::game::item::{Inventory, ItemDatabase};
 use crate::game::map::Player;
 use crate::game::zeny::MAX_ZENY;

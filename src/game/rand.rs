@@ -31,7 +31,7 @@ impl ThreadRng {
         // 使用当前时间种子初始化
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_nanos() as u64;
         Self(parking_lot::Mutex::new(StdRng::seed_from_u64(seed)))
     }

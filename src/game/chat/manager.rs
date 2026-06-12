@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::game::map::{ChannelBus, ChatType, GameEvent, MapState, Player};
+use crate::game::map::{ChannelBus, ChatType, GameEvent, MapState, Player, map_channel_name};
 
 use super::parser::{ChatCommand, parse_chat};
 use super::rate_limit::WhisperRateLimiter;
@@ -163,7 +163,7 @@ impl ChatManager {
             chat_type: ChatType::Map,
         };
 
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
         let packet = event.to_packet_bytes();
         channel_bus.publish(&channel_name, &event, packet);
     }

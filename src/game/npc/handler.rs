@@ -81,10 +81,10 @@ impl NpcHandler {
             },
             super::data::NpcType::SkillTrainer => {
                 // 有脚本时优先使用脚本驱动对话
-                if npc.script.is_some() {
+                if let Some(ref script) = npc.script {
                     NpcResponse::StartScript {
                         npc_id,
-                        script: npc.script.clone().unwrap(),
+                        script: script.clone(),
                     }
                 } else {
                     NpcResponse::SkillList {

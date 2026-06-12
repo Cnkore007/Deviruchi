@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 /// 邮件附件中的物品
@@ -53,10 +52,7 @@ impl MailMessage {
         title: String,
         body: String,
     ) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         Self {
             mail_id: Uuid::new_v4(),
             sender_id,
@@ -75,10 +71,7 @@ impl MailMessage {
     }
 
     pub fn is_expired(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let now = crate::util::unix_timestamp_secs();
         now > self.expires_at
     }
 

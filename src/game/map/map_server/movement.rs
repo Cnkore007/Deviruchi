@@ -1,7 +1,7 @@
 //! 方向改变与私聊 handler
 
 use super::MapServer;
-use crate::game::map::channel::GameEvent;
+use crate::game::map::channel::{GameEvent, map_channel_name};
 use crate::network::packet::id::*;
 use crate::network::session::Session;
 
@@ -44,7 +44,7 @@ impl MapServer {
         let player = self.map_state.get_player(&player_id)?;
 
         // 向同地图其他玩家广播方向变化
-        let channel_name = format!("map:{}", player.map_name);
+        let channel_name = map_channel_name(&player.map_name);
         let event = GameEvent::PlayerDirectionChange {
             player_id,
             direction,

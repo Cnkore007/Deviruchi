@@ -107,7 +107,9 @@ impl CharServer {
         info!("Request char list for account_id={}", account_id);
 
         // 先清理已过期的删除定时器角色
-        let _ = self.db.cleanup_deleted_characters();
+        if let Err(e) = self.db.cleanup_deleted_characters() {
+            tracing::warn!("Failed to cleanup deleted characters: {}", e);
+        }
 
         let characters = self.db.get_characters_by_account(account_id).ok()?;
 

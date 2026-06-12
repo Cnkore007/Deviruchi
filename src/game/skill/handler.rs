@@ -89,7 +89,7 @@ impl SkillHandler {
 
         // 获取目标玩家
         let target = if target_id != 0 {
-            Some(self.find_target_by_char_id(caster.clone(), target_id, map_state)?)
+            Some(self.find_target_by_char_id(&caster.map_name, target_id, map_state)?)
         } else {
             None
         };
@@ -193,12 +193,11 @@ impl SkillHandler {
     /// 根据 char_id 查找目标玩家
     fn find_target_by_char_id(
         &self,
-        caster: Arc<Player>,
+        map_name: &str,
         target_char_id: u32,
         map_state: &MapState,
     ) -> Result<Player, SkillError> {
-        let map_name = caster.map_name.clone();
-        let players = map_state.get_players_on_map(&map_name);
+        let players = map_state.get_players_on_map(map_name);
 
         players
             .into_iter()

@@ -102,8 +102,9 @@ impl Timer {
 
         while let Some(entry) = queue.peek() {
             if entry.due <= now {
-                let entry = queue.pop().unwrap();
-                (entry.callback)();
+                if let Some(entry) = queue.pop() {
+                    (entry.callback)();
+                }
             } else {
                 break;
             }

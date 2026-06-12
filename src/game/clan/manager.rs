@@ -178,7 +178,7 @@ impl ClanManager {
                 // 验证发送者是公会成员
                 if clan.find_member_by_account(sender_account_id).is_some() {
                     // 实际发送需集成网络层，这里仅验证逻辑
-                    log::info!(
+                    tracing::info!(
                         "[Clan {}] {}: {}",
                         clan.name,
                         sender_account_id,
