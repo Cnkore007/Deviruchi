@@ -22,7 +22,7 @@ pub enum HomunculusType {
 
 impl HomunculusType {
     /// 从字符串解析（用于数据库加载）
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_name(s: &str) -> Self {
         match s {
             "Lif" => HomunculusType::Lif,
             "Amistr" => HomunculusType::Amistr,
@@ -61,7 +61,7 @@ impl HomunculusRace {
     }
 
     /// 从字符串解析（用于数据库加载）
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_name(s: &str) -> Self {
         match s {
             "Demihuman" => HomunculusRace::Demihuman,
             "Brute" => HomunculusRace::Brute,
@@ -95,7 +95,7 @@ impl EvolutionStage {
     }
 
     /// 从字符串解析（用于数据库加载）
-    pub fn from_str(s: &str) -> Self {
+    pub fn from_name(s: &str) -> Self {
         match s {
             "Evolved" => EvolutionStage::Evolved,
             "SuperEvolved" => EvolutionStage::SuperEvolved,
@@ -358,7 +358,7 @@ impl HomunculusDatabase {
         let mut templates = std::collections::HashMap::new();
 
         for (class, yt) in yaml_db {
-            let race = HomunculusRace::from_str(&yt.race);
+            let race = HomunculusRace::from_name(&yt.race);
             templates.insert(class, HomunculusTemplate {
                 class_name: yt.class_name,
                 name: yt.name,

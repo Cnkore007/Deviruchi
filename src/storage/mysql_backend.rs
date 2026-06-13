@@ -85,7 +85,7 @@ mod inner {
 
     /// 将 IntoValue 参数列表转换为 mysql::Params（位置参数）
     fn params_to_mysql(params: &[&dyn IntoValue]) -> Vec<mysql::Value> {
-        params.iter().map(|p| value_to_mysql(&p.into_value())).collect()
+        params.iter().map(|p| value_to_mysql(&p.to_value())).collect()
     }
 
     /// 将 mysql_common::Row 转换为抽象 Row

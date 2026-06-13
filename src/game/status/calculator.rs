@@ -356,8 +356,7 @@ impl StatusCalculator {
     /// 计算最终伤害减免
     pub fn calculate_damage_reduction(base_reduction: i32, modifiers: &StatModifiers) -> i32 {
         (base_reduction + modifiers.damage_reduction_percent)
-            .max(0)
-            .min(100)
+            .clamp(0, 100)
     }
 }
 

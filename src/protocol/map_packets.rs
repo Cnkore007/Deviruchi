@@ -1,4 +1,4 @@
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string, parse_string};
+use super::packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string, parse_string};
 
 const NAME_LENGTH: usize = 24;
 
@@ -49,7 +49,7 @@ pub struct CharInfo {
 impl Packed for SCCharList {
     fn to_packet(&self) -> Vec<u8> {
         let count = self.characters.len() as u8;
-        let mut ctx = PacketBuilder::new(0x006B);
+        let mut ctx = PacketBuilderCtx::new(0x006B);
         ctx = ctx.put_u8(count);
 
         for char_info in &self.characters {
@@ -110,7 +110,7 @@ pub struct CHEnterCharServer {
 
 impl Packed for CHEnterCharServer {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0065)
+        PacketBuilderCtx::new(0x0065)
             .put_u32(self.account_id)
             .put_u32(self.login_id1)
             .put_u32(self.login_id2)
@@ -138,7 +138,7 @@ pub struct CHSelectChar {
 
 impl Packed for CHSelectChar {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0066).put_u32(self.char_id).build()
+        PacketBuilderCtx::new(0x0066).put_u32(self.char_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -169,7 +169,7 @@ pub struct CHMakeChar {
 
 impl Packed for CHMakeChar {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0067)
+        PacketBuilderCtx::new(0x0067)
             .put_fixed_str(&self.name, NAME_LENGTH)
             .put_u8(self.str)
             .put_u8(self.agi)
@@ -211,7 +211,7 @@ pub struct CHDeleteChar {
 
 impl Packed for CHDeleteChar {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0068)
+        PacketBuilderCtx::new(0x0068)
             .put_u32(self.char_id)
             .put_fixed_str(&self.email, 40)
             .build()
@@ -236,7 +236,7 @@ pub struct HCDeleteCharOk {
 
 impl Packed for HCDeleteCharOk {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x006C).put_u32(self.char_id).build()
+        PacketBuilderCtx::new(0x006C).put_u32(self.char_id).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -252,7 +252,7 @@ pub struct CHCancelDelete {
 
 impl Packed for CHCancelDelete {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F8).put_u32(self.char_id).build()
+        PacketBuilderCtx::new(0x01F8).put_u32(self.char_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -272,7 +272,7 @@ pub struct HCCancelDeleteOk {
 
 impl Packed for HCCancelDeleteOk {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x006D).put_u32(self.char_id).build()
+        PacketBuilderCtx::new(0x006D).put_u32(self.char_id).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -293,7 +293,7 @@ pub struct ZCNotifyAct {
 
 impl Packed for ZCNotifyAct {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x008D)
+        PacketBuilderCtx::new(0x008D)
             .put_u32(self.src_id)
             .put_u32(self.dst_id)
             .put_u32(self.damage)
@@ -319,7 +319,7 @@ pub struct ZCMonsterHpBar {
 
 impl Packed for ZCMonsterHpBar {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0977)
+        PacketBuilderCtx::new(0x0977)
             .put_u32(self.mob_id)
             .put_u32(self.hp)
             .put_u32(self.max_hp)
@@ -341,7 +341,7 @@ pub struct HCNotifyZoneServer {
 
 impl Packed for HCNotifyZoneServer {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0083)
+        PacketBuilderCtx::new(0x0083)
             .put_fixed_str(&self.map_ip, 16)
             .put_u16(self.map_port)
             .put_fixed_str(&self.token, 32)
@@ -363,7 +363,7 @@ pub struct CZRequestAction {
 
 impl Packed for CZRequestAction {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0089)
+        PacketBuilderCtx::new(0x0089)
             .put_u32(self.account_id)
             .put_u32(self.target_id)
             .put_u8(self.action_type)
@@ -394,7 +394,7 @@ pub struct CZUseItem {
 
 impl Packed for CZUseItem {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x009B)
+        PacketBuilderCtx::new(0x009B)
             .put_u16(self.index)
             .put_u32(self.item_id)
             .build()
@@ -419,7 +419,7 @@ pub struct CZRequestPickupItem {
 
 impl Packed for CZRequestPickupItem {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0090)
+        PacketBuilderCtx::new(0x0090)
             .put_u16(self.x)
             .put_u16(self.y)
             .build()
@@ -444,7 +444,7 @@ pub struct CZContactNpc {
 
 impl Packed for CZContactNpc {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0190)
+        PacketBuilderCtx::new(0x0190)
             .put_u32(self.npc_id)
             .put_u8(self.action)
             .build()
@@ -471,7 +471,7 @@ pub struct ZcSayDialog {
 
 impl Packed for ZcSayDialog {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B4)
+        PacketBuilderCtx::new(0x00B4)
             .put_u32(self.npc_id)
             .put_str(&self.message)
             .put_u8(0)
@@ -497,7 +497,7 @@ pub struct ZcWaitDialog {
 
 impl Packed for ZcWaitDialog {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B5).put_u32(self.npc_id).build()
+        PacketBuilderCtx::new(0x00B5).put_u32(self.npc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -517,7 +517,7 @@ pub struct ZcCloseDialog {
 
 impl Packed for ZcCloseDialog {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B6).put_u32(self.npc_id).build()
+        PacketBuilderCtx::new(0x00B6).put_u32(self.npc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -538,7 +538,7 @@ pub struct ZcMenuList {
 
 impl Packed for ZcMenuList {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B7)
+        PacketBuilderCtx::new(0x00B7)
             .put_u32(self.npc_id)
             .put_str(&self.menu_text)
             .put_u8(0)
@@ -564,7 +564,7 @@ pub struct CzAckNextDialog {
 
 impl Packed for CzAckNextDialog {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B9).put_u32(self.npc_id).build()
+        PacketBuilderCtx::new(0x00B9).put_u32(self.npc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -585,7 +585,7 @@ pub struct CzAckSelectMenu {
 
 impl Packed for CzAckSelectMenu {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00B8)
+        PacketBuilderCtx::new(0x00B8)
             .put_u32(self.npc_id)
             .put_u8(self.select)
             .build()
@@ -609,7 +609,7 @@ pub struct CzAckCloseDialog {
 
 impl Packed for CzAckCloseDialog {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0146).put_u32(self.npc_id).build()
+        PacketBuilderCtx::new(0x0146).put_u32(self.npc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -816,7 +816,7 @@ pub struct ZcReqWearEquipAck {
 
 impl Packed for ZcReqWearEquipAck {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x00AA);
+        let mut ctx = PacketBuilderCtx::new(0x00AA);
         ctx = ctx
             .put_u16(self.index)
             .put_u16(self.position)
@@ -840,7 +840,7 @@ pub struct ZcReqTakeoffEquipAck {
 
 impl Packed for ZcReqTakeoffEquipAck {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x00AC);
+        let mut ctx = PacketBuilderCtx::new(0x00AC);
         ctx = ctx
             .put_u16(self.position)
             .put_u8(self.result);
@@ -916,7 +916,7 @@ pub struct ZcPcPurchaseResult {
 
 impl Packed for ZcPcPurchaseResult {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x00CA);
+        let mut ctx = PacketBuilderCtx::new(0x00CA);
         ctx = ctx.put_u8(self.result);
         ctx.build()
     }
@@ -935,7 +935,7 @@ pub struct ZcPcSellResult {
 
 impl Packed for ZcPcSellResult {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x00CB);
+        let mut ctx = PacketBuilderCtx::new(0x00CB);
         ctx = ctx.put_u8(self.result);
         ctx.build()
     }
@@ -993,7 +993,7 @@ pub struct ZcItemIdentifyAck {
 
 impl Packed for ZcItemIdentifyAck {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x01DC);
+        let mut ctx = PacketBuilderCtx::new(0x01DC);
         ctx = ctx
             .put_u16(self.index)
             .put_u8(self.result);
@@ -1033,7 +1033,7 @@ pub struct ZcWeaponRefineAck {
 
 impl Packed for ZcWeaponRefineAck {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x0223);
+        let mut ctx = PacketBuilderCtx::new(0x0223);
         ctx = ctx
             .put_u8(self.result)
             .put_u16(self.index);
@@ -1072,7 +1072,7 @@ pub struct ZcEmotion {
 
 impl Packed for ZcEmotion {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x00C0);
+        let mut ctx = PacketBuilderCtx::new(0x00C0);
         ctx = ctx
             .put_u32(self.entity_id)
             .put_u8(self.emotion);

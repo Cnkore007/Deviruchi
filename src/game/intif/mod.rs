@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 use uuid::Uuid;
 
+type HandlerMap = HashMap<InterMessageType, Box<dyn Fn(&InterMessage) + Send + Sync>>;
+
 /// 服务器间消息类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u16)]
@@ -240,7 +242,7 @@ pub struct InterServerManager {
     /// 待处理消息队列
     message_queue: RwLock<Vec<InterMessage>>,
     /// 消息处理器
-    handlers: RwLock<HashMap<InterMessageType, Box<dyn Fn(&InterMessage) + Send + Sync>>>,
+    handlers: RwLock<HandlerMap>,
     /// 本地服务器 ID
     local_server_id: u32,
 }

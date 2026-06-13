@@ -142,61 +142,61 @@ pub trait TransactionOps {
 ///
 /// 为常用类型实现此 trait，使上层代码无需依赖 rusqlite 类型。
 pub trait IntoValue {
-    fn into_value(&self) -> Value;
+    fn to_value(&self) -> Value;
 }
 
 impl IntoValue for i32 {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Int(*self)
     }
 }
 
 impl IntoValue for u32 {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Int(*self as i32)
     }
 }
 
 impl IntoValue for i64 {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::BigInt(*self)
     }
 }
 
 impl IntoValue for u64 {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::BigInt(*self as i64)
     }
 }
 
 impl IntoValue for f64 {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Float(*self)
     }
 }
 
 impl IntoValue for str {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Text(self.to_string())
     }
 }
 
 impl IntoValue for String {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Text(self.clone())
     }
 }
 
 impl IntoValue for &str {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         Value::Text(self.to_string())
     }
 }
 
 impl<T: IntoValue> IntoValue for Option<T> {
-    fn into_value(&self) -> Value {
+    fn to_value(&self) -> Value {
         match self {
-            Some(v) => v.into_value(),
+            Some(v) => v.to_value(),
             None => Value::Null,
         }
     }

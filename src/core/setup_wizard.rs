@@ -74,7 +74,7 @@ impl SetupWizard {
         println!("║    ██████╔╝███████╗ ╚████╔╝ ██║██║  ██║╚██████╔╝╚██████╗██║║");
         println!("║    ╚═════╝ ╚══════╝  ╚═══╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚═╝║");
         println!("║                                                            ║");
-        println!("║              v0.0.2 — 首次配置向导                          ║");
+        println!("║              v0.0.3 — 首次配置向导                          ║");
         println!("║                                                            ║");
         println!("╚══════════════════════════════════════════════════════════════╝");
         println!();
@@ -185,13 +185,13 @@ impl SetupWizard {
 
         // 角色名长度
         println!("\n  角色名长度限制 (直接回车使用默认值):");
-        config.game.player_name_length_min = Self::input_u8("最小长度", 4)? as u8;
-        config.game.player_name_length_max = Self::input_u8("最大长度", 24)? as u8;
+        config.game.player_name_length_min = Self::input_u8("最小长度", 4)?;
+        config.game.player_name_length_max = Self::input_u8("最大长度", 24)?;
 
         // 公会名长度
         println!("\n  公会名长度限制:");
-        config.game.guild_name_length_min = Self::input_u8("最小长度", 4)? as u8;
-        config.game.guild_name_length_max = Self::input_u8("最大长度", 24)? as u8;
+        config.game.guild_name_length_min = Self::input_u8("最小长度", 4)?;
+        config.game.guild_name_length_max = Self::input_u8("最大长度", 24)?;
 
         println!();
         Ok(config)

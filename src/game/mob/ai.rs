@@ -70,6 +70,7 @@ pub struct MobAI {
 }
 
 impl MobAI {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         spawn_manager: Arc<MobSpawnManager>,
         channel_bus: Arc<ChannelBus>,
@@ -173,13 +174,12 @@ impl MobAI {
                     }
                     // 检查该怪物是否正在被玩家攻击（有伤害记录且处于战斗状态）
                     let other_state = *other_mob.ai_state.read();
-                    if matches!(other_state, MobAIState::Chase | MobAIState::Attack) {
-                        if let Some(attacker_id) = *other_mob.target_id.read() {
+                    if matches!(other_state, MobAIState::Chase | MobAIState::Attack)
+                        && let Some(attacker_id) = *other_mob.target_id.read() {
                             *mob.ai_state.write() = MobAIState::Chase;
                             *mob.target_id.write() = Some(attacker_id);
                             return;
                         }
-                    }
                 }
             }
             MobBehavior::PassiveAssist => {
@@ -197,13 +197,12 @@ impl MobAI {
                             continue;
                         }
                         let other_state = *other_mob.ai_state.read();
-                        if matches!(other_state, MobAIState::Chase | MobAIState::Attack) {
-                            if let Some(attacker_id) = *other_mob.target_id.read() {
+                        if matches!(other_state, MobAIState::Chase | MobAIState::Attack)
+                            && let Some(attacker_id) = *other_mob.target_id.read() {
                                 *mob.ai_state.write() = MobAIState::Chase;
                                 *mob.target_id.write() = Some(attacker_id);
                                 return;
                             }
-                        }
                     }
                 }
             }

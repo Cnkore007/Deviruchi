@@ -182,6 +182,7 @@ impl ItemIntegrationHandler {
     }
 
     /// 应用物品效果
+    #[allow(clippy::too_many_arguments)]
     fn apply_effect(
         &self,
         player: &Player,

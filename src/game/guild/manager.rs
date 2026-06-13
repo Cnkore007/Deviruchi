@@ -83,11 +83,10 @@ impl GuildManager {
         // 持久化到数据库
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
-            if let Some(guild) = guilds.get(&guild_id) {
-                if let Err(e) = storage.save_guild(guild) {
+            if let Some(guild) = guilds.get(&guild_id)
+                && let Err(e) = storage.save_guild(guild) {
                     tracing::warn!("持久化创建公会失败: {}", e);
                 }
-            }
         }
 
         Some(guild_id)
@@ -107,11 +106,10 @@ impl GuildManager {
             drop(player_guild);
 
             // 从数据库删除
-            if let Some(ref storage) = self.storage {
-                if let Err(e) = storage.delete_guild(guild_id) {
+            if let Some(ref storage) = self.storage
+                && let Err(e) = storage.delete_guild(guild_id) {
                     tracing::warn!("持久化删除公会失败: {}", e);
                 }
-            }
 
             true
         } else {
@@ -170,11 +168,10 @@ impl GuildManager {
         // 持久化到数据库
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
-            if let Some(guild) = guilds.get(&guild_id) {
-                if let Err(e) = storage.save_guild(guild) {
+            if let Some(guild) = guilds.get(&guild_id)
+                && let Err(e) = storage.save_guild(guild) {
                     tracing::warn!("持久化加入公会失败: {}", e);
                 }
-            }
         }
 
         true
@@ -201,11 +198,10 @@ impl GuildManager {
         // 持久化到数据库
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
-            if let Some(guild) = guilds.get(&guild_id) {
-                if let Err(e) = storage.save_guild(guild) {
+            if let Some(guild) = guilds.get(&guild_id)
+                && let Err(e) = storage.save_guild(guild) {
                     tracing::warn!("持久化离开公会失败: {}", e);
                 }
-            }
         }
 
         true
@@ -232,11 +228,10 @@ impl GuildManager {
         // 持久化到数据库
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
-            if let Some(guild) = guilds.get(&guild_id) {
-                if let Err(e) = storage.save_guild(guild) {
+            if let Some(guild) = guilds.get(&guild_id)
+                && let Err(e) = storage.save_guild(guild) {
                     tracing::warn!("持久化踢出成员失败: {}", e);
                 }
-            }
         }
 
         true
@@ -265,16 +260,14 @@ impl GuildManager {
         drop(guilds);
 
         // 持久化到数据库
-        if result {
-            if let Some(ref storage) = self.storage {
+        if result
+            && let Some(ref storage) = self.storage {
                 let guilds = self.guilds.read();
-                if let Some(guild) = guilds.get(&guild_id) {
-                    if let Err(e) = storage.save_guild(guild) {
+                if let Some(guild) = guilds.get(&guild_id)
+                    && let Err(e) = storage.save_guild(guild) {
                         tracing::warn!("持久化变更职位失败: {}", e);
                     }
-                }
             }
-        }
 
         result
     }
@@ -307,11 +300,10 @@ impl GuildManager {
         // 持久化到数据库
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
-            if let Some(guild) = guilds.get(guild_id) {
-                if let Err(e) = storage.save_guild(guild) {
+            if let Some(guild) = guilds.get(guild_id)
+                && let Err(e) = storage.save_guild(guild) {
                     tracing::warn!("持久化更新公告失败: {}", e);
                 }
-            }
         }
 
         true

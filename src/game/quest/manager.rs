@@ -150,7 +150,7 @@ impl QuestManager {
         }
 
         // 创建任务进度（克隆目标）
-        let objectives = quest.objectives.iter().cloned().collect();
+        let objectives = quest.objectives.to_vec();
         let progress = QuestProgress::new(quest_id, objectives, quest.time_limit);
 
         player_data.add_quest(progress.clone());

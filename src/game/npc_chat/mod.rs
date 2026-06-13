@@ -142,7 +142,7 @@ impl NpcChatManager {
         let mut npc_patterns = self.npc_patterns.write();
         let sets = npc_patterns
             .entry(npc_id)
-            .or_insert_with(HashMap::new);
+            .or_default();
 
         let set = sets
             .entry(set_id)
@@ -156,11 +156,10 @@ impl NpcChatManager {
     /// 对应 rAthena 的 `activatepset` 命令。
     pub fn activate_set(&self, npc_id: Uuid, set_id: i64) {
         let mut npc_patterns = self.npc_patterns.write();
-        if let Some(sets) = npc_patterns.get_mut(&npc_id) {
-            if let Some(set) = sets.get_mut(&set_id) {
+        if let Some(sets) = npc_patterns.get_mut(&npc_id)
+            && let Some(set) = sets.get_mut(&set_id) {
                 set.active = true;
             }
-        }
     }
 
     /// 停用模式集

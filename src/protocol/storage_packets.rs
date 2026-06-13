@@ -1,4 +1,4 @@
-use crate::protocol::packet_builder::PacketBuilder;
+use crate::protocol::packet_builder::PacketBuilderCtx;
 
 /// 客户端请求打开仓库 (0x0213)
 pub struct CZReqStorageOpen;
@@ -47,7 +47,7 @@ pub struct ZCStorageOpen {
 
 impl ZCStorageOpen {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F3).put_u8(self.result).build()
+        PacketBuilderCtx::new(0x01F3).put_u8(self.result).build()
     }
 }
 
@@ -56,7 +56,7 @@ pub struct ZCStorageClose;
 
 impl ZCStorageClose {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F4).build()
+        PacketBuilderCtx::new(0x01F4).build()
     }
 }
 
@@ -77,7 +77,7 @@ pub struct ZCStorageItems {
 
 impl ZCStorageItems {
     pub fn to_packet(&self) -> Vec<u8> {
-        let mut builder = PacketBuilder::new(0x01F5);
+        let mut builder = PacketBuilderCtx::new(0x01F5);
         builder = builder.put_u16(self.count);
 
         for item in &self.items {
@@ -101,7 +101,7 @@ pub struct ZCStorageItemAdd {
 
 impl ZCStorageItemAdd {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F6)
+        PacketBuilderCtx::new(0x01F6)
             .put_u16(self.index)
             .put_u16(self.item_id)
             .put_u16(self.amount)
@@ -118,7 +118,7 @@ pub struct ZCStorageItemRemove {
 
 impl ZCStorageItemRemove {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01F7)
+        PacketBuilderCtx::new(0x01F7)
             .put_u16(self.index)
             .put_u16(self.amount)
             .build()

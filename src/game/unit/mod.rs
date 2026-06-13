@@ -161,19 +161,19 @@ impl MovementValidator {
         let degrees = angle * 180.0 / std::f64::consts::PI;
 
         // 将角度转换为 8 方向
-        if degrees >= -22.5 && degrees < 22.5 {
+        if (-22.5..22.5).contains(&degrees) {
             Direction::East
-        } else if degrees >= 22.5 && degrees < 67.5 {
+        } else if (22.5..67.5).contains(&degrees) {
             Direction::SouthEast
-        } else if degrees >= 67.5 && degrees < 112.5 {
+        } else if (67.5..112.5).contains(&degrees) {
             Direction::South
-        } else if degrees >= 112.5 && degrees < 157.5 {
+        } else if (112.5..157.5).contains(&degrees) {
             Direction::SouthWest
-        } else if degrees >= 157.5 || degrees < -157.5 {
+        } else if !(-157.5..157.5).contains(&degrees) {
             Direction::West
-        } else if degrees >= -157.5 && degrees < -112.5 {
+        } else if (-157.5..-112.5).contains(&degrees) {
             Direction::NorthWest
-        } else if degrees >= -112.5 && degrees < -67.5 {
+        } else if (-112.5..-67.5).contains(&degrees) {
             Direction::North
         } else {
             Direction::NorthEast
@@ -335,15 +335,14 @@ impl UnitManager {
         }
 
         let elapsed = current_time.saturating_sub(unit.last_move_time);
-        if elapsed >= unit.speed as u64 {
-            if let Some(next) = unit.next_waypoint() {
+        if elapsed >= unit.speed as u64
+            && let Some(next) = unit.next_waypoint() {
                 let dir = self.validator.validate_direction(unit.position, next);
                 unit.update_direction(dir);
                 unit.update_position(next.x, next.y);
                 unit.last_move_time = current_time;
                 return Some(next);
             }
-        }
 
         None
     }

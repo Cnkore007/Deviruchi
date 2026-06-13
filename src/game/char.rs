@@ -171,7 +171,7 @@ impl CharServer {
                 "Character creation rejected: stat out of range 1-9 for account_id={}",
                 account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
 
         let total: u16 = stats.iter().map(|&s| s as u16).sum();
@@ -180,7 +180,7 @@ impl CharServer {
                 "Character creation rejected: total stats {} > {} for account_id={}",
                 total, constants::MAX_TOTAL_STATS, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
 
         // 校验角色名称（长度 + 特殊字符 + 重复检查）
@@ -189,7 +189,7 @@ impl CharServer {
                 "Character creation rejected: {} (account_id={})",
                 err_msg, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
         }
         let name = make_char.name.trim_matches('\0');
 
@@ -260,14 +260,14 @@ impl CharServer {
                 map_bytes[..map_len].copy_from_slice(&char_info.map_name.as_bytes()[..map_len]);
                 resp.extend_from_slice(&map_bytes);
                 // 用 PacketBuilder 添加包头
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
                     .put_slice(&resp)
                     .build())
             }
             Err(e) => {
                 error!("Failed to create character: {}", e);
                 // 失败响应：marker(1) + padding(3)
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006D)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
                     .put_slice(&[0x01, 0x00, 0x00, 0x00])
                     .build())
             }
@@ -348,7 +348,7 @@ impl CharServer {
                 "Delete char rejected: char_id={} not owned by account_id={}",
                 delete_req.char_id, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                 .put_slice(&[0x01, 0x00, 0x00, 0x00])
                 .build());
         }
@@ -372,13 +372,13 @@ impl CharServer {
                     "Failed to mark character {} for deletion (already marked or not found)",
                     delete_req.char_id
                 );
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                     .put_slice(&[0x01, 0x00, 0x00, 0x00])
                     .build())
             }
             Err(e) => {
                 error!("Database error deleting character {}: {}", delete_req.char_id, e);
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                     .put_slice(&[0x01, 0x00, 0x00, 0x00])
                     .build())
             }
@@ -405,7 +405,7 @@ impl CharServer {
                 "Cancel delete rejected: char_id={} not owned by account_id={}",
                 cancel_req.char_id, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                 .put_slice(&[0x01, 0x00, 0x00, 0x00])
                 .build());
         }
@@ -428,7 +428,7 @@ impl CharServer {
                     "Failed to cancel deletion for character {} (not marked)",
                     cancel_req.char_id
                 );
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                     .put_slice(&[0x01, 0x00, 0x00, 0x00])
                     .build())
             }
@@ -437,7 +437,7 @@ impl CharServer {
                     "Database error cancelling deletion for {}: {}",
                     cancel_req.char_id, e
                 );
-                Some(crate::protocol::packet_builder::PacketBuilder::new(0x006E)
+                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
                     .put_slice(&[0x01, 0x00, 0x00, 0x00])
                     .build())
             }
@@ -449,13 +449,7 @@ impl CharServer {
         let used_slots: std::collections::HashSet<u8> =
             characters.iter().map(|c| c.char_num).collect();
 
-        for slot in 0..9 {
-            if !used_slots.contains(&slot) {
-                return Some(slot);
-            }
-        }
-
-        None
+        (0..9u8).find(|slot| !used_slots.contains(slot))
     }
 
     /// 验证角色名称是否合法

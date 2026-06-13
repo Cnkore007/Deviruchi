@@ -249,7 +249,7 @@ impl PetDatabase {
                         db.init_default_pets();
                         // 将 YAML 数据覆盖/补充硬编码数据
                         let mut yaml_loaded = 0;
-                        for (_mob_name, template) in &templates {
+                        for template in templates.values() {
                             // 尝试从 egg_item 名称推断 pet_class
                             // YAML 中的物品名称格式如 "Poring_Egg"，对应 egg_id 22001
                             let egg_id = item_name_to_egg_id(&template.egg_item);

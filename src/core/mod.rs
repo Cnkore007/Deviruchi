@@ -75,7 +75,7 @@ impl Core {
         let log_config = logging::LogConfig {
             enabled: self.config.logging.enabled,
             console: self.config.logging.console,
-            default_level: logging::LogLevel::from_str(&self.config.logging.level),
+            default_level: logging::LogLevel::parse(&self.config.logging.level),
             category_levels: std::collections::HashMap::new(),
             log_dir: self.config.logging.log_dir.clone(),
             rotation_hourly: self.config.logging.rotation_hourly,
@@ -209,14 +209,6 @@ impl Core {
         let session_manager = self.session_manager.clone();
         let packet_handler = packet_handler.clone();
 
-        // 启动 Agent API 服务器
-        let agent_api = Arc::new(AgentApi::new(
-            self.cli.config.clone(),
-            map_state.clone(),
-        ));
-        let agent_addr = "127.0.0.1:16400".to_string();
-        let agent_server = AgentServer::new(agent_addr, agent_api);
-
         // 收集所有服务器任务
         let mut handles = Vec::new();
 
@@ -261,13 +253,33 @@ impl Core {
             }
         }
 
-        // Agent API 服务器（Unix Socket）
-        handles.push(tokio::spawn(async move {
-            if let Err(e) = agent_server.listen().await {
-                tracing::error!("Agent API 错误: {}", e);
-            }
-            Ok::<(), anyhow::Error>(())
-        }));
+        // Agent API 服务器
+        if let Some(agent_port) = self.config.network.agent_port {
+            let agent_api = Arc::new(AgentApi::new(
+                self.cli.config.clone(),
+                map_state.clone(),
+            ));
+            let agent_addr = format!("127.0.0.1:{}", agent_port);
+            let agent_server = AgentServer::new(agent_addr, agent_api);
+            handles.push(tokio::spawn(async move {
+                if let Err(e) = agent_server.listen().await {
+                    tracing::error!("Agent API 错误: {}", e);
+                }
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
+
+        // Web HTTP API 服务器
+        if let Some(web_port) = self.config.network.web_port {
+            let web_addr = format!("0.0.0.0:{}", web_port);
+            let web_server = crate::web::WebServer::new(web_addr, map_state.clone());
+            handles.push(tokio::spawn(async move {
+                if let Err(e) = web_server.listen().await {
+                    tracing::error!("Web API 错误: {}", e);
+                }
+                Ok::<(), anyhow::Error>(())
+            }));
+        }
 
         // 优雅关机：监听 SIGINT/SIGTERM，收到信号后通知所有任务退出
         let shutdown = async {

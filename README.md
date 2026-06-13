@@ -2,7 +2,7 @@
 
 高性能 Ragnarok Online 服务端，用 Rust 语言，基于 rAthena 重构而来，简单、高效、稳定、易扩展。
 
-> **v0.0.2** — 功能追平 rAthena 95%
+> **v0.0.3** — 功能追平 rAthena 95%
 
 ## 目标
 
@@ -24,6 +24,9 @@ Deviruchi 是 rAthena 服务端的 Rust 实现，目标是：
 | 极低延迟 | 模块间内存 channel 通信，延迟微秒级 |
 | 无忧升级 | 自动数据库迁移，支持 SQLite → MySQL |
 | rAthena 兼容 | 完全兼容 rAthena 原生客户端（TCP 二进制协议） |
+| Renewal/Pre-Renewal | 双公式系统，支持新旧两套伤害/状态公式 |
+| DB Import Overlay | db/import/ 覆盖层，自定义数据不修改原文件 |
+| DeviAgent CLI | `deviruchi agent` 子命令一键启动 AI 助手 |
 
 ## 架构
 
@@ -41,23 +44,23 @@ DeviAgent (智能助手)
 
 ## 当前进度
 
-> **83,000+ 行** Rust 代码，220+ 个源文件，1,389 测试（全部通过），覆盖 61 个服务端模块。
+> **85,000+ 行** Rust 代码，220+ 个源文件，1,400 测试（全部通过），覆盖 63 个服务端模块。
 
 ### 项目统计
 
 | 指标 | 数值 | 说明 |
 |------|------|------|
-| 服务端模块 | 61 个 | 覆盖 rAthena 所有核心功能 |
+| 服务端模块 | 63 个 | 覆盖 rAthena 所有核心功能 |
 | 包处理器 | 91 个 | 支持 rAthena 原生客户端 |
 | 智能助手代码 | 1,536 行 | REPL + 知识库 + 6 个工具 |
-| 总代码行数 | 83,000+ 行 | 包含测试和文档 |
+| 总代码行数 | 85,000+ 行 | 包含测试和文档 |
 | 脚本命令 | 580 个 | rAthena 兼容 95% |
 | 技能数量 | 1,635 个 | 完全复用 rAthena 数据 |
 | 怪物数量 | 2,675 个 | 完全复用 rAthena 数据 |
 | 物品数量 | 29,356 个 | 完全复用 rAthena 数据 |
 | 单元测试 | 1,322 个 | 100% 通过 |
 | 集成测试 | 67 个 | 100% 通过 |
-| 总测试 | 1,389 个 | 100% 通过 |
+| 总测试 | 1,400 个 | 100% 通过 |
 
 ### 服务端 — 已完成（61 个模块）
 
@@ -256,6 +259,7 @@ tcp_nodelay = true           # TCP 无延迟（降低延迟）
 keepalive = true             # TCP 保活
 read_buffer_size = 8192      # 读缓冲区大小
 write_buffer_size = 8192     # 写缓冲区大小
+agent_port = 16400           # Agent API 端口（可选，不设置则禁用）
 ```
 
 | 参数 | 类型 | 默认值 | 说明 |
@@ -268,6 +272,7 @@ write_buffer_size = 8192     # 写缓冲区大小
 | `keepalive` | bool | true | TCP 保活检测 |
 | `read_buffer_size` | usize | 8192 | 读缓冲区大小（字节） |
 | `write_buffer_size` | usize | 8192 | 写缓冲区大小（字节） |
+| `agent_port` | u16 | None | Agent API 端口（不设置则禁用 Agent 服务） |
 
 ### [game] 游戏配置
 

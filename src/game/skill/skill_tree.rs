@@ -180,7 +180,7 @@ impl SkillTree {
 
     /// 添加技能树节点到指定职业
     pub fn add_node(&mut self, job_id: u16, node: SkillTreeNode) {
-        self.trees.entry(job_id).or_insert_with(Vec::new).push(node);
+        self.trees.entry(job_id).or_default().push(node);
     }
 
     /// 检查是否可以学习指定技能
@@ -244,23 +244,20 @@ impl SkillTree {
     /// 在指定职业的技能树中查找技能节点
     fn find_node(&self, job: u16, skill_id: u16) -> Option<&SkillTreeNode> {
         // 先在指定职业的技能树中查找
-        if let Some(tree) = self.trees.get(&job) {
-            if let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
+        if let Some(tree) = self.trees.get(&job)
+            && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
                 return Some(node);
             }
-        }
 
         // 如果指定职业没有该技能，在通用技能树（job=0）中查找
-        if job != 0 {
-            if let Some(tree) = self.trees.get(&0) {
-                if let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
+        if job != 0
+            && let Some(tree) = self.trees.get(&0)
+                && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
                     // 只有 required_job == 0 的技能才对所有职业开放
                     if node.required_job == 0 {
                         return Some(node);
                     }
                 }
-            }
-        }
 
         None
     }
@@ -280,11 +277,10 @@ impl SkillTree {
         }
 
         // 添加通用技能（job=0 且 required_job=0）
-        if job != 0 {
-            if let Some(tree) = self.trees.get(&0) {
+        if job != 0
+            && let Some(tree) = self.trees.get(&0) {
                 skills.extend(tree.iter().filter(|n| n.required_job == 0));
             }
-        }
 
         skills
     }

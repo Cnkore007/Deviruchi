@@ -106,7 +106,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "error" => LogLevel::Error,
             "warn" | "warning" => LogLevel::Warning,
@@ -721,10 +721,10 @@ mod tests {
 
     #[test]
     fn test_log_level_from_str() {
-        assert_eq!(LogLevel::from_str("debug"), LogLevel::Debug);
-        assert_eq!(LogLevel::from_str("info"), LogLevel::Info);
-        assert_eq!(LogLevel::from_str("warn"), LogLevel::Warning);
-        assert_eq!(LogLevel::from_str("error"), LogLevel::Error);
+        assert_eq!(LogLevel::parse("debug"), LogLevel::Debug);
+        assert_eq!(LogLevel::parse("info"), LogLevel::Info);
+        assert_eq!(LogLevel::parse("warn"), LogLevel::Warning);
+        assert_eq!(LogLevel::parse("error"), LogLevel::Error);
     }
 
     #[test]

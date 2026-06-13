@@ -49,6 +49,7 @@ fn character_row_params() -> Vec<&'static dyn IntoValue> {
 }
 
 impl Database {
+    #[allow(clippy::too_many_arguments)]
     pub fn create_character(
         &self,
         account_id: u32,
@@ -165,7 +166,7 @@ impl Database {
         self.query_row_optional(
             &sql,
             &[&(char_id as i32) as &dyn IntoValue],
-            |row| Self::character_from_row(row),
+            Self::character_from_row,
         )
     }
 
@@ -273,8 +274,8 @@ impl Database {
     }
 
     /// ==================== 玩家数据持久化 ====================
-
     /// 保存角色完整数据到数据库
+    #[allow(clippy::too_many_arguments)]
     pub fn save_character(
         &self,
         char_id: u32,
@@ -721,7 +722,7 @@ impl Database {
         self.query_row_optional(
             &sql,
             &[&name as &dyn IntoValue],
-            |row| Self::character_from_row(row),
+            Self::character_from_row,
         )
     }
 
@@ -746,7 +747,6 @@ impl Database {
     }
 
     /// ==================== 技能管理 ====================
-
     /// 获取角色的指定技能等级（未学习返回 0）
     pub fn get_skill_level(&self, char_id: u32, skill_id: u16) -> Result<u8> {
         self.query_row_optional(

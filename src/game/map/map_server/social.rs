@@ -473,7 +473,7 @@ impl MapServer {
                     &player2.inventory.read(),
                     item_db.clone(),
                 ),
-                &*item_db,
+                &item_db,
             ) {
                 tracing::warn!(
                     "Trade validation failed between {} and {}: {:?}",

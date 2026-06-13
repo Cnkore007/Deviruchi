@@ -4,6 +4,8 @@
 
 use uuid::Uuid;
 
+type StoreEntry = (u32, Uuid, String, Vec<(u16, u32, u16)>);
+
 /// 搜索结果条目
 #[derive(Debug, Clone)]
 pub struct SearchResult {
@@ -109,8 +111,8 @@ impl SearchStoreManager {
     pub fn search(
         &self,
         filter: &SearchFilter,
-        vending_stores: &[(u32, Uuid, String, Vec<(u16, u32, u16)>)],
-        buying_stores: &[(u32, Uuid, String, Vec<(u16, u32, u16)>)],
+        vending_stores: &[StoreEntry],
+        buying_stores: &[StoreEntry],
     ) -> Vec<SearchResult> {
         let mut results = Vec::new();
 
@@ -157,7 +159,7 @@ impl SearchStoreManager {
         }
 
         // 按价格排序
-        results.sort_by(|a, b| a.price.cmp(&b.price));
+        results.sort_by_key(|a| a.price);
 
         // 限制结果数
         results.truncate(self.max_results);

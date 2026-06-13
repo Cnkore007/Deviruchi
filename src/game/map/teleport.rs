@@ -97,7 +97,15 @@ impl SavePointManager {
             save_points: HashMap::new(),
         }
     }
+}
 
+impl Default for SavePointManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SavePointManager {
     /// 设置角色的存储点
     pub fn set_save_point(&mut self, char_id: u32, save_point: SavePoint) {
         self.save_points.insert(char_id, save_point);

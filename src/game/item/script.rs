@@ -303,8 +303,8 @@ fn parse_single_command(line: &str) -> Option<ItemScriptCommand> {
         }
         "cure" => {
             let mut statuses = Vec::new();
-            for i in 1..parts.len() {
-                if let Some(status) = parse_status(parts[i]) {
+            for part in parts.iter().skip(1) {
+                if let Some(status) = parse_status(part) {
                     statuses.push(status);
                 }
             }
@@ -313,7 +313,7 @@ fn parse_single_command(line: &str) -> Option<ItemScriptCommand> {
 
         // ==================== 复活命令 ====================
         "resurrection" | "raise" => {
-            let hp_percent = parse_int(parts.get(1).unwrap_or(&"50")).max(1).min(100) as u16;
+            let hp_percent = parse_int(parts.get(1).unwrap_or(&"50")).clamp(1, 100) as u16;
             Some(ItemScriptCommand::Resurrection { hp_percent })
         }
 
@@ -331,8 +331,7 @@ fn parse_single_command(line: &str) -> Option<ItemScriptCommand> {
             let item_id = parse_int(parts.get(1).unwrap_or(&"0")) as u16;
             let count = parse_int(parts.get(2).unwrap_or(&"1")).max(1) as u16;
             let rate = parse_int(parts.get(3).unwrap_or(&"10000"))
-                .max(1)
-                .min(10000) as u16;
+                .clamp(1, 10000) as u16;
             Some(ItemScriptCommand::GetItem2 {
                 item_id,
                 count,
@@ -343,7 +342,7 @@ fn parse_single_command(line: &str) -> Option<ItemScriptCommand> {
         // ==================== 技能命令 ====================
         "useskill" | "skill" => {
             let skill_id = parse_int(parts.get(1).unwrap_or(&"0")) as u16;
-            let level = parse_int(parts.get(2).unwrap_or(&"1")).max(1).min(255) as u8;
+            let level = parse_int(parts.get(2).unwrap_or(&"1")).clamp(1, 255) as u8;
             Some(ItemScriptCommand::UseSkill { skill_id, level })
         }
         "learningskill" => {

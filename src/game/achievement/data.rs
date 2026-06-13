@@ -34,7 +34,7 @@ impl std::fmt::Display for AchievementCategory {
 
 impl AchievementCategory {
     /// 从字符串解析分类
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_name(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "battle" => Some(Self::Battle),
             "adventure" => Some(Self::Adventure),

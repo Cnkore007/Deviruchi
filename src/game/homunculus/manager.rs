@@ -151,7 +151,7 @@ impl HomunculusManager {
             let homun = Homunculus {
                 homun_id,
                 owner_id: row.get_i32(1).unwrap_or(0) as u32,
-                homunculus_type: HomunculusType::from_str(
+                homunculus_type: HomunculusType::from_name(
                     &row.get_string(2).unwrap_or_default(),
                 ),
                 name: row.get_string(3).unwrap_or_default(),
@@ -171,13 +171,13 @@ impl HomunculusManager {
                 luk: row.get_i32(17).unwrap_or(1) as u16,
                 evolved: row.get_i32(18).unwrap_or(0) != 0,
                 alive: row.get_i32(19).unwrap_or(1) != 0,
-                race: HomunculusRace::from_str(
+                race: HomunculusRace::from_name(
                     &row.get_string(20).unwrap_or_else(|_| "Formless".to_string()),
                 ),
                 element: row.get_string(21).unwrap_or_else(|_| "Neutral".to_string()),
                 // element_level (index 21) 在数据库中存在但 Homunculus 结构体中无对应字段，
                 // 此处跳过读取，保持索引对齐
-                evolution_stage: EvolutionStage::from_str(
+                evolution_stage: EvolutionStage::from_name(
                     &row.get_string(23).unwrap_or_else(|_| "Base".to_string()),
                 ),
                 skill_points: row.get_i32(24).unwrap_or(0) as u16,

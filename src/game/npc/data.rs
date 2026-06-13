@@ -2,10 +2,12 @@ use parking_lot::RwLock;
 
 /// NPC 事件触发方式
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum NpcEvent {
     /// 无事件
     None,
     /// 点击触发（默认）
+    #[default]
     OnClick,
     /// 接近触发（进入触发半径时自动触发）
     OnTouch,
@@ -13,11 +15,6 @@ pub enum NpcEvent {
     OnInit,
 }
 
-impl Default for NpcEvent {
-    fn default() -> Self {
-        NpcEvent::OnClick
-    }
-}
 
 /// NPC类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,6 +106,7 @@ impl Npc {
         npc
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn warp(
         id: u32,
         name: &str,
@@ -226,7 +224,7 @@ impl NpcDatabase {
     /// 获取全局默认数据库实例
     pub fn default_instance() -> &'static NpcDatabase {
         static INSTANCE: std::sync::OnceLock<NpcDatabase> = std::sync::OnceLock::new();
-        INSTANCE.get_or_init(|| NpcDatabase::new())
+        INSTANCE.get_or_init(NpcDatabase::new)
     }
 
     /// 兼容旧接口：通过 ID 获取 NPC

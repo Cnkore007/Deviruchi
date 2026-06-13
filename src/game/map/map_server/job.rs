@@ -132,15 +132,14 @@ impl MapServer {
         self.map_state.change_player_job(player_id, new_job);
 
         // 保存到数据库（重新获取修改后的玩家数据）
-        if let Some(updated_player) = self.map_state.get_player(player_id) {
-            if let Err(e) = updated_player.save_to_db(&self.db) {
+        if let Some(updated_player) = self.map_state.get_player(player_id)
+            && let Err(e) = updated_player.save_to_db(&self.db) {
                 tracing::error!(
                     player = %player_name,
                     error = %e,
                     "转职后保存玩家数据失败"
                 );
             }
-        }
     }
 }
 

@@ -23,12 +23,11 @@ impl MapServer {
         let player_id = session.player_id?;
 
         // Check GM permissions
-        if let Some(player) = self.map_state.get_player(&player_id) {
-            if !Self::check_gm_permission(&player, 10) {
+        if let Some(player) = self.map_state.get_player(&player_id)
+            && !Self::check_gm_permission(&player, 10) {
                 tracing::warn!("Player {} attempted GM warp without permission", player.name);
                 return None;
             }
-        }
 
         // Check warp cooldown
         {
@@ -70,12 +69,11 @@ impl MapServer {
         let player_id = session.player_id?;
 
         // Check GM permissions
-        if let Some(player) = self.map_state.get_player(&player_id) {
-            if !Self::check_gm_permission(&player, 10) {
+        if let Some(player) = self.map_state.get_player(&player_id)
+            && !Self::check_gm_permission(&player, 10) {
                 tracing::warn!("Player {} attempted GM goto without permission", player.name);
                 return None;
             }
-        }
 
         // Check warp cooldown
         {

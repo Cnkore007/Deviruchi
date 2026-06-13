@@ -1,4 +1,4 @@
-use crate::protocol::packet_builder::PacketBuilder;
+use crate::protocol::packet_builder::PacketBuilderCtx;
 
 // ========== Client -> Server ==========
 
@@ -87,7 +87,7 @@ pub struct ZCTradeRequest {
 
 impl ZCTradeRequest {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00E5)
+        PacketBuilderCtx::new(0x00E5)
             .put_u32(self.requester_id)
             .put_fixed_str(&self.requester_name, 24)
             .build()
@@ -101,7 +101,7 @@ pub struct ZCTradeAck {
 
 impl ZCTradeAck {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00E7)
+        PacketBuilderCtx::new(0x00E7)
             .put_u8(if self.accept { 1 } else { 0 })
             .build()
     }
@@ -119,7 +119,7 @@ pub struct ZCTradeAddItem {
 
 impl ZCTradeAddItem {
     pub fn to_packet(&self) -> Vec<u8> {
-        let mut builder = PacketBuilder::new(0x00E8)
+        let mut builder = PacketBuilderCtx::new(0x00E8)
             .put_u32(self.amount)
             .put_u16(self.item_id)
             .put_u8(if self.identified { 1 } else { 0 })
@@ -139,7 +139,7 @@ pub struct ZCTradeAddZeny {
 
 impl ZCTradeAddZeny {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00E9).put_u32(self.amount).build()
+        PacketBuilderCtx::new(0x00E9).put_u32(self.amount).build()
     }
 }
 
@@ -148,7 +148,7 @@ pub struct ZCTradeLock;
 
 impl ZCTradeLock {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00EC).build()
+        PacketBuilderCtx::new(0x00EC).build()
     }
 }
 
@@ -157,7 +157,7 @@ pub struct ZCTradeCommit;
 
 impl ZCTradeCommit {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00F0).build()
+        PacketBuilderCtx::new(0x00F0).build()
     }
 }
 
@@ -168,6 +168,6 @@ pub struct ZCTradeCancel {
 
 impl ZCTradeCancel {
     pub fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x00F1).put_u8(self.reason).build()
+        PacketBuilderCtx::new(0x00F1).put_u8(self.reason).build()
     }
 }

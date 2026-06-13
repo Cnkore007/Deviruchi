@@ -221,6 +221,7 @@ impl LogManager {
     }
 
     /// 记录物品日志
+    #[allow(clippy::too_many_arguments)]
     pub fn log_pick(
         &self,
         player_id: Uuid,
@@ -291,6 +292,7 @@ impl LogManager {
     }
 
     /// 记录聊天日志
+    #[allow(clippy::too_many_arguments)]
     pub fn log_chat(
         &self,
         player_id: Uuid,
@@ -327,6 +329,7 @@ impl LogManager {
     }
 
     /// 记录 GM 命令日志
+    #[allow(clippy::too_many_arguments)]
     pub fn log_atcommand(
         &self,
         player_id: Uuid,
@@ -395,6 +398,7 @@ impl LogManager {
     }
 
     /// 记录现金商店日志
+    #[allow(clippy::too_many_arguments)]
     pub fn log_cash(
         &self,
         player_id: Uuid,
@@ -478,8 +482,8 @@ impl LogManager {
     /// 刷新缓冲区（返回并清空）
     pub fn flush(&self) -> Vec<LogEntry> {
         let mut buffer = self.buffer.write();
-        let entries = buffer.drain(..).collect();
-        entries
+        
+        buffer.drain(..).collect()
     }
 
     /// 更新配置

@@ -449,11 +449,7 @@ impl PlayerCharacterManager {
         F: FnOnce(&mut PlayerCharacter) -> R,
     {
         let mut chars = self.characters.write();
-        if let Some(char) = chars.get_mut(&id) {
-            Some(f(char))
-        } else {
-            None
-        }
+        chars.get_mut(&id).map(f)
     }
 
     /// 获取所有角色

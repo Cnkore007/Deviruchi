@@ -197,6 +197,10 @@ impl Storage {
         self.slots.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn slots(&self) -> &[StorageSlot] {
         &self.slots
     }

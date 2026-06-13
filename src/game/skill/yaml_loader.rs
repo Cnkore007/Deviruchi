@@ -159,11 +159,10 @@ fn map_skill_type(type_str: &Option<String>, damage_flags: &Option<HashMap<Strin
         Some("Debuff") => SkillType::Debuff,
         _ => {
             // 从 DamageFlags 推断
-            if let Some(flags) = damage_flags {
-                if flags.get("NoDamage").copied() == Some(true) {
+            if let Some(flags) = damage_flags
+                && flags.get("NoDamage").copied() == Some(true) {
                     return SkillType::Support;
                 }
-            }
             SkillType::Active
         }
     }

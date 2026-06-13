@@ -79,7 +79,7 @@ impl SqliteBackend {
         sql: &str,
         params: &[&dyn IntoValue],
     ) -> Result<usize> {
-        let values: Vec<Value> = params.iter().map(|p| p.into_value()).collect();
+        let values: Vec<Value> = params.iter().map(|p| p.to_value()).collect();
         let rusqlite_params: Vec<Box<dyn rusqlite::types::ToSql>> =
             values.iter().map(|v| v.to_rusqlite()).collect();
         let mut stmt = conn.prepare(sql)?;
@@ -94,7 +94,7 @@ impl SqliteBackend {
         sql: &str,
         params: &[&dyn IntoValue],
     ) -> Result<Vec<Row>> {
-        let values: Vec<Value> = params.iter().map(|p| p.into_value()).collect();
+        let values: Vec<Value> = params.iter().map(|p| p.to_value()).collect();
         let rusqlite_params: Vec<Box<dyn rusqlite::types::ToSql>> =
             values.iter().map(|v| v.to_rusqlite()).collect();
         let mut stmt = conn.prepare(sql)?;

@@ -1,0 +1,6 @@
+server-starting = Server starting...
+server-listening = Listening on: { $addr }
+server-shutdown = Shutdown signal received, gracefully shutting down...
+login-success = Login success: { $user }
+login-failed = Login failed: { $reason }
+player-online = Players online: { $count }

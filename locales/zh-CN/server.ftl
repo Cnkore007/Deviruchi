@@ -1,0 +1,6 @@
+server-starting = 服务器启动中...
+server-listening = 监听端口: { $addr }
+server-shutdown = 收到关机信号，正在优雅关闭...
+login-success = 登录成功: { $user }
+login-failed = 登录失败: { $reason }
+player-online = 在线玩家: { $count }

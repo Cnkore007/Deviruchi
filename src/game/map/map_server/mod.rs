@@ -70,6 +70,7 @@ pub struct MapServer {
 }
 
 impl MapServer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Arc<crate::storage::Database>,
         token_store: Arc<TokenStore>,

@@ -355,11 +355,10 @@ impl TradeManager {
     /// 锁定交易（玩家点击确认），返回是否双方都已锁定
     pub fn lock_trade(&self, session_id: Uuid, player_id: Uuid) -> bool {
         let sessions = self.sessions.read();
-        if let Some(session) = sessions.get(&session_id) {
-            if session.lock(player_id) {
+        if let Some(session) = sessions.get(&session_id)
+            && session.lock(player_id) {
                 return session.is_fully_locked();
             }
-        }
         false
     }
 

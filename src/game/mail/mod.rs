@@ -117,12 +117,11 @@ impl MailSystem {
     /// 读取邮件详情
     pub fn read_mail(&self, player_id: &Uuid, mail_id: &Uuid) -> Option<MailMessage> {
         let mut inboxes = self.inboxes.write();
-        if let Some(mails) = inboxes.get_mut(player_id) {
-            if let Some(mail) = mails.iter_mut().find(|m| &m.mail_id == mail_id) {
+        if let Some(mails) = inboxes.get_mut(player_id)
+            && let Some(mail) = mails.iter_mut().find(|m| &m.mail_id == mail_id) {
                 mail.read = true;
                 return Some(mail.clone());
             }
-        }
         None
     }
 

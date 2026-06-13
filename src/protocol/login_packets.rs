@@ -1,4 +1,4 @@
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string};
 
 /// 客户端登录请求 (0x0064)
 #[derive(Debug, Clone)]
@@ -10,7 +10,7 @@ pub struct CALogin {
 
 impl Packed for CALogin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0064)
+        PacketBuilderCtx::new(0x0064)
             .put_u32(self.version)
             .put_fixed_str(&self.username, 24)
             .put_fixed_str(&self.password, 24)
@@ -55,7 +55,7 @@ pub struct ACAceptLogin {
 
 impl Packed for ACAceptLogin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0069)
+        PacketBuilderCtx::new(0x0069)
             .put_u32(self.account_id)
             .put_u32(self.login_id1)
             .put_u32(self.login_id2)
@@ -84,7 +84,7 @@ pub struct ACRefuseLogin {
 
 impl Packed for ACRefuseLogin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x006A).put_u8(self.error_code).build()
+        PacketBuilderCtx::new(0x006A).put_u8(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -100,7 +100,7 @@ pub struct SCNotifyBan {
 
 impl Packed for SCNotifyBan {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0081).put_u32(self.error_code).build()
+        PacketBuilderCtx::new(0x0081).put_u32(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -117,7 +117,7 @@ pub struct CAConnectInfo {
 
 impl Packed for CAConnectInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0200)
+        PacketBuilderCtx::new(0x0200)
             .put_u32(self.version)
             .put_u8(self.client_type)
             .build()

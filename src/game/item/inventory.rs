@@ -129,6 +129,10 @@ impl Inventory {
         self.slots.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// 获取所有格子
     pub fn slots(&self) -> &[InventorySlot] {
         &self.slots

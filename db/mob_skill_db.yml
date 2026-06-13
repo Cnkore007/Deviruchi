@@ -1,0 +1,49 @@
+# Mob Skill Database
+# Standalone mob skill entries loaded separately from mob_db.yml Skills.
+# Fields: mob_id, skill_id, level, rate (0-10000), cast_time (ms), delay (ms),
+#         target (target|self), condition (any|hpcertain|chase|idle|rudeattacked|longrange),
+#         condition_value (e.g. HP% threshold)
+
+# Lunatic - Heal when low HP
+- mob_id: 1002
+  skill_id: 28       # AL_HEAL
+  level: 3
+  rate: 1000
+  cast_time: 0
+  delay: 10000
+  target: self
+  condition: hpcertain
+  condition_value: 50
+
+# Fabre - Bash on attack
+- mob_id: 1312
+  skill_id: 5        # SM_BASH
+  level: 3
+  rate: 500
+  cast_time: 0
+  delay: 5000
+  target: target
+  condition: any
+  condition_value: 0
+
+# Fabre - Emergency heal when critically low
+- mob_id: 1312
+  skill_id: 28       # AL_HEAL
+  level: 1
+  rate: 300
+  cast_time: 0
+  delay: 8000
+  target: self
+  condition: hpcertain
+  condition_value: 30
+
+# Poring - Heal when chasing
+- mob_id: 1001
+  skill_id: 28       # AL_HEAL
+  level: 1
+  rate: 200
+  cast_time: 0
+  delay: 15000
+  target: self
+  condition: chase
+  condition_value: 0

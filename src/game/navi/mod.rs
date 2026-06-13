@@ -100,11 +100,10 @@ impl NaviManager {
         }
 
         // 添加连接
-        if let Some(node) = maps.get_mut(from) {
-            if !node.neighbors.iter().any(|(n, _)| n == to) {
+        if let Some(node) = maps.get_mut(from)
+            && !node.neighbors.iter().any(|(n, _)| n == to) {
                 node.neighbors.push((to.to_string(), cost));
             }
-        }
     }
 
     /// 添加双向连接

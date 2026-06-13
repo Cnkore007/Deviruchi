@@ -31,7 +31,7 @@ impl fmt::Display for QuestType {
 }
 
 impl QuestType {
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_name(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "killhunt" | "kill" | "hunt" => Some(Self::KillHunt),
             "collectitem" | "collect" => Some(Self::CollectItem),

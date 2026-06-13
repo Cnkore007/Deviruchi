@@ -9,21 +9,18 @@ pub trait Packed {
 
 pub struct PacketBuilder;
 
-impl PacketBuilder {
-    pub fn new(packet_id: u16) -> PacketBuilderCtx {
-        PacketBuilderCtx {
-            packet_id,
-            data: BytesMut::with_capacity(256),
-        }
-    }
-}
-
 pub struct PacketBuilderCtx {
     packet_id: u16,
     data: BytesMut,
 }
 
 impl PacketBuilderCtx {
+    pub fn new(packet_id: u16) -> Self {
+        Self {
+            packet_id,
+            data: BytesMut::with_capacity(256),
+        }
+    }
     pub fn put_u8(mut self, val: u8) -> Self {
         self.data.put_u8(val);
         self

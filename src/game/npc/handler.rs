@@ -245,11 +245,10 @@ impl NpcHandler {
         // 3. 检查是否已学习
         {
             let learned = self.learned_skills.read();
-            if let Some(skills) = learned.get(&player.char_id) {
-                if skills.contains(&skill_id) {
+            if let Some(skills) = learned.get(&player.char_id)
+                && skills.contains(&skill_id) {
                     return LearnResult::AlreadyLearned;
                 }
-            }
         }
 
         // 4. 检查 Zeny 是否足够
@@ -265,7 +264,7 @@ impl NpcHandler {
             let mut learned = self.learned_skills.write();
             learned
                 .entry(player.char_id)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(skill_id);
         }
 

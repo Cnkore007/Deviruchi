@@ -93,7 +93,7 @@ impl StorageSyncScheduler {
             Some(arc) => arc.read().clone(),
             None => {
                 // 仓库已从内存移除，标记为 Clean 并返回
-                sync_states.write().get_mut(&char_id).map(|r| r.mark_clean());
+                if let Some(r) = sync_states.write().get_mut(&char_id) { r.mark_clean() }
                 return false;
             }
         };
@@ -102,14 +102,14 @@ impl StorageSyncScheduler {
         match repository.save(&storage).await {
             Ok(()) => {
                 // 标记为干净
-                sync_states.write().get_mut(&char_id).map(|r| r.mark_clean());
+                if let Some(r) = sync_states.write().get_mut(&char_id) { r.mark_clean() }
                 tracing::debug!("仓库同步成功: char_id={}", char_id);
                 true
             }
             Err(e) => {
                 tracing::error!("仓库同步失败: char_id={}, error={}", char_id, e);
                 // 同步失败，标记回 Dirty 以便重试
-                sync_states.write().get_mut(&char_id).map(|r| r.mark_dirty());
+                if let Some(r) = sync_states.write().get_mut(&char_id) { r.mark_dirty() }
                 false
             }
         }

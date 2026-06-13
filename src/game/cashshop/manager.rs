@@ -338,11 +338,10 @@ impl CashShopManager {
         }
 
         // 检查每日限制（假设只购买1个）
-        if let Some(limit) = self.check_daily_limit(player.char_id, item_id, 1, &item) {
-            if let PurchaseResult::DailyLimitReached { limit, item_name } = limit {
+        if let Some(limit) = self.check_daily_limit(player.char_id, item_id, 1, &item)
+            && let PurchaseResult::DailyLimitReached { limit, item_name } = limit {
                 return GiftResult::DailyLimitReached { limit, item_name };
             }
-        }
 
         // 计算价格（礼物固定为1个）
         let total_cost = item.actual_price();
@@ -421,6 +420,7 @@ impl CashShopManager {
     }
 
     /// 记录购买日志
+    #[allow(clippy::too_many_arguments)]
     fn log_purchase(
         &self,
         char_id: u32,

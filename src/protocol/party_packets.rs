@@ -1,4 +1,4 @@
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string, parse_string};
+use super::packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string, parse_string};
 
 /// 客户端创建队伍 (0x0100)
 #[derive(Debug, Clone)]
@@ -8,7 +8,7 @@ pub struct CZMakeParty {
 
 impl Packed for CZMakeParty {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0100)
+        PacketBuilderCtx::new(0x0100)
             .put_fixed_str(&self.party_name, 24)
             .build()
     }
@@ -28,7 +28,7 @@ pub struct CZReqPartyInvite {
 
 impl Packed for CZReqPartyInvite {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0101)
+        PacketBuilderCtx::new(0x0101)
             .put_u32(self.target_account_id)
             .build()
     }
@@ -51,7 +51,7 @@ pub struct CZReqPartyJoin {
 
 impl Packed for CZReqPartyJoin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0102)
+        PacketBuilderCtx::new(0x0102)
             .put_u32(self.party_id)
             .put_u8(if self.accept { 1 } else { 0 })
             .build()
@@ -73,7 +73,7 @@ pub struct CZLeaveParty;
 
 impl Packed for CZLeaveParty {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0103).build()
+        PacketBuilderCtx::new(0x0103).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -89,7 +89,7 @@ pub struct CZPartyChat {
 
 impl Packed for CZPartyChat {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0109).put_str(&self.message).build()
+        PacketBuilderCtx::new(0x0109).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -107,7 +107,7 @@ pub struct CZChatMessage {
 
 impl Packed for CZChatMessage {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x010C).put_str(&self.message).build()
+        PacketBuilderCtx::new(0x010C).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {

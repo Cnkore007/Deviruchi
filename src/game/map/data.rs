@@ -207,7 +207,7 @@ impl MapDatabase {
         for y in 125..175 {
             for x in 125..175 {
                 if (x == 125 || x == 174 || y == 125 || y == 174)
-                    && !(x >= 130 && x <= 169 && y >= 130 && y <= 169)
+                    && !((130..=169).contains(&x) && (130..=169).contains(&y))
                 {
                     prontera.set_cell(x, y, CellType::Water);
                 }

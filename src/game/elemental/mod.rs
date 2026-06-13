@@ -122,6 +122,7 @@ pub struct Elemental {
 
 impl Elemental {
     /// 创建新精灵
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         elemental_id: u16,
         element: ElementalElement,
@@ -232,6 +233,7 @@ impl ElementalManager {
     }
 
     /// 召唤精灵
+    #[allow(clippy::too_many_arguments)]
     pub fn summon(
         &self,
         elemental_id: u16,

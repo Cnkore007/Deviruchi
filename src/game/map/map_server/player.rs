@@ -212,7 +212,7 @@ impl MapServer {
         // 调用 SkillHandler 执行技能逻辑
         let result = self.skill_handler.use_skill(
             Arc::new(player.clone()),
-            skill_pkt.skill_id as u16,
+            skill_pkt.skill_id,
             1, // 默认技能等级 1
             skill_pkt.target_id,
             &self.map_state,

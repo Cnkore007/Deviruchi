@@ -40,7 +40,7 @@ pub fn item_name_to_id(name: &str) -> u32 {
 /// rAthena 的 mob_db.yml 中 Skills 使用技能名称（如 "SM_BASH"），
 /// 而系统内部使用数字 ID，此映射用于转换。
 static SKILL_NAME_TO_ID: once_cell::sync::Lazy<std::collections::HashMap<String, u16>> =
-    once_cell::sync::Lazy::new(|| load_skill_name_to_id_map());
+    once_cell::sync::Lazy::new(load_skill_name_to_id_map);
 
 /// 从 skill_db.yml 加载技能名称到 ID 的映射表
 fn load_skill_name_to_id_map() -> std::collections::HashMap<String, u16> {
@@ -368,11 +368,10 @@ fn parse_behavior(ai: &str, modes: &Option<HashMap<String, bool>>) -> MobBehavio
         "05" => MobBehavior::PassiveAssist,
         _ => {
             // 检查 Modes 中的 CanMove 字段
-            if let Some(modes) = modes {
-                if modes.get("CanMove").copied() == Some(false) {
+            if let Some(modes) = modes
+                && modes.get("CanMove").copied() == Some(false) {
                     return MobBehavior::Immobile;
                 }
-            }
             MobBehavior::Passive
         }
     }

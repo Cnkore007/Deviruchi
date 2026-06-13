@@ -30,6 +30,10 @@ pub struct Config {
     pub party: PartyConfig,
     pub storage: StorageConfig,
     pub chat: ChatConfig,
+    pub i18n: I18nConfig,
+    pub day_night: DayNightConfig,
+    pub pincode: PincodeConfig,
+    pub client_hash: ClientHashConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -130,6 +134,8 @@ pub struct NetworkConfig {
     pub keepalive: bool,
     pub read_buffer_size: usize,
     pub write_buffer_size: usize,
+    pub web_port: Option<u16>,
+    pub agent_port: Option<u16>,
 }
 
 impl Default for NetworkConfig {
@@ -143,6 +149,8 @@ impl Default for NetworkConfig {
             keepalive: true,
             read_buffer_size: 8192,
             write_buffer_size: 8192,
+            web_port: None,
+            agent_port: None,
         }
     }
 }
@@ -161,6 +169,7 @@ pub struct GameConfig {
     pub guild_name_length_max: u8,
     pub autosave_interval_seconds: u64,
     pub autosave_enabled: bool,
+    pub delete_grace_period_seconds: u64,
 }
 
 impl Default for GameConfig {
@@ -178,6 +187,7 @@ impl Default for GameConfig {
             guild_name_length_max: 24,
             autosave_interval_seconds: 60,
             autosave_enabled: true,
+            delete_grace_period_seconds: 86400,
         }
     }
 }
@@ -463,6 +473,54 @@ impl Default for ChatConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct I18nConfig {
+    pub enabled: bool,
+    pub locale: String,
+    pub locale_dir: String,
+}
+
+impl Default for I18nConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            locale: "zh-CN".to_string(),
+            locale_dir: "locales".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Default)]
+pub struct DayNightConfig {
+    pub day_duration_ms: u64,
+    pub night_duration_ms: u64,
+    pub night_at_start: bool,
+}
+
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PincodeConfig {
+    pub pincode_enabled: bool,
+    pub pincode_max_attempts: u8,
+}
+
+impl Default for PincodeConfig {
+    fn default() -> Self {
+        Self {
+            pincode_enabled: false,
+            pincode_max_attempts: 3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Default)]
+pub struct ClientHashConfig {
+    pub client_hash_check: bool,
+}
+
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -485,6 +543,10 @@ impl Default for Config {
             party: PartyConfig::default(),
             storage: StorageConfig::default(),
             chat: ChatConfig::default(),
+            i18n: I18nConfig::default(),
+            day_night: DayNightConfig::default(),
+            pincode: PincodeConfig::default(),
+            client_hash: ClientHashConfig::default(),
         }
     }
 }
@@ -504,6 +566,7 @@ impl Config {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("读取配置文件失败: {:?}", path))?;
 
+        #[allow(unused_mut)]
         let mut config: Config =
             toml::from_str(&content).with_context(|| format!("解析配置文件失败: {:?}", path))?;
 

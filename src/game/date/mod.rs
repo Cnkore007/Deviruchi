@@ -178,7 +178,7 @@ impl GameDate {
     ///
     /// 对应 rAthena 的 `is_day_of_sun()`：`(day_of_year + 1) % 2 == 0`
     pub fn is_day_of_sun() -> bool {
-        (Self::day_of_year() + 1) % 2 == 0
+        (Self::day_of_year() + 1).is_multiple_of(2)
     }
 
     /// 今天是否是月亮日（星芒系统）
@@ -192,7 +192,7 @@ impl GameDate {
     ///
     /// 对应 rAthena 的 `is_day_of_star()`：`(day_of_year + 1) % 5 == 0`
     pub fn is_day_of_star() -> bool {
-        (Self::day_of_year() + 1) % 5 == 0
+        (Self::day_of_year() + 1).is_multiple_of(5)
     }
 }
 

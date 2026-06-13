@@ -185,8 +185,8 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
     // 注意：逐行解析限制下，for 的初始化命令会被丢弃，
     // 脚本作者应在 for 之前手动编写初始化命令。
     // 循环体由 ForStart 和 ForEnd 之间的命令组成，配合 endloop 使用。
-    if let Some(rest) = line.strip_prefix("for ") {
-        if let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
+    if let Some(rest) = line.strip_prefix("for ")
+        && let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
             let parts: Vec<&str> = inner.splitn(3, ';').collect();
             if parts.len() == 3 {
                 let cond_expr = parse_expr(parts[1].trim());
@@ -202,16 +202,13 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
                 }
             }
         }
-    }
 
     // while (条件) —— 等价于 ForStart(条件, 空增量)
-    if let Some(rest) = line.strip_prefix("while ") {
-        if let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
-            if let Some(expr) = parse_expr(inner.trim()) {
+    if let Some(rest) = line.strip_prefix("while ")
+        && let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')'))
+            && let Some(expr) = parse_expr(inner.trim()) {
                 return Some(ScriptCommand::ForStart(expr, Vec::new()));
             }
-        }
-    }
 
     // endloop —— 标记循环结束，对应 ForEnd
     if line == "endloop" {
@@ -406,10 +403,10 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
 fn parse_callfunc(args: &str) -> Option<ScriptCommand> {
     let args = args.trim();
     // 找到函数名（带引号或不带引号）
-    let (func_name, rest) = if args.starts_with('"') {
-        let end_quote = args[1..].find('"')?;
-        let name = &args[1..1 + end_quote];
-        (name.to_string(), &args[2 + end_quote..])
+    let (func_name, rest) = if let Some(rest) = args.strip_prefix('"') {
+        let end_quote = rest.find('"')?;
+        let name = &rest[..end_quote];
+        (name.to_string(), &rest[end_quote + 1..])
     } else {
         // 不带引号：找到 '(' 的位置
         let paren_pos = args.find('(')?;

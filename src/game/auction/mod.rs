@@ -88,8 +88,8 @@ impl AuctionHouse {
         }
 
         // 检查是否达到一口价
-        if let Some(buyout) = entry.buyout_price {
-            if bid_amount >= buyout {
+        if let Some(buyout) = entry.buyout_price
+            && bid_amount >= buyout {
                 let bid = AuctionBid {
                     bidder_id,
                     bidder_name: bidder_name.to_string(),
@@ -106,7 +106,6 @@ impl AuctionHouse {
                 self.move_to_pending(entry);
                 return Ok(bid);
             }
-        }
 
         // 检查出价是否高于当前最高价 + 最小增量
         let min_bid = entry.current_bid + (entry.current_bid * BID_INCREMENT_PERCENT / 100);
@@ -258,13 +257,12 @@ impl AuctionHouse {
     /// 领取拍卖物品（买家）
     pub fn claim_item(&self, player_id: &Uuid, auction_id: &Uuid) -> Result<AuctionEntry, AuctionError> {
         let mut pending = self.pending_claim.write();
-        if let Some(entries) = pending.get_mut(player_id) {
-            if let Some(pos) = entries.iter().position(|e| &e.auction_id == auction_id) {
+        if let Some(entries) = pending.get_mut(player_id)
+            && let Some(pos) = entries.iter().position(|e| &e.auction_id == auction_id) {
                 let entry = entries.remove(pos);
                 debug!("Item claimed for auction {}", auction_id);
                 return Ok(entry);
             }
-        }
         Err(AuctionError::NotFound)
     }
 

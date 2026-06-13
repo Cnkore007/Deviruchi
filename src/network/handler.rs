@@ -21,6 +21,7 @@ pub struct PacketHandler {
 }
 
 impl PacketHandler {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Arc<Database>,
         session_manager: Arc<SessionManager>,

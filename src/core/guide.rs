@@ -108,8 +108,8 @@ fn generate_item_section() -> String {
     let mut items_by_type: HashMap<String, Vec<(u32, String, String)>> = HashMap::new();
 
     // 尝试加载简化格式
-    if let Ok(content) = std::fs::read_to_string("db/item_db.yml") {
-        if let Ok(items) = serde_yaml::from_str::<Vec<SimpleItemEntry>>(&content) {
+    if let Ok(content) = std::fs::read_to_string("db/item_db.yml")
+        && let Ok(items) = serde_yaml::from_str::<Vec<SimpleItemEntry>>(&content) {
             for item in items {
                 let type_name = item.type_.clone().unwrap_or_else(|| "Etc".to_string());
                 let detail = format!("{} (买:{}, 卖:{})", item.Name, item.buy_price, item.sell_price);
@@ -119,7 +119,6 @@ fn generate_item_section() -> String {
                     .push((item.Id, item.Name.clone(), detail));
             }
         }
-    }
 
     // 尝试加载 rAthena 格式（equip/usable/etc）
     let rathena_files = [

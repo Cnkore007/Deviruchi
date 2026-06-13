@@ -290,7 +290,7 @@ impl ChannelManager {
                 let mut player_channels = self.player_channels.write();
                 player_channels
                     .entry(player_id)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(channel_id);
                 true
             } else {

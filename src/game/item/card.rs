@@ -23,6 +23,7 @@ pub enum CardResult {
 
 /// 卡片提供的属性加成
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct CardBonus {
     pub atk_bonus: u16,
     pub def_bonus: u16,
@@ -36,22 +37,6 @@ pub struct CardBonus {
     pub luk_bonus: i16,
 }
 
-impl Default for CardBonus {
-    fn default() -> Self {
-        Self {
-            atk_bonus: 0,
-            def_bonus: 0,
-            max_hp_bonus: 0,
-            max_sp_bonus: 0,
-            str_bonus: 0,
-            agi_bonus: 0,
-            vit_bonus: 0,
-            int_bonus: 0,
-            dex_bonus: 0,
-            luk_bonus: 0,
-        }
-    }
-}
 
 /// 卡片系统
 pub struct CardSystem;

@@ -371,20 +371,17 @@ fn is_same_job_line(current: JobType, prerequisite: JobType) -> bool {
     }
 
     // 检查当前职业的一转前置是否匹配
-    if let Some(first_class) = current.prerequisite_first_class() {
-        if first_class == prerequisite {
+    if let Some(first_class) = current.prerequisite_first_class()
+        && first_class == prerequisite {
             return true;
         }
-    }
 
     // 检查当前职业的二转前置，再看二转前置的一转是否匹配
-    if let Some(second_class) = current.prerequisite_second_class() {
-        if let Some(first_class) = second_class.prerequisite_first_class() {
-            if first_class == prerequisite {
+    if let Some(second_class) = current.prerequisite_second_class()
+        && let Some(first_class) = second_class.prerequisite_first_class()
+            && first_class == prerequisite {
                 return true;
             }
-        }
-    }
 
     false
 }

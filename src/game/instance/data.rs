@@ -188,6 +188,7 @@ pub struct Instance {
 }
 
 impl Instance {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: u32,
         name: &str,

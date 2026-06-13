@@ -341,11 +341,10 @@ impl MercenaryManager {
         let mercenaries = self.mercenaries.read();
 
         for (char_id, mercenary_id) in summoned.iter() {
-            if let Some(mercenary) = mercenaries.get(mercenary_id) {
-                if mercenary.is_contract_expired() {
+            if let Some(mercenary) = mercenaries.get(mercenary_id)
+                && mercenary.is_contract_expired() {
                     dismissed.push(*char_id);
                 }
-            }
         }
 
         drop(summoned);

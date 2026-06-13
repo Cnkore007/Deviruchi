@@ -136,7 +136,9 @@ impl Default for MobBehaviorFlags {
 
 /// 怪物种族
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum MobRace {
+    #[default]
     Formless,
     Undead,
     Brute,
@@ -149,11 +151,6 @@ pub enum MobRace {
     Dragon,
 }
 
-impl Default for MobRace {
-    fn default() -> Self {
-        MobRace::Formless
-    }
-}
 
 /// 怪物类型
 #[derive(Debug, Clone, Copy)]
@@ -183,23 +180,22 @@ pub enum MobBehavior {
 
 /// 怪物技能目标类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum MobSkillTarget {
     /// 对攻击目标（敌人）使用
+    #[default]
     Target,
     /// 对自身使用（如治疗、增益）
     Self_,
 }
 
-impl Default for MobSkillTarget {
-    fn default() -> Self {
-        MobSkillTarget::Target
-    }
-}
 
 /// 怪物技能触发条件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum MobSkillCondition {
     /// 无特殊条件（任何时候都可触发）
+    #[default]
     Any,
     /// 被围攻时（rAthena: rudeattacked）
     RudeAttacked,
@@ -209,11 +205,6 @@ pub enum MobSkillCondition {
     HpCertain,
 }
 
-impl Default for MobSkillCondition {
-    fn default() -> Self {
-        MobSkillCondition::Any
-    }
-}
 
 /// 怪物技能数据
 #[derive(Debug, Clone)]
@@ -767,7 +758,7 @@ impl MobDatabase {
     /// 获取全局默认数据库实例
     pub fn default_instance() -> &'static MobDatabase {
         static INSTANCE: std::sync::OnceLock<MobDatabase> = std::sync::OnceLock::new();
-        INSTANCE.get_or_init(|| MobDatabase::new())
+        INSTANCE.get_or_init(MobDatabase::new)
     }
 }
 

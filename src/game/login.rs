@@ -72,12 +72,11 @@ impl LoginServer {
     /// 处理 CALogin (0x0064)
     fn handle_ca_login(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         // IP 封禁检查：拦截被封禁 IP 的登录请求
-        if let Some(ref addr) = session.client_addr {
-            if self.ip_ban_manager.is_banned(addr) {
+        if let Some(ref addr) = session.client_addr
+            && self.ip_ban_manager.is_banned(addr) {
                 warn!("Login rejected: IP {} is banned", addr);
                 return Some(ACRefuseLogin { error_code: 0 }.to_packet());
             }
-        }
 
         // 解析登录包
         let login = CALogin::from_slice(data)?;
@@ -104,11 +103,10 @@ impl LoginServer {
         if !crate::storage::password::verify_password(&login.password, &account.password_hash) {
             warn!("Login failed: invalid password for user={}", login.username);
             // 暴力破解检测：记录失败尝试，超过阈值自动封禁 IP
-            if let Some(ref addr) = session.client_addr {
-                if self.ip_ban_manager.record_attempt(addr) {
+            if let Some(ref addr) = session.client_addr
+                && self.ip_ban_manager.record_attempt(addr) {
                     error!("IP {} auto-banned due to brute force attempts", addr);
                 }
-            }
             return Some(ACRefuseLogin { error_code: 0 }.to_packet());
         }
 

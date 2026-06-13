@@ -1,6 +1,6 @@
 //! 公会系统数据包协议
 
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string};
 
 const GUILD_NAME_LENGTH: usize = 24;
 const MEMBER_NAME_LENGTH: usize = 24;
@@ -17,7 +17,7 @@ pub struct CZGuildCreate {
 
 impl Packed for CZGuildCreate {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0165)
+        PacketBuilderCtx::new(0x0165)
             .put_fixed_str(&self.name, GUILD_NAME_LENGTH)
             .build()
     }
@@ -37,7 +37,7 @@ pub struct CZGuildInvite {
 
 impl Packed for CZGuildInvite {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0168)
+        PacketBuilderCtx::new(0x0168)
             .put_fixed_str(&self.target_name, MEMBER_NAME_LENGTH)
             .build()
     }
@@ -58,7 +58,7 @@ pub struct CZGuildJoin {
 
 impl Packed for CZGuildJoin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0169)
+        PacketBuilderCtx::new(0x0169)
             .put_u32(self.guild_id)
             .put_u8(if self.accept { 1 } else { 0 })
             .build()
@@ -80,7 +80,7 @@ pub struct CZGuildLeave;
 
 impl Packed for CZGuildLeave {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x016B).build()
+        PacketBuilderCtx::new(0x016B).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -97,7 +97,7 @@ pub struct CZGuildExpel {
 
 impl Packed for CZGuildExpel {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x016C)
+        PacketBuilderCtx::new(0x016C)
             .put_fixed_str(&self.target_name, MEMBER_NAME_LENGTH)
             .put_fixed_str(&self.reason, MES_LENGTH)
             .build()
@@ -122,7 +122,7 @@ pub struct CZGuildChangeNotice {
 
 impl Packed for CZGuildChangeNotice {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0183)
+        PacketBuilderCtx::new(0x0183)
             .put_fixed_str(&self.notice, NOTICE_LENGTH)
             .build()
     }
@@ -142,7 +142,7 @@ pub struct CZGuildRequestInfo {
 
 impl Packed for CZGuildRequestInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B7).put_u32(self.guild_id).build()
+        PacketBuilderCtx::new(0x01B7).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -162,7 +162,7 @@ pub struct CZGuildRequestMemberInfo {
 
 impl Packed for CZGuildRequestMemberInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B8).put_u32(self.guild_id).build()
+        PacketBuilderCtx::new(0x01B8).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -182,7 +182,7 @@ pub struct CZGuildRequestPosInfo {
 
 impl Packed for CZGuildRequestPosInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B9).put_u32(self.guild_id).build()
+        PacketBuilderCtx::new(0x01B9).put_u32(self.guild_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -202,7 +202,7 @@ pub struct CZGuildChat {
 
 impl Packed for CZGuildChat {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01EC).put_str(&self.message).build()
+        PacketBuilderCtx::new(0x01EC).put_str(&self.message).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -223,7 +223,7 @@ pub struct ZCGuildCreated {
 
 impl Packed for ZCGuildCreated {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x014C)
+        PacketBuilderCtx::new(0x014C)
             .put_u8(self.result)
             .put_u32(self.guild_id)
             .build()
@@ -249,7 +249,7 @@ pub struct ZCGuildInfo {
 
 impl Packed for ZCGuildInfo {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x014D)
+        PacketBuilderCtx::new(0x014D)
             .put_u32(self.guild_id)
             .put_u8(self.level)
             .put_u32(self.member_count)
@@ -285,7 +285,7 @@ pub struct ZCGuildMemberInfo {
 
 impl Packed for ZCGuildMemberInfo {
     fn to_packet(&self) -> Vec<u8> {
-        let mut builder = PacketBuilder::new(0x014E);
+        let mut builder = PacketBuilderCtx::new(0x014E);
         builder = builder.put_u16(self.member_count);
         for member in &self.members {
             builder = builder
@@ -313,7 +313,7 @@ pub struct ZCGuildInvite {
 
 impl Packed for ZCGuildInvite {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0150)
+        PacketBuilderCtx::new(0x0150)
             .put_u32(self.guild_id)
             .put_fixed_str(&self.guild_name, GUILD_NAME_LENGTH)
             .put_fixed_str(&self.inviter_name, MEMBER_NAME_LENGTH)
@@ -333,7 +333,7 @@ pub struct ZCGuildLeaveResult {
 
 impl Packed for ZCGuildLeaveResult {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0154).put_u8(self.result).build()
+        PacketBuilderCtx::new(0x0154).put_u8(self.result).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -351,7 +351,7 @@ pub struct ZCGuildExpelResult {
 
 impl Packed for ZCGuildExpelResult {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x015A)
+        PacketBuilderCtx::new(0x015A)
             .put_u8(self.result)
             .put_fixed_str(&self.target_name, MEMBER_NAME_LENGTH)
             .put_fixed_str(&self.reason, MES_LENGTH)
@@ -379,7 +379,7 @@ pub struct ZCGuildPositionInfo {
 
 impl Packed for ZCGuildPositionInfo {
     fn to_packet(&self) -> Vec<u8> {
-        let mut builder = PacketBuilder::new(0x0162);
+        let mut builder = PacketBuilderCtx::new(0x0162);
         builder = builder.put_u16(self.position_count);
         for pos in &self.positions {
             builder = builder
@@ -403,7 +403,7 @@ pub struct ZCGuildNotice {
 
 impl Packed for ZCGuildNotice {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x017F)
+        PacketBuilderCtx::new(0x017F)
             .put_fixed_str(&self.notice, NOTICE_LENGTH)
             .build()
     }
@@ -422,7 +422,7 @@ pub struct ZCGuildChat {
 
 impl Packed for ZCGuildChat {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01EC)
+        PacketBuilderCtx::new(0x01EC)
             .put_fixed_str(&self.sender_name, MEMBER_NAME_LENGTH)
             .put_str(&self.message)
             .build()

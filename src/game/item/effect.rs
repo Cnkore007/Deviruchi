@@ -26,7 +26,7 @@ pub enum StatType {
 
 impl StatType {
     /// 从字符串解析属性类型
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn from_name(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "str" => Some(StatType::Str),
             "agi" => Some(StatType::Agi),
@@ -619,8 +619,8 @@ fn parse_command(line: &str) -> Option<ItemEffect> {
         "cure" => {
             // cure <status1>,<status2>,... - 治愈负面状态
             let mut statuses = Vec::new();
-            for i in 1..parts.len() {
-                if let Some(status) = parse_status(parts[i]) {
+            for part in parts.iter().skip(1) {
+                if let Some(status) = parse_status(part) {
                     statuses.push(status);
                 }
             }
@@ -630,7 +630,7 @@ fn parse_command(line: &str) -> Option<ItemEffect> {
         // ==================== 复活命令 ====================
         " resurrection" | "resurrection" | "raise" => {
             // resurrection <hp_percent>
-            let hp_percent = parse_int(parts.get(1).unwrap_or(&"0")).max(1).min(100) as u16;
+            let hp_percent = parse_int(parts.get(1).unwrap_or(&"0")).clamp(1, 100) as u16;
             Some(ItemEffect::Resurrection(hp_percent))
         }
 
@@ -656,8 +656,7 @@ fn parse_command(line: &str) -> Option<ItemEffect> {
             let item_id = parse_int(parts.get(1).unwrap_or(&"0")) as u16;
             let count = parse_int(parts.get(2).unwrap_or(&"1")).max(1) as u16;
             let rate = parse_int(parts.get(3).unwrap_or(&"10000"))
-                .max(1)
-                .min(10000) as u16;
+                .clamp(1, 10000) as u16;
             Some(ItemEffect::GetItem {
                 item_id,
                 count,
@@ -669,7 +668,7 @@ fn parse_command(line: &str) -> Option<ItemEffect> {
         "useskill" | "skill" => {
             // useskill <skill_id>,<level>
             let skill_id = parse_int(parts.get(1).unwrap_or(&"0")) as u16;
-            let level = parse_int(parts.get(2).unwrap_or(&"1")).max(1).min(255) as u8;
+            let level = parse_int(parts.get(2).unwrap_or(&"1")).clamp(1, 255) as u8;
             Some(ItemEffect::UseSkill { skill_id, level })
         }
 

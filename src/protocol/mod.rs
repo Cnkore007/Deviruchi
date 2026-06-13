@@ -10,4 +10,4 @@ pub mod storage_packets;
 pub mod teleport_packets;
 pub mod trade_packets;
 
-pub use packet_builder::{Packed, PacketBuilder, parse_fixed_string, parse_string};
+pub use packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string, parse_string};

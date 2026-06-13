@@ -2,7 +2,7 @@
 //!
 //! 包含玩家回城、GM传送、地图切换等相关协议
 
-use super::packet_builder::{Packed, PacketBuilder, parse_fixed_string};
+use super::packet_builder::{Packed, PacketBuilderCtx, parse_fixed_string};
 
 const NAME_LENGTH: usize = 24;
 const MAP_NAME_LENGTH: usize = 16;
@@ -14,7 +14,7 @@ pub struct CZUseReturn;
 
 impl Packed for CZUseReturn {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0119).build()
+        PacketBuilderCtx::new(0x0119).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -31,7 +31,7 @@ pub struct ZCWarpAck {
 
 impl Packed for ZCWarpAck {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0088).put_u8(self.warp_type).build()
+        PacketBuilderCtx::new(0x0088).put_u8(self.warp_type).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -55,7 +55,7 @@ pub struct ZCChangeMap {
 
 impl Packed for ZCChangeMap {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0091)
+        PacketBuilderCtx::new(0x0091)
             .put_fixed_str(&self.map_name, MAP_NAME_LENGTH)
             .put_u16(self.x)
             .put_u16(self.y)
@@ -78,7 +78,7 @@ pub struct CZGmWarp {
 
 impl Packed for CZGmWarp {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0138)
+        PacketBuilderCtx::new(0x0138)
             .put_fixed_str(&self.map_name, MAP_NAME_LENGTH)
             .put_u16(self.x)
             .put_u16(self.y)
@@ -106,7 +106,7 @@ pub struct CZGmGoto {
 
 impl Packed for CZGmGoto {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x013A)
+        PacketBuilderCtx::new(0x013A)
             .put_fixed_str(&self.target_name, NAME_LENGTH)
             .build()
     }
@@ -130,7 +130,7 @@ pub struct CZGmSummon {
 
 impl Packed for CZGmSummon {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x013B)
+        PacketBuilderCtx::new(0x013B)
             .put_fixed_str(&self.target_name, NAME_LENGTH)
             .build()
     }
@@ -152,7 +152,7 @@ pub struct CZGmSavePoint;
 
 impl Packed for CZGmSavePoint {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x013C).build()
+        PacketBuilderCtx::new(0x013C).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -182,7 +182,7 @@ impl ZCWarpError {
 
 impl Packed for ZCWarpError {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0084).put_u8(self.error_code).build()
+        PacketBuilderCtx::new(0x0084).put_u8(self.error_code).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -197,7 +197,7 @@ pub struct CZSetSavePoint;
 
 impl Packed for CZSetSavePoint {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B8).build()
+        PacketBuilderCtx::new(0x01B8).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -215,7 +215,7 @@ pub struct ZCSavePointSet {
 
 impl Packed for ZCSavePointSet {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x01B9)
+        PacketBuilderCtx::new(0x01B9)
             .put_fixed_str(&self.map_name, MAP_NAME_LENGTH)
             .put_u16(self.x)
             .put_u16(self.y)
@@ -236,7 +236,7 @@ pub struct ZCWarpStart {
 
 impl Packed for ZCWarpStart {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0840).put_u8(self.warp_type).build()
+        PacketBuilderCtx::new(0x0840).put_u8(self.warp_type).build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {

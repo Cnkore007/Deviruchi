@@ -1,4 +1,4 @@
-use super::packet_builder::{Packed, PacketBuilder};
+use super::packet_builder::{Packed, PacketBuilderCtx};
 
 /// 客户端进入地图请求 (0x007C)
 #[derive(Debug, Clone)]
@@ -8,7 +8,7 @@ pub struct CZEnter {
 
 impl Packed for CZEnter {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x007C).put_u32(self.gc_id).build()
+        PacketBuilderCtx::new(0x007C).put_u32(self.gc_id).build()
     }
 
     fn from_slice(slice: &[u8]) -> Option<Self> {
@@ -30,7 +30,7 @@ pub struct ZCAcceptEnter {
 
 impl Packed for ZCAcceptEnter {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x02D3)
+        PacketBuilderCtx::new(0x02D3)
             .put_u32(self.start_time)
             .put_u16(self.pos_x)
             .put_u16(self.pos_y)
@@ -52,7 +52,7 @@ pub struct CZRequestMove {
 
 impl Packed for CZRequestMove {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x0085);
+        let mut ctx = PacketBuilderCtx::new(0x0085);
         ctx = ctx.put_u16(self.pos_x);
         ctx = ctx.put_u16(self.pos_y);
         ctx = ctx.put_slice(&self.move_data);
@@ -83,7 +83,7 @@ pub struct ZCMove {
 
 impl Packed for ZCMove {
     fn to_packet(&self) -> Vec<u8> {
-        let mut ctx = PacketBuilder::new(0x0086);
+        let mut ctx = PacketBuilderCtx::new(0x0086);
         ctx = ctx.put_u32(self.entity_id);
         ctx = ctx.put_slice(&self.move_data);
         ctx.build()
@@ -105,7 +105,7 @@ pub struct CZUseSkill {
 
 impl Packed for CZUseSkill {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilder::new(0x0112)
+        PacketBuilderCtx::new(0x0112)
             .put_u16(self.skill_id)
             .put_u32(self.target_id)
             .put_u16(self.target_x)

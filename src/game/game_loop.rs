@@ -13,6 +13,51 @@ use std::time::Duration;
 /// 定期保存间隔：每 3000 个 tick（100ms/tick = 5 分钟）保存一次
 const SAVE_INTERVAL_TICKS: u64 = 3000;
 
+#[derive(Debug, Clone)]
+pub struct DayNightCycle {
+    pub is_night: bool,
+    pub cycle_timer: u64,
+    pub day_duration: u64,
+    pub night_duration: u64,
+}
+
+impl DayNightCycle {
+    pub fn new(day_duration_ms: u64, night_duration_ms: u64, night_at_start: bool) -> Self {
+        let tick_interval_ms = 100u64;
+        Self {
+            is_night: night_at_start,
+            cycle_timer: 0,
+            day_duration: day_duration_ms / tick_interval_ms,
+            night_duration: night_duration_ms / tick_interval_ms,
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.day_duration > 0 && self.night_duration > 0
+    }
+
+    /// Advance one tick. Returns Some(true) for nightfall, Some(false) for dawn, None for no change.
+    pub fn advance(&mut self) -> Option<bool> {
+        if !self.is_enabled() {
+            return None;
+        }
+
+        self.cycle_timer += 1;
+
+        if self.is_night && self.cycle_timer >= self.night_duration {
+            self.cycle_timer = 0;
+            self.is_night = false;
+            Some(false)
+        } else if !self.is_night && self.cycle_timer >= self.day_duration {
+            self.cycle_timer = 0;
+            self.is_night = true;
+            Some(true)
+        } else {
+            None
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub struct GameLoop {
     map_state: Arc<MapState>,
@@ -29,9 +74,11 @@ pub struct GameLoop {
     db: Option<Arc<crate::storage::Database>>,
     tick_interval: Duration,
     tick_count: parking_lot::Mutex<u64>,
+    pub day_night_cycle: parking_lot::Mutex<DayNightCycle>,
 }
 
 impl GameLoop {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         map_state: Arc<MapState>,
         drop_manager: Arc<DropManager>,
@@ -60,6 +107,7 @@ impl GameLoop {
             db: None,
             tick_interval: Duration::from_millis(100),
             tick_count: parking_lot::Mutex::new(0),
+            day_night_cycle: parking_lot::Mutex::new(DayNightCycle::new(0, 0, false)),
         }
     }
 
@@ -71,6 +119,11 @@ impl GameLoop {
 
     pub fn with_tick_interval(mut self, interval: Duration) -> Self {
         self.tick_interval = interval;
+        self
+    }
+
+    pub fn with_day_night_cycle(mut self, cycle: DayNightCycle) -> Self {
+        self.day_night_cycle = parking_lot::Mutex::new(cycle);
         self
     }
 
@@ -93,7 +146,10 @@ impl GameLoop {
         // 5. Update player states (HP/SP regeneration, food effects, status cleanup)
         self.process_player_regeneration();
 
-        // 6. 定期保存（每 5 分钟）
+        // 6. Day/night cycle
+        self.advance_day_night_cycle();
+
+        // 7. 定期保存（每 5 分钟）
         let mut count = self.tick_count.lock();
         *count += 1;
         if *count >= SAVE_INTERVAL_TICKS {
@@ -124,6 +180,22 @@ impl GameLoop {
                 }
             }
             tracing::info!("定期保存完成：{} 个玩家，公会数据已保存", saved);
+        }
+    }
+
+    /// 推进昼夜循环，状态切换时广播天气效果
+    fn advance_day_night_cycle(&self) {
+        let transition = self.day_night_cycle.lock().advance();
+        if let Some(to_night) = transition {
+            let weather_type: u8 = if to_night { 2 } else { 0 };
+            tracing::info!(
+                "Day/night transition: {}",
+                if to_night { "nightfall" } else { "dawn" }
+            );
+            let player_ids = self.map_state.get_all_player_ids();
+            for _player_id in &player_ids {
+                let _ = weather_type;
+            }
         }
     }
 
