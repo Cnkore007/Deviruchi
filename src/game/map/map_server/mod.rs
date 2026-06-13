@@ -117,7 +117,6 @@ impl MapServer {
     }
 
     /// 设置 Map Server ID
-    #[allow(dead_code)]
     pub fn with_server_id(mut self, server_id: u32) -> Self {
         self.map_server_id = server_id;
         self

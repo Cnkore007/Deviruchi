@@ -398,18 +398,15 @@ impl Player {
 
     // ==================== 存档点相关 ====================
 
-    #[allow(dead_code)]
     pub fn get_save_point(&self) -> (u16, u16) {
         let sp = self.save_point.read();
         (sp.x, sp.y)
     }
 
-    #[allow(dead_code)]
     pub fn get_save_map(&self) -> String {
         self.save_point.read().map.clone()
     }
 
-    #[allow(dead_code)]
     pub fn set_save_point(&self) {
         let pos = self.pos.read();
         let mut sp = self.save_point.write();
@@ -418,7 +415,6 @@ impl Player {
         sp.y = pos.y;
     }
 
-    #[allow(dead_code)]
     pub fn set_save_point_at(&self, map: &str, x: u16, y: u16) {
         let mut sp = self.save_point.write();
         sp.map = map.to_string();
@@ -493,7 +489,6 @@ impl Player {
     }
 
     /// 设置战斗状态
-    #[allow(dead_code)]
     pub fn set_combat(&self, in_combat: bool) {
         self.combat.write().in_combat = in_combat;
     }
@@ -509,7 +504,6 @@ impl Player {
     }
 
     /// 设置职业ID
-    #[allow(dead_code)]
     pub fn set_job(&self, job: u16) {
         self.economy.write().job = job;
     }

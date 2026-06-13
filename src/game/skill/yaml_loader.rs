@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! rAthena skill_db.yml 格式加载器
@@ -14,6 +13,7 @@ use std::fs;
 /// rAthena skill_db.yml 文件结构
 #[derive(Deserialize, Debug)]
 struct SkillDbFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: SkillDbHeader,
     Body: Option<Vec<SkillDbEntry>>,
 }
@@ -21,9 +21,9 @@ struct SkillDbFile {
 #[derive(Deserialize, Debug)]
 struct SkillDbHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
@@ -42,16 +42,19 @@ struct SkillDbEntry {
     #[serde(rename = "Range", default)]
     range: Option<LevelOrValue>,
     #[serde(rename = "HitCount", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     hit_count: Option<LevelOrValue>,
     #[serde(rename = "Element", default)]
     element: Option<LevelOrString>,
     #[serde(rename = "SplashArea", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     splash_area: Option<LevelOrValue>,
     #[serde(rename = "Requires")]
     requires: Option<SkillRequires>,
     #[serde(rename = "DamageFlags", default)]
     damage_flags: Option<HashMap<String, bool>>,
     #[serde(rename = "Flags", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     flags: Option<HashMap<String, bool>>,
     #[serde(rename = "CastTime", default)]
     cast_time: Option<Vec<LevelTime>>,
@@ -107,6 +110,7 @@ struct SkillRequires {
     #[serde(rename = "HpCost", default)]
     hp_cost: Option<Vec<LevelAmount>>,
     #[serde(rename = "ZenyCost", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     zeny_cost: Option<Vec<LevelAmount>>,
 }
 

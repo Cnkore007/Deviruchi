@@ -396,29 +396,6 @@ impl CashShopManager {
         None
     }
 
-    /// 记录每日购买（购买/赠送系统实现后启用）
-    #[allow(dead_code)]
-    fn record_daily_purchase(&self, char_id: u32, item_id: u16, amount: u16) {
-        let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-
-        let mut purchases = self.daily_purchases.write();
-        let record = purchases
-            .entry(char_id)
-            .or_insert_with(|| DailyPurchaseRecord {
-                items: HashMap::new(),
-                last_reset_date: today.clone(),
-            });
-
-        // 检查是否需要重置（日期变更）
-        if record.last_reset_date != today {
-            record.items.clear();
-            record.last_reset_date = today;
-        }
-
-        // 增加购买数量
-        *record.items.entry(item_id).or_insert(0) += amount;
-    }
-
     /// 记录购买日志
     #[allow(clippy::too_many_arguments)]
     fn log_purchase(
@@ -468,7 +445,6 @@ impl CashShopManager {
     }
 
     /// 重置玩家的每日购买记录（通常在日期变更时调用）
-    #[allow(dead_code)]
     pub fn reset_daily_purchases(&self, char_id: u32) {
         let mut purchases = self.daily_purchases.write();
         if let Some(record) = purchases.get_mut(&char_id) {
@@ -478,7 +454,6 @@ impl CashShopManager {
     }
 
     /// 批量重置所有玩家的每日购买记录
-    #[allow(dead_code)]
     pub fn reset_all_daily_purchases(&self) {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let mut purchases = self.daily_purchases.write();

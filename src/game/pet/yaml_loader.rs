@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! rAthena pet_db.yml 格式加载器
@@ -23,6 +22,7 @@ pub struct PetTemplate {
 
 #[derive(Deserialize, Debug)]
 struct PetDbFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: PetDbHeader,
     Body: Option<Vec<PetDbEntry>>,
 }
@@ -30,9 +30,9 @@ struct PetDbFile {
 #[derive(Deserialize, Debug)]
 struct PetDbHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 

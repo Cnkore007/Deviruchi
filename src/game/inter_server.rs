@@ -67,46 +67,7 @@ pub struct CharacterTransfer {
     pub account_level: u32,
 }
 
-impl CharacterTransfer {
-    /// 从数据库角色创建传输数据
-    #[allow(dead_code)]
-    pub fn from_character(
-        char: &crate::storage::Character,
-        account_id: u32,
-        account_level: u32,
-    ) -> Self {
-        Self {
-            char_id: char.char_id,
-            account_id,
-            name: char.name.clone(),
-            level: char.base_level,
-            job: char.class,
-            hp: char.hp,
-            max_hp: char.max_hp,
-            sp: char.sp,
-            max_sp: char.max_sp,
-            map_name: char.last_map.clone(),
-            pos_x: char.last_x as u16,
-            pos_y: char.last_y as u16,
-            save_map: char.last_map.clone(), // 使用last_map作为save_map的默认值
-            save_x: char.last_x as u16,
-            save_y: char.last_y as u16,
-            str: char.str as u8,
-            agi: char.agi as u8,
-            vit: char.vit as u8,
-            int: char.int as u8,
-            dex: char.dex as u8,
-            luk: char.luk as u8,
-            zeny: char.zeny,
-            sex: 1, // 默认男性，可根据需要扩展
-            hair_color: char.hair_color,
-            hair: char.hair,
-            cloak_id: 0,
-            boots_id: 0,
-            account_level,
-        }
-    }
-}
+
 
 /// Inter-Server 数据包枚举
 #[derive(Debug, Clone)]
@@ -225,6 +186,7 @@ pub trait InterServerConnector: Send + Sync {
 }
 
 /// Inter-Server 通信管理器
+#[allow(dead_code)]
 pub struct InterServerComm {
     /// 到其他服务器的连接
     connections: RwLock<HashMap<u32, Box<dyn InterServerConnector>>>,
@@ -261,40 +223,7 @@ impl InterServerComm {
         }
     }
 
-    /// 添加到服务器的连接
-    #[allow(dead_code)]
-    pub fn add_connection(&self, server_id: u32, connector: Box<dyn InterServerConnector>) {
-        let mut connections = self.connections.write();
-        connections.insert(server_id, connector);
-    }
 
-    /// 移除服务器连接
-    #[allow(dead_code)]
-    pub fn remove_connection(&self, server_id: u32) {
-        let mut connections = self.connections.write();
-        connections.remove(&server_id);
-    }
-
-    /// 发送数据包到指定服务器
-    #[allow(dead_code)]
-    pub fn send_to(&self, server_id: u32, packet: &InterServerPacket) -> Result<(), String> {
-        let connections = self.connections.read();
-        if let Some(conn) = connections.get(&server_id) {
-            conn.send_packet(packet)
-        } else {
-            Err(format!("No connection to server {}", server_id))
-        }
-    }
-
-    /// 检查到指定服务器的连接是否正常
-    #[allow(dead_code)]
-    pub fn is_connected_to(&self, server_id: u32) -> bool {
-        let connections = self.connections.read();
-        connections
-            .get(&server_id)
-            .map(|c| c.is_connected())
-            .unwrap_or(false)
-    }
 }
 
 impl Default for InterServerComm {
@@ -353,7 +282,6 @@ impl InterServerChannel {
     }
 
     /// 发送角色传输请求
-    #[allow(dead_code)]
     pub fn send_char_transfer(&self, event: CharTransferEvent) -> Result<(), String> {
         self.tx
             .send(InterServerEvent::CharTransfer(event))
@@ -361,7 +289,6 @@ impl InterServerChannel {
     }
 
     /// 发送角色离开通知
-    #[allow(dead_code)]
     pub fn send_char_leave(&self, event: CharLeaveEvent) -> Result<(), String> {
         self.tx
             .send(InterServerEvent::CharLeave(event))
@@ -369,7 +296,6 @@ impl InterServerChannel {
     }
 
     /// 发送心跳
-    #[allow(dead_code)]
     pub fn send_heartbeat(&self, server_id: u32, timestamp: u64) -> Result<(), String> {
         self.tx
             .send(InterServerEvent::Heartbeat(server_id, timestamp))
@@ -377,13 +303,11 @@ impl InterServerChannel {
     }
 
     /// 尝试接收事件（非阻塞）
-    #[allow(dead_code)]
     pub fn try_recv(rx: &std::sync::mpsc::Receiver<InterServerEvent>) -> Option<InterServerEvent> {
         rx.try_recv().ok()
     }
 
     /// 接收事件
-    #[allow(dead_code)]
     pub fn recv(
         rx: &std::sync::mpsc::Receiver<InterServerEvent>,
     ) -> Result<InterServerEvent, String> {

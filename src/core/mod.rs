@@ -30,7 +30,6 @@ use crate::network::{AgentServer, GameServer, PacketHandler, SessionManager};
 use crate::storage::{Database, init_schema};
 use std::sync::Arc;
 
-#[allow(dead_code)]
 pub struct Core {
     cli: Cli,
     config: Arc<Config>,
@@ -42,7 +41,6 @@ pub struct Core {
     drop_manager: Arc<DropManager>,
     party_manager: Arc<PartyManager>,
     heal_service: Arc<heal::HealService>,
-    at_command_handler: Arc<AtCommandHandler>,
 }
 
 impl Core {
@@ -50,11 +48,6 @@ impl Core {
         let config = Config::load(&cli.config).unwrap_or_default();
         let config = Arc::new(config);
         let config_for_heal = config.clone();
-        let at_command_handler = Arc::new({
-            let handler = AtCommandHandler::new();
-            handler.register_default_commands();
-            handler
-        });
         Self {
             cli,
             config,
@@ -66,7 +59,6 @@ impl Core {
             drop_manager: Arc::new(DropManager::new()),
             party_manager: Arc::new(PartyManager::new()),
             heal_service: Arc::new(heal::HealService::new(config_for_heal)),
-            at_command_handler,
         }
     }
 

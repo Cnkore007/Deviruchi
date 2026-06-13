@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! rAthena mercenary_db.yml 格式加载器
@@ -39,6 +38,7 @@ pub struct MercenarySkillEntry {
 
 #[derive(Deserialize, Debug)]
 struct MercDbFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: MercDbHeader,
     Body: Option<Vec<MercDbEntry>>,
 }
@@ -46,9 +46,9 @@ struct MercDbFile {
 #[derive(Deserialize, Debug)]
 struct MercDbHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
@@ -56,7 +56,7 @@ struct MercDbHeader {
 struct MercDbEntry {
     Id: u16,
     #[serde(rename = "AegisName")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     aegis_name: Option<String>,
     Name: Option<String>,
     #[serde(default)]

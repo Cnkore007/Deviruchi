@@ -61,8 +61,6 @@ fn chrono_now() -> String {
 /// rAthena 物品条目（用于 YAML 反序列化）
 #[derive(Deserialize, Debug)]
 struct ItemFile {
-    #[allow(dead_code)]
-    Header: Option<serde_yaml::Value>,
     Body: Option<Vec<ItemEntry>>,
 }
 
@@ -74,9 +72,6 @@ struct ItemEntry {
     type_: Option<String>,
     #[serde(rename = "Buy", default)]
     buy: u32,
-    #[serde(rename = "Sell", default)]
-    #[allow(dead_code)]
-    sell: u32,
     #[serde(rename = "Attack", default)]
     attack: u16,
     #[serde(rename = "Defense", default)]
@@ -85,7 +80,6 @@ struct ItemEntry {
 
 /// 简化物品条目（来自 item_db.yml）
 #[derive(Deserialize, Debug)]
-#[allow(dead_code)]
 struct SimpleItemEntry {
     Id: u32,
     Name: String,
@@ -95,10 +89,6 @@ struct SimpleItemEntry {
     buy_price: u32,
     #[serde(rename = "SellPrice", default)]
     sell_price: u32,
-    #[serde(rename = "HpRestore", default)]
-    hp_restore: u16,
-    #[serde(rename = "SpRestore", default)]
-    sp_restore: u16,
 }
 
 fn generate_item_section() -> String {
@@ -212,18 +202,12 @@ fn generate_item_section() -> String {
 /// rAthena 怪物条目
 #[derive(Deserialize, Debug)]
 struct MobFile {
-    #[allow(dead_code)]
-    Header: Option<serde_yaml::Value>,
     Body: Option<Vec<MobEntry>>,
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(dead_code)]
 struct MobEntry {
     Id: u16,
-    #[serde(rename = "AegisName")]
-    #[allow(dead_code)]
-    aegis_name: Option<String>,
     Name: String,
     #[serde(rename = "Level", default)]
     level: u16,
@@ -233,10 +217,6 @@ struct MobEntry {
     base_exp: u32,
     #[serde(rename = "JobExp", default)]
     job_exp: u32,
-    #[serde(rename = "Attack", default)]
-    attack: u16,
-    #[serde(rename = "Defense", default)]
-    defense: u16,
     #[serde(rename = "Size", default)]
     size: Option<String>,
     #[serde(rename = "Race", default)]
@@ -300,8 +280,6 @@ fn generate_mob_section() -> String {
 /// rAthena 技能条目
 #[derive(Deserialize, Debug)]
 struct SkillFile {
-    #[allow(dead_code)]
-    Header: Option<serde_yaml::Value>,
     Body: Option<Vec<SkillEntry>>,
 }
 
@@ -313,9 +291,6 @@ struct SkillEntry {
     max_level: u8,
     #[serde(rename = "Type", default)]
     type_: Option<String>,
-    #[serde(rename = "Description", default)]
-    #[allow(dead_code)]
-    description: Option<String>,
 }
 
 fn generate_skill_section() -> String {

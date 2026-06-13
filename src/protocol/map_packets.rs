@@ -747,22 +747,12 @@ mod tests {
 
 /// NPC 对话相关数据包 ID 常量
 pub mod id {
-    // 服务器 -> 客户端
-    #[allow(dead_code)]
     pub const ZC_SAY_DIALOG: u16 = 0x00B4;
-    #[allow(dead_code)]
     pub const ZC_WAIT_DIALOG: u16 = 0x00B5;
-    #[allow(dead_code)]
     pub const ZC_CLOSE_DIALOG: u16 = 0x00B6;
-    #[allow(dead_code)]
     pub const ZC_MENU_LIST: u16 = 0x00B7;
-
-    // 客户端 -> 服务器
-    #[allow(dead_code)]
     pub const CZ_ACK_SELECT_MENU: u16 = 0x00B8;
-    #[allow(dead_code)]
     pub const CZ_ACK_NEXT_DIALOG: u16 = 0x00B9;
-    #[allow(dead_code)]
     pub const CZ_ACK_CLOSE_DIALOG: u16 = 0x0146;
 }
 

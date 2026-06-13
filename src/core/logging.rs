@@ -154,13 +154,13 @@ impl Default for LogConfig {
 }
 
 /// 全局日志管理器
-#[allow(dead_code)]
 pub struct LogManager {
     /// 日志配置
     config: RwLock<LogConfig>,
     /// 日志目录
     log_dir: String,
-    /// 各分类的 appender
+    /// 各分类的 appender（保持 WorkerGuard 存活）
+    #[allow(dead_code)] // keep-alive: guard 必须存活才能写入日志
     appenders:
         RwLock<std::collections::HashMap<LogCategory, tracing_appender::non_blocking::WorkerGuard>>,
 }

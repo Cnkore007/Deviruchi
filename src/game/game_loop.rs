@@ -255,7 +255,6 @@ impl GameLoop {
     }
 
     /// Start the game loop as an async task
-    #[allow(dead_code)]
     pub fn start(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
         let tick_interval = self.tick_interval;
         tokio::spawn(async move {

@@ -150,7 +150,6 @@ impl TokenStore {
     }
 
     /// 获取token信息（不消费）
-    #[allow(dead_code)]
     pub fn get_token_data(&self, token: &str) -> Option<TokenData> {
         let tokens = self.tokens.read();
         tokens.get(token).map(|entry| entry.into())
@@ -163,7 +162,6 @@ impl TokenStore {
     }
 
     /// 获取当前活跃token数量
-    #[allow(dead_code)]
     pub fn active_token_count(&self) -> usize {
         let tokens = self.tokens.read();
         tokens.len()

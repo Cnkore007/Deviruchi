@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 use super::data::{Item, ItemType};
@@ -14,6 +13,7 @@ use std::fs;
 /// rAthena item_db 文件结构（适用于 item_db_equip.yml / item_db_usable.yml / item_db_etc.yml）
 #[derive(Deserialize, Debug)]
 struct ItemRathenaFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: ItemRathenaHeader,
     Body: Option<Vec<ItemRathenaEntry>>,
 }
@@ -21,9 +21,9 @@ struct ItemRathenaFile {
 #[derive(Deserialize, Debug)]
 struct ItemRathenaHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
@@ -32,7 +32,6 @@ struct ItemRathenaHeader {
 struct ItemRathenaEntry {
     Id: u16,
     #[serde(rename = "AegisName")]
-    #[allow(dead_code)]
     aegis_name: String,
     Name: String,
     #[serde(rename = "Type")]
@@ -52,18 +51,24 @@ struct ItemRathenaEntry {
     #[serde(rename = "Defense", default)]
     defense: u16,
     #[serde(rename = "Range", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     range: u16,
     #[serde(rename = "Slots", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     slots: u16,
     #[serde(rename = "Locations", default)]
     locations: Option<HashMap<String, bool>>,
     #[serde(rename = "WeaponLevel", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     weapon_level: u8,
     #[serde(rename = "ArmorLevel", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     armor_level: u8,
     #[serde(rename = "EquipLevelMin", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     equip_level_min: u8,
     #[serde(rename = "Refineable", default)]
+    #[allow(dead_code)] // rAthena YAML compat
     refineable: bool,
 }
 
@@ -321,6 +326,7 @@ fn load_legacy_format(path: &str) -> Result<HashMap<u16, Item>, Box<dyn Error>> 
 
 #[derive(Deserialize, Debug)]
 struct ItemNameMapFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: ItemNameMapHeader,
     Body: Option<Vec<ItemNameMapEntry>>,
 }
@@ -328,9 +334,9 @@ struct ItemNameMapFile {
 #[derive(Deserialize, Debug)]
 struct ItemNameMapHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 

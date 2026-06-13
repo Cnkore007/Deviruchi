@@ -55,7 +55,6 @@ fn check_skill_condition(
 }
 
 /// 怪物AI处理器
-#[allow(dead_code)]
 pub struct MobAI {
     spawn_manager: Arc<MobSpawnManager>,
     channel_bus: Arc<ChannelBus>,
@@ -693,44 +692,6 @@ impl MobAI {
         }
     }
 
-    /// 处理怪物掉落
-    #[allow(dead_code)]
-    fn process_drops(&self, mob: &Arc<Mob>) {
-        if mob.drops.is_empty() {
-            return;
-        }
-
-        let (mob_x, mob_y) = mob.get_position();
-        let channel_name = map_channel_name(&mob.spawn_map);
-
-        for drop in &mob.drops {
-            let roll = self.rand_u32() % 10000;
-            if roll < drop.chance {
-                let amount = if drop.min_amount >= drop.max_amount {
-                    drop.min_amount
-                } else {
-                    drop.min_amount
-                        + (self.rand_u32() % ((drop.max_amount - drop.min_amount + 1) as u32))
-                            as u16
-                };
-
-                // 添加掉落物到地图
-                self.drop_manager
-                    .add(drop.item_id, amount, mob_x, mob_y, &mob.spawn_map);
-
-                // 发布 ItemDrop 事件
-                let drop_event = GameEvent::ItemDrop {
-                    item_id: drop.item_id,
-                    x: mob_x,
-                    y: mob_y,
-                    amount,
-                };
-                let packet = drop_event.to_packet_bytes();
-                self.channel_bus.publish(&channel_name, &drop_event, packet);
-            }
-        }
-    }
-
     /// 使用 DropTableResolver 处理怪物掉落
     ///
     /// 根据 mob_id 获取掉落表，使用 DropResolver 解析掉落，
@@ -776,12 +737,6 @@ impl MobAI {
     /// 返回 [0, 100) 范围内的随机数
     fn rand_simple(&self) -> i32 {
         (self.rng.rand_range(0, 99)) as i32
-    }
-
-    /// 返回随机 u32
-    #[allow(dead_code)]
-    fn rand_u32(&self) -> u32 {
-        self.rng.rand_range(u32::MIN, u32::MAX)
     }
 
     /// 返回 [min, max] 范围内的随机偏移

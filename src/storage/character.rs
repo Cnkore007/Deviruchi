@@ -42,12 +42,6 @@ pub struct CharacterHotkeyData {
     pub item_or_skill_id: u32,
 }
 
-/// 辅助函数：构建 Character 结构体的参数数组
-#[allow(dead_code)]
-fn character_row_params() -> Vec<&'static dyn IntoValue> {
-    vec![]
-}
-
 impl Database {
     #[allow(clippy::too_many_arguments)]
     pub fn create_character(

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! Mob YAML 数据加载器
@@ -79,7 +78,7 @@ fn load_skill_name_to_id_map() -> std::collections::HashMap<String, u16> {
 /// 用于从 skill_db.yml 中提取 Id 和 Name 的简化结构
 #[derive(Deserialize, Debug)]
 struct SkillDbForMapping {
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Header: serde_yaml::Value,
     Body: Option<Vec<SkillDbMappingEntry>>,
 }
@@ -107,29 +106,30 @@ pub fn skill_name_to_id(name: &str) -> u16 {
 /// rAthena mob_db.yml 文件结构
 #[derive(Deserialize, Debug)]
 struct MobYamlFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: MobYamlHeader,
     Body: Option<Vec<MobYamlEntry>>,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Footer: Option<MobYamlFooter>,
 }
 
 #[derive(Deserialize, Debug)]
 struct MobYamlHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(dead_code)]
+#[allow(dead_code)] // rAthena YAML compat
 struct MobYamlFooter {
     Imports: Option<Vec<MobYamlImport>>,
 }
 
 #[derive(Deserialize, Debug)]
-#[allow(dead_code)]
+#[allow(dead_code)] // rAthena YAML compat
 struct MobYamlImport {
     Path: String,
     Mode: Option<String>,
@@ -140,7 +140,7 @@ struct MobYamlImport {
 struct MobYamlEntry {
     Id: u16,
     #[serde(rename = "AegisName")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _aegis_name: String,
     Name: String,
     #[serde(default)]
@@ -162,12 +162,15 @@ struct MobYamlEntry {
     #[serde(default)]
     MagicDefense: u16,
     #[serde(default = "default_stat")]
+    #[allow(dead_code)] // rAthena YAML compat
     Str: u16,
     #[serde(default = "default_stat")]
     Agi: u16,
     #[serde(default = "default_stat")]
+    #[allow(dead_code)] // rAthena YAML compat
     Vit: u16,
     #[serde(default = "default_stat")]
+    #[allow(dead_code)] // rAthena YAML compat
     Int: u16,
     #[serde(default = "default_stat")]
     Dex: u16,
@@ -192,22 +195,21 @@ struct MobYamlEntry {
     #[serde(default)]
     AttackDelay: u32,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     AttackMotion: u32,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     DamageMotion: u32,
     #[serde(default)]
     Ai: String,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Class: String,
     #[serde(default)]
     Modes: Option<HashMap<String, bool>>,
     #[serde(default)]
     Drops: Option<Vec<MobYamlDrop>>,
     #[serde(default)]
-    #[allow(dead_code)]
     MvpDrops: Option<Vec<MobYamlDrop>>,
     /// 怪物技能列表
     #[serde(default)]
@@ -221,7 +223,7 @@ struct MobYamlDrop {
     #[serde(default)]
     Rate: u32,
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     StealProtected: Option<bool>,
 }
 
@@ -249,14 +251,14 @@ struct MobSkillEntry {
     Rate: u32,
     /// 吟唱时间（毫秒）
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     CastTime: u32,
     /// 冷却/延迟时间（毫秒）
     #[serde(default)]
     Delay: u32,
     /// 触发时的表情
     #[serde(default)]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Emotion: u32,
     /// 技能目标："target"（敌人）或 "self"（自身）
     #[serde(default = "default_skill_target")]

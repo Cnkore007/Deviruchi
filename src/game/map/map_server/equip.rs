@@ -108,25 +108,4 @@ impl MapServer {
         }
     }
 
-    /// 处理卸下所有装备请求
-    #[allow(dead_code)]
-    pub(super) fn handle_unequip_all(&self, _data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
-        let player_id = session.player_id?;
-
-        tracing::info!("Player {} 请求卸下所有装备", player_id);
-
-        let player = self.map_state.get_player(&player_id)?;
-        let mut equipment = player.equipment.write();
-
-        // 卸下所有装备
-        let slots_to_unequip: Vec<EquipSlot> = equipment.get_all().keys().cloned().collect();
-        for slot in slots_to_unequip {
-            equipment.unequip(slot);
-        }
-
-        tracing::info!("Player {} 成功卸下所有装备", player_id);
-
-        // 返回成功（简化实现）
-        Some(vec![0x00, 0x00])
-    }
 }

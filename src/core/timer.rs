@@ -8,8 +8,7 @@ static TIMER_QUEUE: Lazy<Mutex<BinaryHeap<TimerEntry>>> =
     Lazy::new(|| Mutex::new(BinaryHeap::new()));
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct TimerId(u64);
+pub struct TimerId(#[allow(dead_code)] u64); // 预留给未来的 cancel/lookup API
 
 impl TimerId {
     pub fn new(id: u64) -> Self {

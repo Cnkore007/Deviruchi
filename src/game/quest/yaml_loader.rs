@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! rAthena quest_db.yml 格式加载器
@@ -11,6 +10,7 @@ use std::fs;
 
 #[derive(Deserialize, Debug)]
 struct QuestDbFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: QuestDbHeader,
     Body: Option<Vec<QuestDbEntry>>,
 }
@@ -18,9 +18,9 @@ struct QuestDbFile {
 #[derive(Deserialize, Debug)]
 struct QuestDbHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
@@ -42,11 +42,13 @@ struct QuestTarget {
 
 #[derive(Deserialize, Debug)]
 struct QuestDrop {
+    #[allow(dead_code)] // rAthena YAML compat
     Mob: Option<String>,
     Item: String,
     #[serde(default = "default_one")]
     Count: u32,
     #[serde(default)]
+    #[allow(dead_code)] // rAthena YAML compat
     Rate: u32,
 }
 

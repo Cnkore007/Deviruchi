@@ -145,12 +145,6 @@ impl WoEManager {
         *self.current_state.read()
     }
 
-    /// 设置状态
-    #[allow(dead_code)]
-    fn set_state(&self, state: WoEState) {
-        *self.current_state.write() = state;
-    }
-
     /// 检查 WoE 是否激活
     pub fn is_woe_active(&self) -> bool {
         matches!(

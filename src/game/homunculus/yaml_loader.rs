@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(non_snake_case)]
 
 //! rAthena homunculus_db.yml 格式加载器
@@ -34,6 +33,7 @@ pub struct HomunculusTemplateYaml {
 
 #[derive(Deserialize, Debug)]
 struct HomunDbFile {
+    #[allow(dead_code)] // rAthena YAML compat
     Header: HomunDbHeader,
     Body: Option<Vec<HomunDbEntry>>,
 }
@@ -41,9 +41,9 @@ struct HomunDbFile {
 #[derive(Deserialize, Debug)]
 struct HomunDbHeader {
     #[serde(rename = "Type")]
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     _type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // rAthena YAML compat
     Version: u32,
 }
 
