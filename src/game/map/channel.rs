@@ -198,7 +198,10 @@ impl GameEvent {
             // ==================== 怪物生成：0x0078 EntityAppear ====================
             // entity_type=6 表示怪物，job 字段使用 mob_type（怪物外观 ID）
             GameEvent::MobSpawn {
-                mob_id, mob_type, x, y,
+                mob_id,
+                mob_type,
+                x,
+                y,
             } => {
                 let entity_id = get_entity_id(mob_id);
                 // mob_type 作为 job 字段传入，entity_type=6
@@ -212,11 +215,7 @@ impl GameEvent {
             }
 
             // ==================== 怪物移动：0x0086 EntityMove ====================
-            GameEvent::MobMove {
-                mob_id,
-                to_x,
-                to_y,
-            } => {
+            GameEvent::MobMove { mob_id, to_x, to_y } => {
                 let entity_id = get_entity_id(mob_id);
                 // 怪物移动没有 from 信息，使用 to 作为起始点（客户端会插值）
                 build_entity_move_packet(entity_id, *to_x, *to_y, *to_x, *to_y)
@@ -289,36 +288,36 @@ pub fn build_entity_appear_packet(
     // 4(guild_id) + 4(emblem_id) + 2(manner) + 2(karma) + 1(sex) +
     // 2(x) + 2(y) + 1(dir) + 2(x2) + 2(y2) + 1(dir2) = 63 字节
     let mut pkt = Vec::with_capacity(63);
-    pkt.extend_from_slice(&0x0078u16.to_le_bytes());    // packet_id
-    pkt.extend_from_slice(&entity_id.to_le_bytes());     // entity_id
-    pkt.extend_from_slice(&150u16.to_le_bytes());        // walk_speed (默认 150)
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // body_state
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // health_state
-    pkt.extend_from_slice(&0u32.to_le_bytes());          // effect_state
+    pkt.extend_from_slice(&0x0078u16.to_le_bytes()); // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes()); // entity_id
+    pkt.extend_from_slice(&150u16.to_le_bytes()); // walk_speed (默认 150)
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // body_state
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // health_state
+    pkt.extend_from_slice(&0u32.to_le_bytes()); // effect_state
     let job = if entity_type == 6 { mob_type } else { 0 };
-    pkt.extend_from_slice(&job.to_le_bytes());           // job (怪物外观/玩家职业)
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // head
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // weapon
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory
-    pkt.extend_from_slice(&0u32.to_le_bytes());          // move_start_time
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory2
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // accessory3
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // head_palette
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // body_palette
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // head_dir
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // robe
-    pkt.extend_from_slice(&0u32.to_le_bytes());          // guild_id
-    pkt.extend_from_slice(&0u32.to_le_bytes());          // emblem_id
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // manner
-    pkt.extend_from_slice(&0u16.to_le_bytes());          // karma
-    pkt.push(0u8);                                       // sex
-    pkt.extend_from_slice(&x.to_le_bytes());             // x
-    pkt.extend_from_slice(&y.to_le_bytes());             // y
-    pkt.push(dir);                                       // dir
+    pkt.extend_from_slice(&job.to_le_bytes()); // job (怪物外观/玩家职业)
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // head
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // weapon
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // accessory
+    pkt.extend_from_slice(&0u32.to_le_bytes()); // move_start_time
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // accessory2
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // accessory3
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // head_palette
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // body_palette
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // head_dir
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // robe
+    pkt.extend_from_slice(&0u32.to_le_bytes()); // guild_id
+    pkt.extend_from_slice(&0u32.to_le_bytes()); // emblem_id
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // manner
+    pkt.extend_from_slice(&0u16.to_le_bytes()); // karma
+    pkt.push(0u8); // sex
+    pkt.extend_from_slice(&x.to_le_bytes()); // x
+    pkt.extend_from_slice(&y.to_le_bytes()); // y
+    pkt.push(dir); // dir
     // 0x0078 包末尾还有重复的坐 x2, y2, dir2（站位数据，与当前位置相同）
-    pkt.extend_from_slice(&x.to_le_bytes());             // x2
-    pkt.extend_from_slice(&y.to_le_bytes());             // y2
-    pkt.push(dir);                                       // dir2
+    pkt.extend_from_slice(&x.to_le_bytes()); // x2
+    pkt.extend_from_slice(&y.to_le_bytes()); // y2
+    pkt.push(dir); // dir2
     pkt
 }
 
@@ -328,9 +327,9 @@ pub fn build_entity_appear_packet(
 /// reason=0 表示正常消失（离开视野/死亡）
 pub fn build_entity_disappear_packet(entity_id: u32) -> Vec<u8> {
     let mut pkt = Vec::with_capacity(7);
-    pkt.extend_from_slice(&0x007au16.to_le_bytes());  // packet_id
-    pkt.extend_from_slice(&entity_id.to_le_bytes());  // entity_id
-    pkt.push(0u8);                                    // reason (0=正常消失)
+    pkt.extend_from_slice(&0x007au16.to_le_bytes()); // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes()); // entity_id
+    pkt.push(0u8); // reason (0=正常消失)
     pkt
 }
 
@@ -347,15 +346,15 @@ pub fn build_entity_move_packet(
     dest_y: u16,
 ) -> Vec<u8> {
     let mut pkt = Vec::with_capacity(20);
-    pkt.extend_from_slice(&0x0086u16.to_le_bytes());       // packet_id
-    pkt.extend_from_slice(&entity_id.to_le_bytes());       // entity_id
+    pkt.extend_from_slice(&0x0086u16.to_le_bytes()); // packet_id
+    pkt.extend_from_slice(&entity_id.to_le_bytes()); // entity_id
     // from_x 和 from_y 需要编码为 3 字节格式（x9 位 + y9 位 + dir3 位）
     let from_xy = encode_pos3(from_x, from_y, 0);
     pkt.extend_from_slice(&from_xy);
     // dest_x 和 dest_y 同样编码
     let dest_xy = encode_pos3(dest_x, dest_y, 0);
     pkt.extend_from_slice(&dest_xy);
-    pkt.extend_from_slice(&0u32.to_le_bytes());            // move_start_time
+    pkt.extend_from_slice(&0u32.to_le_bytes()); // move_start_time
     pkt
 }
 

@@ -1,7 +1,7 @@
 pub mod data;
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 pub use data::*;
@@ -54,7 +54,10 @@ impl CardManager {
         let card = self.get_card(card_id).ok_or("Card not found")?;
 
         if !self.can_insert(card_id, equip_slot) {
-            return Err(format!("Card {} cannot be inserted into this equipment", card_id));
+            return Err(format!(
+                "Card {} cannot be inserted into this equipment",
+                card_id
+            ));
         }
 
         let mut player_cards = self.player_cards.write();
@@ -86,9 +89,7 @@ impl CardManager {
         slot_index: usize,
     ) -> Option<CardSlot> {
         let mut player_cards = self.player_cards.write();
-        let equip_cards = player_cards
-            .get_mut(&player_id)?
-            .get_mut(equip_key)?;
+        let equip_cards = player_cards.get_mut(&player_id)?.get_mut(equip_key)?;
 
         if slot_index < equip_cards.len() {
             Some(equip_cards.remove(slot_index))
@@ -98,11 +99,7 @@ impl CardManager {
     }
 
     /// 获取装备上的所有卡片
-    pub fn get_equipment_cards(
-        &self,
-        player_id: &Uuid,
-        equip_key: &str,
-    ) -> Vec<CardSlot> {
+    pub fn get_equipment_cards(&self, player_id: &Uuid, equip_key: &str) -> Vec<CardSlot> {
         self.player_cards
             .read()
             .get(player_id)
@@ -112,11 +109,7 @@ impl CardManager {
     }
 
     /// 获取装备上所有卡片效果的总和
-    pub fn get_equipment_card_effects(
-        &self,
-        player_id: &Uuid,
-        equip_key: &str,
-    ) -> Vec<CardEffect> {
+    pub fn get_equipment_card_effects(&self, player_id: &Uuid, equip_key: &str) -> Vec<CardEffect> {
         let cards = self.get_equipment_cards(player_id, equip_key);
         let database = self.database.read();
         let mut effects = Vec::new();
@@ -131,19 +124,11 @@ impl CardManager {
     }
 
     /// 获取玩家所有已插入卡片的装备摘要
-    pub fn get_player_card_summary(
-        &self,
-        player_id: &Uuid,
-    ) -> Vec<(String, Vec<CardSlot>)> {
+    pub fn get_player_card_summary(&self, player_id: &Uuid) -> Vec<(String, Vec<CardSlot>)> {
         self.player_cards
             .read()
             .get(player_id)
-            .map(|equips| {
-                equips
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
-            })
+            .map(|equips| equips.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default()
     }
 

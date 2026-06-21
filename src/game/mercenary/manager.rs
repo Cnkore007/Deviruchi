@@ -8,8 +8,8 @@ use crate::storage::Database;
 use chrono::{Duration, Utc};
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use thiserror::Error;
 
 /// 雇佣兵错误类型
@@ -175,11 +175,7 @@ impl MercenaryManager {
     }
 
     /// 创建雇佣兵（INSERT 到数据库 + 加入内存）
-    pub fn create(
-        &self,
-        owner_id: u32,
-        class_id: u16,
-    ) -> Result<Mercenary, MercenaryError> {
+    pub fn create(&self, owner_id: u32, class_id: u16) -> Result<Mercenary, MercenaryError> {
         let template = self
             .database
             .get(class_id)
@@ -187,9 +183,7 @@ impl MercenaryManager {
 
         let mercenary_id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let contract_end = Some(Utc::now() + Duration::hours(48));
-        let contract_end_ts = contract_end
-            .map(|dt| dt.timestamp())
-            .unwrap_or(0);
+        let contract_end_ts = contract_end.map(|dt| dt.timestamp()).unwrap_or(0);
 
         let mercenary = Mercenary {
             mercenary_id,
@@ -342,9 +336,10 @@ impl MercenaryManager {
 
         for (char_id, mercenary_id) in summoned.iter() {
             if let Some(mercenary) = mercenaries.get(mercenary_id)
-                && mercenary.is_contract_expired() {
-                    dismissed.push(*char_id);
-                }
+                && mercenary.is_contract_expired()
+            {
+                dismissed.push(*char_id);
+            }
         }
 
         drop(summoned);
@@ -374,11 +369,7 @@ impl MercenaryManager {
     }
 
     /// 增加忠诚度（UPDATE loyalty 到数据库）
-    pub fn increase_loyalty(
-        &self,
-        mercenary_id: u32,
-        amount: u32,
-    ) -> Result<(), MercenaryError> {
+    pub fn increase_loyalty(&self, mercenary_id: u32, amount: u32) -> Result<(), MercenaryError> {
         let mut mercenaries = self.mercenaries.write();
         let mercenary = mercenaries
             .get_mut(&mercenary_id)
@@ -541,9 +532,7 @@ mod tests {
         let manager = create_test_manager();
         let merc = manager.create(100, 6017).unwrap();
 
-        manager
-            .increase_loyalty(merc.mercenary_id, 50)
-            .unwrap();
+        manager.increase_loyalty(merc.mercenary_id, 50).unwrap();
 
         let m = manager.get(merc.mercenary_id).unwrap();
         assert_eq!(m.loyalty, 150); // 100 + 50

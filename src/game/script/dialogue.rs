@@ -110,7 +110,6 @@ impl NpcDialogueState {
             // ============================================================
             // 对话命令
             // ============================================================
-
             ScriptCommand::Mes(msg) => {
                 self.current_index += 1;
                 DialogueResponse::Message(msg.clone())
@@ -139,7 +138,6 @@ impl NpcDialogueState {
             // ============================================================
             // 传送
             // ============================================================
-
             ScriptCommand::Warp(map, x, y) => {
                 self.current_index += 1;
                 DialogueResponse::Warp {
@@ -152,14 +150,14 @@ impl NpcDialogueState {
             // ============================================================
             // 控制流
             // ============================================================
-
             ScriptCommand::Goto(label) => {
                 if let Some(&idx) = self.script.labels.get(label) {
                     self.current_index = idx;
                 } else {
                     tracing::warn!(
                         "脚本标签 '{}' 未找到，跳过 goto 命令 (NPC: {})",
-                        label, self.npc_id
+                        label,
+                        self.npc_id
                     );
                     self.current_index += 1;
                 }
@@ -172,7 +170,8 @@ impl NpcDialogueState {
                         self.variables.insert(var_name.clone(), *value);
                     }
                     ExprValue::Str(value) => {
-                        self.string_variables.insert(var_name.clone(), value.clone());
+                        self.string_variables
+                            .insert(var_name.clone(), value.clone());
                     }
                     ExprValue::Var(ref_var) => {
                         // 尝试从整数变量复制
@@ -207,7 +206,6 @@ impl NpcDialogueState {
             // ============================================================
             // 函数调用
             // ============================================================
-
             ScriptCommand::CallFunc(func_name, args) => {
                 // 通过标签查找函数入口
                 if let Some(&func_idx) = self.script.labels.get(func_name) {
@@ -218,10 +216,7 @@ impl NpcDialogueState {
                     });
                     self.current_index = func_idx;
                 } else {
-                    tracing::warn!(
-                        "脚本函数 '{}' 未找到 (NPC: {})",
-                        func_name, self.npc_id
-                    );
+                    tracing::warn!("脚本函数 '{}' 未找到 (NPC: {})", func_name, self.npc_id);
                     self.current_index += 1;
                 }
                 DialogueResponse::Continue
@@ -241,7 +236,6 @@ impl NpcDialogueState {
             // ============================================================
             // 循环控制
             // ============================================================
-
             ScriptCommand::ForStart(expr, _inc_cmds) => {
                 // 检查循环条件
                 if expr.eval(&self.variables) {
@@ -360,14 +354,16 @@ impl NpcDialogueState {
             // ============================================================
             // 物品操作
             // ============================================================
-
             ScriptCommand::GetItem(item_id, amount) => {
                 // 添加物品到背包
                 let current = self.context.inventory.entry(*item_id).or_insert(0);
                 *current = current.saturating_add(*amount);
                 tracing::info!(
                     "NPC {} 给予玩家 {} 个物品 {}，当前数量: {}",
-                    self.npc_id, amount, item_id, current
+                    self.npc_id,
+                    amount,
+                    item_id,
+                    current
                 );
                 self.current_index += 1;
                 DialogueResponse::Continue
@@ -386,18 +382,25 @@ impl NpcDialogueState {
                         }
                         tracing::info!(
                             "NPC {} 从玩家背包删除 {} 个物品 {}，剩余: {}",
-                            self.npc_id, amount, item_id, remaining
+                            self.npc_id,
+                            amount,
+                            item_id,
+                            remaining
                         );
                     } else {
                         tracing::warn!(
                             "NPC {} 尝试删除 {} 个物品 {}，但玩家只有 {} 个",
-                            self.npc_id, amount, item_id, current
+                            self.npc_id,
+                            amount,
+                            item_id,
+                            current
                         );
                     }
                 } else {
                     tracing::warn!(
                         "NPC {} 尝试删除物品 {}，但玩家没有该物品",
-                        self.npc_id, item_id
+                        self.npc_id,
+                        item_id
                     );
                 }
                 if should_remove {
@@ -409,7 +412,6 @@ impl NpcDialogueState {
             // ============================================================
             // 信息查询（函数式语法）
             // ============================================================
-
             ScriptCommand::CountItem(item_id, result_var) => {
                 // 从玩家背包查询物品数量
                 let count: i64 = self.context.inventory.get(item_id).copied().unwrap_or(0) as i64;
@@ -431,10 +433,10 @@ impl NpcDialogueState {
 
             ScriptCommand::GetCharId(type_id, result_var) => {
                 let value: i64 = match type_id {
-                    0 => self.context.char_id as i64,     // char_id
-                    1 => self.context.party_id as i64,    // party_id
-                    2 => self.context.guild_id as i64,    // guild_id
-                    3 => self.context.account_id as i64,  // account_id
+                    0 => self.context.char_id as i64,    // char_id
+                    1 => self.context.party_id as i64,   // party_id
+                    2 => self.context.guild_id as i64,   // guild_id
+                    3 => self.context.account_id as i64, // account_id
                     _ => {
                         tracing::warn!("getcharid: 未知类型 {} (NPC: {})", type_id, self.npc_id);
                         0
@@ -459,14 +461,11 @@ impl NpcDialogueState {
 
             ScriptCommand::StrCharInfo(type_id, result_var) => {
                 let value = match type_id {
-                    0 => self.context.char_name.clone(),   // 角色名
-                    1 => self.context.guild_name.clone(),   // 公会名
-                    2 => self.context.party_name.clone(),   // 队伍名
+                    0 => self.context.char_name.clone(),  // 角色名
+                    1 => self.context.guild_name.clone(), // 公会名
+                    2 => self.context.party_name.clone(), // 队伍名
                     _ => {
-                        tracing::warn!(
-                            "strcharinfo: 未知类型 {} (NPC: {})",
-                            type_id, self.npc_id
-                        );
+                        tracing::warn!("strcharinfo: 未知类型 {} (NPC: {})", type_id, self.npc_id);
                         String::new()
                     }
                 };
@@ -480,20 +479,21 @@ impl NpcDialogueState {
                 // 11=BaseLevel, 12=JobLevel, 13=MaxHP, 14=MaxSP
                 // 5=Str, 6=Agi, 7=Vit, 8=Int, 9=Dex, 10=Luk
                 let value: i64 = match param_id {
-                    5 => self.context.str as i64,         // Str
-                    6 => self.context.agi as i64,         // Agi
-                    7 => self.context.vit as i64,         // Vit
-                    8 => self.context.int_ as i64,        // Int
-                    9 => self.context.dex as i64,         // Dex
-                    10 => self.context.luk as i64,        // Luk
+                    5 => self.context.str as i64,  // Str
+                    6 => self.context.agi as i64,  // Agi
+                    7 => self.context.vit as i64,  // Vit
+                    8 => self.context.int_ as i64, // Int
+                    9 => self.context.dex as i64,  // Dex
+                    10 => self.context.luk as i64, // Luk
                     11 => self.context.base_level as i64,
                     12 => self.context.job_level as i64,
-                    13 => self.context.max_hp as i64,     // MaxHP
-                    14 => self.context.max_sp as i64,     // MaxSP
+                    13 => self.context.max_hp as i64, // MaxHP
+                    14 => self.context.max_sp as i64, // MaxSP
                     _ => {
                         tracing::warn!(
                             "readparam: 未知参数 ID {} (NPC: {})",
-                            param_id, self.npc_id
+                            param_id,
+                            self.npc_id
                         );
                         0
                     }
@@ -510,16 +510,19 @@ impl NpcDialogueState {
             // ============================================================
             // 状态操作
             // ============================================================
-
             ScriptCommand::Heal(hp, sp) => {
                 // 恢复 HP/SP
                 self.context.current_hp = (self.context.current_hp + hp).min(self.context.max_hp);
                 self.context.current_sp = (self.context.current_sp + sp).min(self.context.max_sp);
                 tracing::info!(
                     "NPC {} 恢复玩家 HP+{} SP+{}，当前 HP: {}/{}, SP: {}/{}",
-                    self.npc_id, hp, sp, 
-                    self.context.current_hp, self.context.max_hp,
-                    self.context.current_sp, self.context.max_sp
+                    self.npc_id,
+                    hp,
+                    sp,
+                    self.context.current_hp,
+                    self.context.max_hp,
+                    self.context.current_sp,
+                    self.context.max_sp
                 );
                 self.current_index += 1;
                 DialogueResponse::Continue
@@ -528,7 +531,6 @@ impl NpcDialogueState {
             // ============================================================
             // 系统操作
             // ============================================================
-
             ScriptCommand::Announce(message, flag) => {
                 // 设置广播标志，由调用方处理实际广播
                 tracing::info!("公告 [flag={}]: {} (NPC: {})", flag, message, self.npc_id);
@@ -554,13 +556,13 @@ impl NpcDialogueState {
             // ============================================================
             // 数值操作
             // ============================================================
-
             ScriptCommand::GetVariableOfNpc(var_name, npc_name, result_var) => {
                 // TODO: 连接到 NPC 变量系统，从指定 NPC 读取变量
                 // 当前返回 0 作为 stub
                 tracing::debug!(
                     "getvariableofnpc(\"{}\", \"{}\") = 0 (TODO: NPC 变量系统集成)",
-                    var_name, npc_name
+                    var_name,
+                    npc_name
                 );
                 self.variables.insert(result_var.clone(), 0);
                 self.current_index += 1;
@@ -575,7 +577,9 @@ impl NpcDialogueState {
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_nanos() as u64;
-                    let hash = seed.wrapping_mul(6364136223846793005).wrapping_add(self.npc_id as u64);
+                    let hash = seed
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(self.npc_id as u64);
                     let range = (*max - *min + 1) as u64;
                     *min + (hash % range) as i64
                 } else {
@@ -598,24 +602,23 @@ impl NpcDialogueState {
     /// 仅处理不产生对话响应的命令（如 set）
     fn execute_simple_command(&mut self, cmd: &ScriptCommand) {
         match cmd {
-            ScriptCommand::Set(var_name, expr_value) => {
-                match expr_value {
-                    ExprValue::Int(value) => {
-                        self.variables.insert(var_name.clone(), *value);
+            ScriptCommand::Set(var_name, expr_value) => match expr_value {
+                ExprValue::Int(value) => {
+                    self.variables.insert(var_name.clone(), *value);
+                }
+                ExprValue::Str(value) => {
+                    self.string_variables
+                        .insert(var_name.clone(), value.clone());
+                }
+                ExprValue::Var(ref_var) => {
+                    if let Some(val) = self.variables.get(ref_var).copied() {
+                        self.variables.insert(var_name.clone(), val);
                     }
-                    ExprValue::Str(value) => {
-                        self.string_variables.insert(var_name.clone(), value.clone());
-                    }
-                    ExprValue::Var(ref_var) => {
-                        if let Some(val) = self.variables.get(ref_var).copied() {
-                            self.variables.insert(var_name.clone(), val);
-                        }
-                        if let Some(val) = self.string_variables.get(ref_var).cloned() {
-                            self.string_variables.insert(var_name.clone(), val);
-                        }
+                    if let Some(val) = self.string_variables.get(ref_var).cloned() {
+                        self.string_variables.insert(var_name.clone(), val);
                     }
                 }
-            }
+            },
             _ => {
                 // 其他命令在内联执行场景中忽略
                 tracing::debug!("execute_simple_command: 忽略命令 {:?}", cmd);
@@ -1066,7 +1069,9 @@ mod tests {
         assert!(state.is_active());
 
         let resp = state.process();
-        assert!(matches!(resp, DialogueResponse::Message(ref s) if s == "This should not run until resumed"));
+        assert!(
+            matches!(resp, DialogueResponse::Message(ref s) if s == "This should not run until resumed")
+        );
     }
 
     #[test]
@@ -1227,7 +1232,11 @@ mod tests {
         let resp = state.process();
         assert!(matches!(resp, DialogueResponse::Continue));
         let value = state.get_variable("@rand_result").unwrap();
-        assert!(value >= 1 && value <= 100, "随机数 {} 不在 [1, 100] 范围内", value);
+        assert!(
+            value >= 1 && value <= 100,
+            "随机数 {} 不在 [1, 100] 范围内",
+            value
+        );
     }
 
     #[test]

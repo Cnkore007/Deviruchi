@@ -1,11 +1,11 @@
 //! 客户端接口
-//! 
+//!
 //! 处理客户端与服务器之间的通信。
 //! 对应 rAthena 的 clif.cpp。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 客户端操作类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -111,11 +111,7 @@ impl ClientManager {
     }
 
     /// 添加客户端连接
-    pub fn add_connection(
-        &self,
-        address: String,
-        port: u16,
-    ) -> u32 {
+    pub fn add_connection(&self, address: String, port: u16) -> u32 {
         let mut next_id = self.next_connection_id.write();
         let id = *next_id;
         *next_id += 1;
@@ -157,17 +153,14 @@ impl ClientManager {
     }
 
     /// 设置玩家信息
-    pub fn set_player_info(
-        &self,
-        connection_id: u32,
-        player_id: u32,
-        account_id: u32,
-    ) -> bool {
+    pub fn set_player_info(&self, connection_id: u32, player_id: u32, account_id: u32) -> bool {
         let mut connections = self.connections.write();
         if let Some(conn) = connections.get_mut(&connection_id) {
             conn.player_id = Some(player_id);
             conn.account_id = Some(account_id);
-            self.player_connections.write().insert(player_id, connection_id);
+            self.player_connections
+                .write()
+                .insert(player_id, connection_id);
             true
         } else {
             false
@@ -282,7 +275,7 @@ mod tests {
     fn test_add_connection() {
         let manager = ClientManager::new();
         let id = manager.add_connection("127.0.0.1".to_string(), 5000);
-        
+
         assert_eq!(id, 1);
         let conn = manager.get_connection(id).unwrap();
         assert_eq!(conn.status, ClientStatus::Connecting);
@@ -292,7 +285,7 @@ mod tests {
     fn test_player_connection() {
         let manager = ClientManager::new();
         let id = manager.add_connection("127.0.0.1".to_string(), 5000);
-        
+
         manager.set_player_info(id, 1001, 1);
         assert_eq!(manager.get_player_connection(1001), Some(id));
     }
@@ -301,10 +294,10 @@ mod tests {
     fn test_remove_connection() {
         let manager = ClientManager::new();
         let id = manager.add_connection("127.0.0.1".to_string(), 5000);
-        
+
         manager.set_player_info(id, 1001, 1);
         manager.remove_connection(id);
-        
+
         assert!(manager.get_connection(id).is_none());
         assert!(manager.get_player_connection(1001).is_none());
     }
@@ -313,7 +306,7 @@ mod tests {
     fn test_kick_player() {
         let manager = ClientManager::new();
         let id = manager.add_connection("127.0.0.1".to_string(), 5000);
-        
+
         manager.set_player_info(id, 1001, 1);
         assert!(manager.kick_player(1001));
         assert!(manager.get_player_connection(1001).is_none());
@@ -322,14 +315,14 @@ mod tests {
     #[test]
     fn test_message_queue() {
         let manager = ClientManager::new();
-        
+
         manager.send_message(ClientMessage {
             operation: ClientOperation::Chat,
             player_id: 1001,
             timestamp: 0,
             packet: vec![1, 2, 3],
         });
-        
+
         let messages = manager.process_messages();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].operation, ClientOperation::Chat);

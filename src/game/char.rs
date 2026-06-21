@@ -1,19 +1,19 @@
 //! 角色选择业务逻辑
 
+use crate::game::constants;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use crate::game::constants;
 
 use crate::game::token::TokenStore;
 use crate::network::session::{Session, SessionManager};
 use crate::protocol::map_packets::{
-    CHEnterCharServer, CHSelectChar, CHDeleteChar, CHCancelDelete, CHMakeChar, CharInfo,
-    HCNotifyZoneServer, HCDeleteCharOk, HCCancelDeleteOk, SCCharList,
+    CHCancelDelete, CHDeleteChar, CHEnterCharServer, CHMakeChar, CHSelectChar, CharInfo,
+    HCCancelDeleteOk, HCDeleteCharOk, HCNotifyZoneServer, SCCharList,
 };
 use crate::protocol::packet_builder::Packed;
-use crate::storage::{chrono_now, Database};
 #[cfg(test)]
-use crate::storage::{init_schema, Character};
+use crate::storage::{Character, init_schema};
+use crate::storage::{Database, chrono_now};
 
 /// 角色服务器
 pub struct CharServer {
@@ -162,25 +162,42 @@ impl CharServer {
 
         // 校验属性点：每个属性 1-9，总和 <= 30（rAthena 新角色分配）
         let stats = [
-            make_char.str, make_char.agi, make_char.vit,
-            make_char.int, make_char.dex, make_char.luk,
+            make_char.str,
+            make_char.agi,
+            make_char.vit,
+            make_char.int,
+            make_char.dex,
+            make_char.luk,
         ];
 
-        if stats.iter().any(|&s| s == 0 || s > constants::MAX_SINGLE_STAT) {
+        if stats
+            .iter()
+            .any(|&s| s == 0 || s > constants::MAX_SINGLE_STAT)
+        {
             warn!(
                 "Character creation rejected: stat out of range 1-9 for account_id={}",
                 account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(
+                crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build(),
+            );
         }
 
         let total: u16 = stats.iter().map(|&s| s as u16).sum();
         if total > constants::MAX_TOTAL_STATS {
             warn!(
                 "Character creation rejected: total stats {} > {} for account_id={}",
-                total, constants::MAX_TOTAL_STATS, account_id
+                total,
+                constants::MAX_TOTAL_STATS,
+                account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(
+                crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build(),
+            );
         }
 
         // 校验角色名称（长度 + 特殊字符 + 重复检查）
@@ -189,7 +206,11 @@ impl CharServer {
                 "Character creation rejected: {} (account_id={})",
                 err_msg, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D).put_slice(&[0x01, 0x00, 0x00, 0x00]).build());
+            return Some(
+                crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build(),
+            );
         }
         let name = make_char.name.trim_matches('\0');
 
@@ -260,16 +281,20 @@ impl CharServer {
                 map_bytes[..map_len].copy_from_slice(&char_info.map_name.as_bytes()[..map_len]);
                 resp.extend_from_slice(&map_bytes);
                 // 用 PacketBuilder 添加包头
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
-                    .put_slice(&resp)
-                    .build())
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
+                        .put_slice(&resp)
+                        .build(),
+                )
             }
             Err(e) => {
                 error!("Failed to create character: {}", e);
                 // 失败响应：marker(1) + padding(3)
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
-                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                    .build())
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006D)
+                        .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                        .build(),
+                )
             }
         }
     }
@@ -289,10 +314,9 @@ impl CharServer {
         // 验证角色是否属于该账户且未过期删除
         let characters = self.db.get_characters_by_account(account_id).ok()?;
         let now = chrono_now() as u32;
-        let valid_char = characters.iter().any(|c| {
-            c.char_id == enter.char_id
-                && (c.delete_timer == 0 || c.delete_timer > now)
-        });
+        let valid_char = characters
+            .iter()
+            .any(|c| c.char_id == enter.char_id && (c.delete_timer == 0 || c.delete_timer > now));
 
         if !valid_char {
             warn!(
@@ -348,13 +372,18 @@ impl CharServer {
                 "Delete char rejected: char_id={} not owned by account_id={}",
                 delete_req.char_id, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                .build());
+            return Some(
+                crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build(),
+            );
         }
 
         // 标记角色删除（24小时后删除）
-        match self.db.mark_character_for_deletion(delete_req.char_id, account_id, 86400) {
+        match self
+            .db
+            .mark_character_for_deletion(delete_req.char_id, account_id, 86400)
+        {
             Ok(true) => {
                 info!(
                     "Character {} marked for deletion (account_id={})",
@@ -372,15 +401,22 @@ impl CharServer {
                     "Failed to mark character {} for deletion (already marked or not found)",
                     delete_req.char_id
                 );
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                    .build())
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                        .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                        .build(),
+                )
             }
             Err(e) => {
-                error!("Database error deleting character {}: {}", delete_req.char_id, e);
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                    .build())
+                error!(
+                    "Database error deleting character {}: {}",
+                    delete_req.char_id, e
+                );
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                        .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                        .build(),
+                )
             }
         }
     }
@@ -405,12 +441,17 @@ impl CharServer {
                 "Cancel delete rejected: char_id={} not owned by account_id={}",
                 cancel_req.char_id, account_id
             );
-            return Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                .build());
+            return Some(
+                crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                    .build(),
+            );
         }
 
-        match self.db.cancel_character_deletion(cancel_req.char_id, account_id) {
+        match self
+            .db
+            .cancel_character_deletion(cancel_req.char_id, account_id)
+        {
             Ok(true) => {
                 info!(
                     "Character {} deletion cancelled (account_id={})",
@@ -428,18 +469,22 @@ impl CharServer {
                     "Failed to cancel deletion for character {} (not marked)",
                     cancel_req.char_id
                 );
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                    .build())
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                        .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                        .build(),
+                )
             }
             Err(e) => {
                 error!(
                     "Database error cancelling deletion for {}: {}",
                     cancel_req.char_id, e
                 );
-                Some(crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
-                    .put_slice(&[0x01, 0x00, 0x00, 0x00])
-                    .build())
+                Some(
+                    crate::protocol::packet_builder::PacketBuilderCtx::new(0x006E)
+                        .put_slice(&[0x01, 0x00, 0x00, 0x00])
+                        .build(),
+                )
             }
         }
     }
@@ -507,7 +552,9 @@ impl CharServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::map_packets::{CHEnter, CHEnterCharServer, CHDeleteChar, CHCancelDelete, CHMakeChar};
+    use crate::protocol::map_packets::{
+        CHCancelDelete, CHDeleteChar, CHEnter, CHEnterCharServer, CHMakeChar,
+    };
 
     fn create_test_server() -> CharServer {
         let db = Arc::new(Database::open_memory().unwrap());
@@ -768,7 +815,8 @@ mod tests {
             login_id1: 0x12345678,
             login_id2: 0x9ABCDEF0,
             sex: 1,
-        }.to_packet();
+        }
+        .to_packet();
         let enter_body = &full_packet[4..]; // 跳过 header (len_lo, len_hi, id_lo, id_hi)
         let result = server.handle_packet(0x0065, enter_body, &mut session);
         assert!(result.is_some());
@@ -847,7 +895,8 @@ mod tests {
 
         let result = server.handle_delete_char(&data[4..], &mut wrong_session);
         assert!(result.is_some(), "错误账户删除应返回失败响应");
-        let r = result.unwrap(); assert_eq!(r[4], 0x01, "应返回失败");
+        let r = result.unwrap();
+        assert_eq!(r[4], 0x01, "应返回失败");
     }
 
     #[test]
@@ -862,7 +911,10 @@ mod tests {
             .unwrap();
 
         // 先标记删除
-        server.db.mark_character_for_deletion(char_id, 1, 86400).unwrap();
+        server
+            .db
+            .mark_character_for_deletion(char_id, 1, 86400)
+            .unwrap();
 
         // 取消删除
         let data = CHCancelDelete { char_id }.to_packet();
@@ -888,7 +940,8 @@ mod tests {
         let data = CHCancelDelete { char_id }.to_packet();
         let result = server.handle_cancel_delete(&data[4..], &mut session);
         assert!(result.is_some(), "未标记删除时取消应返回失败响应");
-        let r = result.unwrap(); assert_eq!(r[4], 0x01, "应返回失败");
+        let r = result.unwrap();
+        assert_eq!(r[4], 0x01, "应返回失败");
     }
 
     #[test]
@@ -924,23 +977,37 @@ mod tests {
         // 创建第一个角色
         let data1 = CHMakeChar {
             name: "TakenName".to_string(),
-            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
-            hair_color: 0, hair: 1,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
+            hair_color: 0,
+            hair: 1,
         }
         .to_packet();
         let result1 = server.handle_make_char(&data1[4..], &mut session1);
-        let r1 = result1.unwrap(); assert_eq!(r1[4], 0x00, "第一个角色应创建成功");
+        let r1 = result1.unwrap();
+        assert_eq!(r1[4], 0x00, "第一个角色应创建成功");
 
         // 尝试创建同名角色
         let mut session2 = create_session_with_account(1);
         let data2 = CHMakeChar {
             name: "TakenName".to_string(),
-            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
-            hair_color: 0, hair: 1,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
+            hair_color: 0,
+            hair: 1,
         }
         .to_packet();
         let result2 = server.handle_make_char(&data2[4..], &mut session2);
-        let r2 = result2.unwrap(); assert_eq!(r2[4], 0x01, "重复名称应返回失败");
+        let r2 = result2.unwrap();
+        assert_eq!(r2[4], 0x01, "重复名称应返回失败");
     }
 
     #[test]
@@ -950,13 +1017,20 @@ mod tests {
 
         let data = CHMakeChar {
             name: "Ab".to_string(), // 只有 2 字节，少于最少 4 字节
-            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
-            hair_color: 0, hair: 1,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
+            hair_color: 0,
+            hair: 1,
         }
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        let r = result.unwrap(); assert_eq!(r[4], 0x01, "过短名称应返回失败");
+        let r = result.unwrap();
+        assert_eq!(r[4], 0x01, "过短名称应返回失败");
     }
 
     #[test]
@@ -966,13 +1040,20 @@ mod tests {
 
         let data = CHMakeChar {
             name: "Test@#$".to_string(), // 包含特殊字符
-            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
-            hair_color: 0, hair: 1,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
+            hair_color: 0,
+            hair: 1,
         }
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        let r = result.unwrap(); assert_eq!(r[4], 0x01, "含特殊字符的名称应返回失败");
+        let r = result.unwrap();
+        assert_eq!(r[4], 0x01, "含特殊字符的名称应返回失败");
     }
 
     #[test]
@@ -982,13 +1063,20 @@ mod tests {
 
         let data = CHMakeChar {
             name: "测试角色".to_string(), // 中文名称应被允许
-            str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5,
-            hair_color: 0, hair: 1,
+            str: 5,
+            agi: 5,
+            vit: 5,
+            int: 5,
+            dex: 5,
+            luk: 5,
+            hair_color: 0,
+            hair: 1,
         }
         .to_packet();
 
         let result = server.handle_make_char(&data[4..], &mut session);
-        let r = result.unwrap(); assert_eq!(r[4], 0x00, "中文名称应创建成功");
+        let r = result.unwrap();
+        assert_eq!(r[4], 0x00, "中文名称应创建成功");
     }
 
     #[test]

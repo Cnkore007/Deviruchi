@@ -112,7 +112,10 @@ impl GatParser {
         // Cell data: 每个 cell 4 bytes
         for y in 0..map.height {
             for x in 0..map.width {
-                let cell_type = map.get_cell(x, y).map(|c| c.cell_type).unwrap_or(CellType::Wall);
+                let cell_type = map
+                    .get_cell(x, y)
+                    .map(|c| c.cell_type)
+                    .unwrap_or(CellType::Wall);
                 data.push(cell_type_to_u8(cell_type));
                 data.push(0); // padding
                 data.push(0); // padding
@@ -214,9 +217,9 @@ mod tests {
         // Cell data: 每个 cell 4 bytes
         for &ct in cell_types {
             data.push(ct); // cell type
-            data.push(0);  // padding
-            data.push(0);  // padding
-            data.push(0);  // padding
+            data.push(0); // padding
+            data.push(0); // padding
+            data.push(0); // padding
         }
         data
     }

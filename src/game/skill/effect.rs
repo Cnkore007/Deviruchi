@@ -113,12 +113,12 @@ impl SkillEffect {
     fn apply_debuff(skill: &Skill, _caster: &Player, target: &Player, level: u8) -> SkillResult {
         // 根据技能 ID 映射到对应的减益状态效果
         let status_change = match skill.id {
-            92 => StatusChange::Poison,             // 中毒术
-            93 => StatusChange::Silence,            // 沉默术
-            94 => StatusChange::Stun,               // 眩晕攻击
-            95 => StatusChange::Curse,              // 诅咒
-            96 => StatusChange::Blind,              // 暗黑
-            _ => StatusChange::Weakness,            // 默认：虚弱（ATK 降低）
+            92 => StatusChange::Poison,  // 中毒术
+            93 => StatusChange::Silence, // 沉默术
+            94 => StatusChange::Stun,    // 眩晕攻击
+            95 => StatusChange::Curse,   // 诅咒
+            96 => StatusChange::Blind,   // 暗黑
+            _ => StatusChange::Weakness, // 默认：虚弱（ATK 降低）
         };
 
         let duration_ms = skill.skill_time as u64;

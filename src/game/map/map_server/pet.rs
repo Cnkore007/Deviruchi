@@ -10,10 +10,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzCatchPet::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 请求捕捉宠物: mob_id={}",
-            player_id, pkt.mob_id
-        );
+        tracing::info!("Player {} 请求捕捉宠物: mob_id={}", player_id, pkt.mob_id);
 
         // 简化实现：记录日志
         // 完整实现需要检查捕捉概率、消耗捕捉道具等
@@ -27,10 +24,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzPetMenu::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 请求宠物菜单: action={}",
-            player_id, pkt.action
-        );
+        tracing::info!("Player {} 请求宠物菜单: action={}", player_id, pkt.action);
 
         match pkt.action {
             0 => tracing::info!("Player {} 查看宠物信息", player_id),
@@ -48,10 +42,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzSelectEgg::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 选择宠物蛋: index={}",
-            player_id, pkt.egg_index
-        );
+        tracing::info!("Player {} 选择宠物蛋: index={}", player_id, pkt.egg_index);
 
         // 简化实现：记录日志
         tracing::info!("Player {} 孵化宠物蛋", player_id);

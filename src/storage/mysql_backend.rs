@@ -85,7 +85,10 @@ mod inner {
 
     /// 将 IntoValue 参数列表转换为 mysql::Params（位置参数）
     fn params_to_mysql(params: &[&dyn IntoValue]) -> Vec<mysql::Value> {
-        params.iter().map(|p| value_to_mysql(&p.to_value())).collect()
+        params
+            .iter()
+            .map(|p| value_to_mysql(&p.to_value()))
+            .collect()
     }
 
     /// 将 mysql_common::Row 转换为抽象 Row
@@ -248,8 +251,8 @@ mod inner {
             // 使用 iter() 获取结果集迭代器
             if let Some(result_set) = result.iter() {
                 for row_result in result_set {
-                    let mysql_row = row_result
-                        .map_err(|e| Error::DatabaseBackend(e.to_string()))?;
+                    let mysql_row =
+                        row_result.map_err(|e| Error::DatabaseBackend(e.to_string()))?;
                     rows.push(mysql_row_to_row(&mysql_row));
                 }
             }

@@ -3,8 +3,8 @@
 //! 实现 rAthena 风格的卡片插槽管理，包括插入、取出和属性加成计算。
 
 use super::data::ItemDatabase;
-use super::inventory::InventorySlot;
 use super::data::ItemType;
+use super::inventory::InventorySlot;
 
 /// 卡片操作结果
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,8 +22,7 @@ pub enum CardResult {
 }
 
 /// 卡片提供的属性加成
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CardBonus {
     pub atk_bonus: u16,
     pub def_bonus: u16,
@@ -37,7 +36,6 @@ pub struct CardBonus {
     pub luk_bonus: i16,
 }
 
-
 /// 卡片系统
 pub struct CardSystem;
 
@@ -46,7 +44,11 @@ impl CardSystem {
     ///
     /// 遍历装备的 4 个卡片槽位，找到第一个空槽位（值为 0）后插入卡片 ID。
     /// 如果所有槽位已满则返回 `NoEmptySlot`。
-    pub fn insert_card(equipment: &mut InventorySlot, card_item_id: u16, item_db: &ItemDatabase) -> CardResult {
+    pub fn insert_card(
+        equipment: &mut InventorySlot,
+        card_item_id: u16,
+        item_db: &ItemDatabase,
+    ) -> CardResult {
         // 验证物品确实是卡片类型
         match item_db.get(card_item_id) {
             Some(item) if item.type_ == ItemType::Card => {}
@@ -86,7 +88,12 @@ impl CardSystem {
 
     /// 获取装备已插入的卡片列表（过滤掉空槽位）
     pub fn get_cards(equipment: &InventorySlot) -> Vec<u16> {
-        equipment.cards.iter().copied().filter(|&id| id != 0).collect()
+        equipment
+            .cards
+            .iter()
+            .copied()
+            .filter(|&id| id != 0)
+            .collect()
     }
 
     /// 获取卡片提供的属性加成
@@ -125,8 +132,8 @@ impl CardSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::data::{Item, ItemType};
+    use super::*;
 
     /// 创建带测试卡片的数据库
     fn make_db_with_cards() -> ItemDatabase {
@@ -278,10 +285,22 @@ mod tests {
         let mut slot = make_equip_slot();
 
         // 依次插入 4 张卡片
-        assert_eq!(CardSystem::insert_card(&mut slot, 4001, &db), CardResult::Success);
-        assert_eq!(CardSystem::insert_card(&mut slot, 4002, &db), CardResult::Success);
-        assert_eq!(CardSystem::insert_card(&mut slot, 4003, &db), CardResult::Success);
-        assert_eq!(CardSystem::insert_card(&mut slot, 4004, &db), CardResult::Success);
+        assert_eq!(
+            CardSystem::insert_card(&mut slot, 4001, &db),
+            CardResult::Success
+        );
+        assert_eq!(
+            CardSystem::insert_card(&mut slot, 4002, &db),
+            CardResult::Success
+        );
+        assert_eq!(
+            CardSystem::insert_card(&mut slot, 4003, &db),
+            CardResult::Success
+        );
+        assert_eq!(
+            CardSystem::insert_card(&mut slot, 4004, &db),
+            CardResult::Success
+        );
         assert_eq!(slot.cards, [4001, 4002, 4003, 4004]);
     }
 
@@ -334,9 +353,9 @@ mod tests {
         let cards = [4001, 4002, 0, 0];
         let bonus = CardSystem::get_card_bonus(&cards, &db);
         // 每张测试卡片 atk=2, defense=1, 各属性 +1
-        assert_eq!(bonus.atk_bonus, 4);  // 2 + 2
-        assert_eq!(bonus.def_bonus, 2);  // 1 + 1
-        assert_eq!(bonus.str_bonus, 2);  // 1 + 1
+        assert_eq!(bonus.atk_bonus, 4); // 2 + 2
+        assert_eq!(bonus.def_bonus, 2); // 1 + 1
+        assert_eq!(bonus.str_bonus, 2); // 1 + 1
         assert_eq!(bonus.agi_bonus, 2);
         assert_eq!(bonus.vit_bonus, 2);
         assert_eq!(bonus.int_bonus, 2);

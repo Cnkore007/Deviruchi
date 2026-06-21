@@ -24,11 +24,10 @@ pub fn generate_guide() -> Result<()> {
 
     // 文档头部
     content.push_str("# Deviruchi 参考文档\n\n");
-    content.push_str(&format!(
-        "> 自动生成于 {}，请勿手动编辑\n\n",
-        chrono_now()
-    ));
-    content.push_str("本文档列出服务器中的物品、怪物、技能和地图数据，方便您在配置时查找 ID 等信息。\n\n");
+    content.push_str(&format!("> 自动生成于 {}，请勿手动编辑\n\n", chrono_now()));
+    content.push_str(
+        "本文档列出服务器中的物品、怪物、技能和地图数据，方便您在配置时查找 ID 等信息。\n\n",
+    );
     content.push_str("---\n\n");
 
     // 生成各部分
@@ -99,16 +98,20 @@ fn generate_item_section() -> String {
 
     // 尝试加载简化格式
     if let Ok(content) = std::fs::read_to_string("db/item_db.yml")
-        && let Ok(items) = serde_yaml::from_str::<Vec<SimpleItemEntry>>(&content) {
-            for item in items {
-                let type_name = item.type_.clone().unwrap_or_else(|| "Etc".to_string());
-                let detail = format!("{} (买:{}, 卖:{})", item.Name, item.buy_price, item.sell_price);
-                items_by_type
-                    .entry(type_name)
-                    .or_default()
-                    .push((item.Id, item.Name.clone(), detail));
-            }
+        && let Ok(items) = serde_yaml::from_str::<Vec<SimpleItemEntry>>(&content)
+    {
+        for item in items {
+            let type_name = item.type_.clone().unwrap_or_else(|| "Etc".to_string());
+            let detail = format!(
+                "{} (买:{}, 卖:{})",
+                item.Name, item.buy_price, item.sell_price
+            );
+            items_by_type
+                .entry(type_name)
+                .or_default()
+                .push((item.Id, item.Name.clone(), detail));
         }
+    }
 
     // 尝试加载 rAthena 格式（equip/usable/etc）
     let rathena_files = [
@@ -133,10 +136,11 @@ fn generate_item_section() -> String {
                             } else {
                                 format!("{} (买:{})", item.Name, item.buy)
                             };
-                            items_by_type
-                                .entry(type_name)
-                                .or_default()
-                                .push((item.Id, item.Name.clone(), detail));
+                            items_by_type.entry(type_name).or_default().push((
+                                item.Id,
+                                item.Name.clone(),
+                                detail,
+                            ));
                         }
                     } else {
                         tracing::warn!("{}: Body 为空", path);
@@ -157,7 +161,9 @@ fn generate_item_section() -> String {
     }
 
     // 按类型输出
-    let type_order = ["Heal", "Weapon", "Armor", "Card", "PetEgg", "PetArmor", "Etc"];
+    let type_order = [
+        "Heal", "Weapon", "Armor", "Card", "PetEgg", "PetArmor", "Etc",
+    ];
     let type_labels = [
         ("Heal", "恢复道具"),
         ("Weapon", "武器"),
@@ -268,7 +274,11 @@ fn generate_mob_section() -> String {
     }
 
     section.push('\n');
-    section.push_str(&format!("*共 {} 个怪物（显示前 {} 个）*\n\n", sorted.len(), display_count));
+    section.push_str(&format!(
+        "*共 {} 个怪物（显示前 {} 个）*\n\n",
+        sorted.len(),
+        display_count
+    ));
 
     section
 }

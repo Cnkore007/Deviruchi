@@ -216,7 +216,10 @@ impl KafraService {
         }
 
         // 传送系统尚未实现，不扣除点数
-        warn!("Kafra teleport not yet implemented: char_id={}, destination='{}'", char_id, destination.name);
+        warn!(
+            "Kafra teleport not yet implemented: char_id={}, destination='{}'",
+            char_id, destination.name
+        );
         TeleportResult::InternalError("Kafra teleport system not yet implemented".to_string())
     }
 
@@ -234,7 +237,10 @@ impl KafraService {
         }
 
         // 传送系统尚未实现，不扣除点数
-        warn!("Kafra coord teleport not yet implemented: char_id={}, map={}, ({}, {})", char_id, map, x, y);
+        warn!(
+            "Kafra coord teleport not yet implemented: char_id={}, map={}, ({}, {})",
+            char_id, map, x, y
+        );
         TeleportResult::InternalError("Kafra teleport system not yet implemented".to_string())
     }
 

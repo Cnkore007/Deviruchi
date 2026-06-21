@@ -182,7 +182,9 @@ impl ZCWarpError {
 
 impl Packed for ZCWarpError {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilderCtx::new(0x0084).put_u8(self.error_code).build()
+        PacketBuilderCtx::new(0x0084)
+            .put_u8(self.error_code)
+            .build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {

@@ -112,12 +112,7 @@ impl MapState {
     /// 给玩家增加属性点（原地修改），返回是否成功
     ///
     /// status_id: 13=STR, 14=AGI, 15=VIT, 16=INT, 17=DEX, 18=LUK
-    pub fn allocate_player_stat(
-        &self,
-        player_id: &Uuid,
-        status_id: u16,
-        amount: u16,
-    ) -> bool {
+    pub fn allocate_player_stat(&self, player_id: &Uuid, status_id: u16, amount: u16) -> bool {
         let players = self.players.read();
         let Some(player) = players.get(player_id) else {
             return false;
@@ -278,7 +273,10 @@ impl MapState {
     /// 根据 account_id 查找玩家
     pub fn find_player_by_account_id(&self, account_id: u32) -> Option<Player> {
         let players = self.players.read();
-        players.values().find(|p| p.account_id == account_id).cloned()
+        players
+            .values()
+            .find(|p| p.account_id == account_id)
+            .cloned()
     }
 
     /// 重生玩家：更新位置、地图、HP/SP、状态为 Alive

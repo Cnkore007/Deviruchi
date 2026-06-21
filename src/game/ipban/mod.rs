@@ -1,11 +1,11 @@
 //! IP 封禁系统
-//! 
+//!
 //! 处理 IP 地址的封禁和解封。
 //! 对应 rAthena 的 ipban.cpp。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 封禁原因
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,13 +83,7 @@ impl IpBanManager {
     }
 
     /// 封禁 IP
-    pub fn ban_ip(
-        &self,
-        ip: String,
-        reason: BanReason,
-        duration: Option<u64>,
-        banned_by: String,
-    ) {
+    pub fn ban_ip(&self, ip: String, reason: BanReason, duration: Option<u64>, banned_by: String) {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -123,7 +117,7 @@ impl IpBanManager {
         let mut attempts = self.attempts.write();
         let count = attempts.entry(ip.to_string()).or_insert(0);
         *count += 1;
-        
+
         if *count >= self.max_attempts {
             self.ban_ip(
                 ip.to_string(),
@@ -186,10 +180,15 @@ mod tests {
     #[test]
     fn test_ban_unban() {
         let manager = IpBanManager::new(5, 300);
-        
-        manager.ban_ip("192.168.1.1".to_string(), BanReason::BruteForce, None, "admin".to_string());
+
+        manager.ban_ip(
+            "192.168.1.1".to_string(),
+            BanReason::BruteForce,
+            None,
+            "admin".to_string(),
+        );
         assert!(manager.is_banned("192.168.1.1"));
-        
+
         manager.unban_ip("192.168.1.1");
         assert!(!manager.is_banned("192.168.1.1"));
     }
@@ -197,12 +196,12 @@ mod tests {
     #[test]
     fn test_brute_force_detection() {
         let manager = IpBanManager::new(3, 300);
-        
+
         for _ in 0..2 {
             manager.record_attempt("192.168.1.1");
         }
         assert!(!manager.is_banned("192.168.1.1"));
-        
+
         manager.record_attempt("192.168.1.1");
         assert!(manager.is_banned("192.168.1.1"));
     }
@@ -210,11 +209,11 @@ mod tests {
     #[test]
     fn test_reset_attempts() {
         let manager = IpBanManager::new(3, 300);
-        
+
         manager.record_attempt("192.168.1.1");
         manager.record_attempt("192.168.1.1");
         manager.reset_attempts("192.168.1.1");
-        
+
         for _ in 0..2 {
             manager.record_attempt("192.168.1.1");
         }

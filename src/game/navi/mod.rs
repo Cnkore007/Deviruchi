@@ -4,9 +4,9 @@
 //!
 //! Deviruchi 已有 mob AI 的 A* 寻路（`mob/ai.rs`），此模块提供地图级别的导航。
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::cmp::Ordering;
 use parking_lot::RwLock;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 /// 地图节点
 #[derive(Debug, Clone)]
@@ -101,9 +101,10 @@ impl NaviManager {
 
         // 添加连接
         if let Some(node) = maps.get_mut(from)
-            && !node.neighbors.iter().any(|(n, _)| n == to) {
-                node.neighbors.push((to.to_string(), cost));
-            }
+            && !node.neighbors.iter().any(|(n, _)| n == to)
+        {
+            node.neighbors.push((to.to_string(), cost));
+        }
     }
 
     /// 添加双向连接
@@ -238,7 +239,10 @@ mod tests {
         manager.add_bidirectional("geffen", "gef_fild04", 8);
 
         let path = manager.find_path("prontera", "gef_fild04").unwrap();
-        assert_eq!(path.maps, vec!["prontera", "gef_fild01", "geffen", "gef_fild04"]);
+        assert_eq!(
+            path.maps,
+            vec!["prontera", "gef_fild01", "geffen", "gef_fild04"]
+        );
         assert_eq!(path.total_cost, 23);
     }
 

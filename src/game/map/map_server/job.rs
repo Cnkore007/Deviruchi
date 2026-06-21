@@ -4,7 +4,7 @@
 //! 校验转职条件，应用转职效果并持久化。
 
 use super::MapServer;
-use crate::game::job::{check_job_change_requirements, JobType};
+use crate::game::job::{JobType, check_job_change_requirements};
 use crate::network::packet::id::*;
 use crate::network::session::Session;
 
@@ -90,7 +90,9 @@ impl MapServer {
         let target_job = JobType::from_u16(target_job_id)
             .ok_or_else(|| format!("无效的职业 ID: {}", target_job_id))?;
 
-        let player = self.map_state.get_player(player_id)
+        let player = self
+            .map_state
+            .get_player(player_id)
             .ok_or_else(|| "找不到目标玩家".to_string())?;
 
         let current_job = player.job();
@@ -108,7 +110,9 @@ impl MapServer {
 
         Ok(format!(
             "转职成功: {} -> {} ({})",
-            JobType::from_u16(current_job).map(|j| j.name()).unwrap_or("未知"),
+            JobType::from_u16(current_job)
+                .map(|j| j.name())
+                .unwrap_or("未知"),
             target_job.name(),
             target_job_id
         ))
@@ -133,13 +137,14 @@ impl MapServer {
 
         // 保存到数据库（重新获取修改后的玩家数据）
         if let Some(updated_player) = self.map_state.get_player(player_id)
-            && let Err(e) = updated_player.save_to_db(&self.db) {
-                tracing::error!(
-                    player = %player_name,
-                    error = %e,
-                    "转职后保存玩家数据失败"
-                );
-            }
+            && let Err(e) = updated_player.save_to_db(&self.db)
+        {
+            tracing::error!(
+                player = %player_name,
+                error = %e,
+                "转职后保存玩家数据失败"
+            );
+        }
     }
 }
 
@@ -149,23 +154,23 @@ impl MapServer {
 /// - job_id: 当前职业 ID（成功时为新职业，失败时为原职业）
 fn build_ack_changejob(job_id: u16) -> Vec<u8> {
     let mut pkt = Vec::with_capacity(6);
-    pkt.extend_from_slice(&6u16.to_le_bytes());          // length
+    pkt.extend_from_slice(&6u16.to_le_bytes()); // length
     pkt.extend_from_slice(&ZC_ACK_CHANGEJOB.to_le_bytes()); // packet_id
-    pkt.extend_from_slice(&job_id.to_le_bytes());         // job_id
+    pkt.extend_from_slice(&job_id.to_le_bytes()); // job_id
     pkt
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
+    use crate::game::item::Equipment;
+    use crate::game::map::MapState;
     use crate::game::map::channel::ChannelBus;
     use crate::game::map::player::{
         Attributes, CombatStats, Economy, LevelStats, PlayerState, Position, SavePoint,
     };
-    use crate::game::map::MapState;
     use crate::game::status::PlayerStatus;
-    use crate::game::item::Equipment;
-    use crate::game::constants;
     use parking_lot::RwLock;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -204,7 +209,11 @@ mod tests {
     }
 
     /// 创建测试用 Player（指定职业和等级）
-    fn make_test_player_with_job(job: u16, base_level: u16, job_level: u16) -> crate::game::map::Player {
+    fn make_test_player_with_job(
+        job: u16,
+        base_level: u16,
+        job_level: u16,
+    ) -> crate::game::map::Player {
         crate::game::map::Player {
             id: Uuid::new_v4(),
             char_id: 1,
@@ -284,7 +293,10 @@ mod tests {
         // 初始化数据库（转职后需要保存）
         crate::storage::schema::init_schema(&server.db).unwrap();
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         let data = build_job_change_packet(1); // Swordman
         let result = server.handle_job_change(&data, &mut session);
@@ -372,7 +384,10 @@ mod tests {
 
         crate::storage::schema::init_schema(&server.db).unwrap();
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         let data = build_job_change_packet(7); // Knight
         let result = server.handle_job_change(&data, &mut session);
@@ -455,7 +470,10 @@ mod tests {
 
         crate::storage::schema::init_schema(&server.db).unwrap();
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         // 转职为 Swordman（base_hp=200, hp_per_level=30）
         let data = build_job_change_packet(1);
@@ -483,7 +501,10 @@ mod tests {
 
         crate::storage::schema::init_schema(&server.db).unwrap();
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         // 转职为同一职业（Swordman -> Swordman），应重置 JobLv
         let data = build_job_change_packet(1);
@@ -510,7 +531,10 @@ mod tests {
 
         crate::storage::schema::init_schema(&server.db).unwrap();
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestPlayer", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         // GM 命令可以跳过等级检查
         let result = server.gm_change_job(&player_id, 7); // Knight

@@ -1,8 +1,7 @@
 use parking_lot::RwLock;
 
 /// NPC 事件触发方式
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NpcEvent {
     /// 无事件
     None,
@@ -14,7 +13,6 @@ pub enum NpcEvent {
     /// 地图初始化时触发
     OnInit,
 }
-
 
 /// NPC类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -218,7 +216,10 @@ impl NpcDatabase {
 
     /// 获取指定地图上的所有 NPC
     pub fn get_npcs_on_map(&self, map_name: &str) -> Vec<&Npc> {
-        self.npcs.values().filter(|n| n.map_name == map_name).collect()
+        self.npcs
+            .values()
+            .filter(|n| n.map_name == map_name)
+            .collect()
     }
 
     /// 获取全局默认数据库实例
@@ -245,7 +246,8 @@ mes "Welcome to my shop!"
 mes "What would you like to do?"
 next
 select "Buy:Sell:Talk:Leave"
-close"#.to_string(),
+close"#
+                .to_string(),
         );
         npc
     }
@@ -287,7 +289,8 @@ mes "I have many tasks for brave adventurers!"
 mes "What would you like to do?"
 next
 select("Accept Quest:Check Progress:Leave")
-close"#.to_string(),
+close"#
+                .to_string(),
         );
         npc
     }
@@ -301,7 +304,8 @@ close"#.to_string(),
             r#"mes "[Cash Shop]"
 mes "Welcome to the Cash Shop!"
 mes "Here you can purchase special items."
-close"#.to_string(),
+close"#
+                .to_string(),
         );
         npc
     }
@@ -327,14 +331,15 @@ close"#.to_string(),
         npc.display_name = "护士".to_string();
         npc.type_ = NpcType::SkillTrainer;
         npc.sprite_id = 114;
-        npc.add_skill(28, 6, 0);  // Heal, 免费
+        npc.add_skill(28, 6, 0); // Heal, 免费
         npc.add_skill(29, 10, 500); // Increase AGI, 500 Zeny
         npc.script = Some(
             r#"mes "[Nurse]"
 mes "Hello! Do you need healing?"
 next
 select("Heal me:Learn Skills:Leave")
-close"#.to_string(),
+close"#
+                .to_string(),
         );
         npc
     }

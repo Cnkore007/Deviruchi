@@ -78,7 +78,9 @@ impl MapServer {
             const VISION_RADIUS: u16 = 14;
 
             // 视野内的其他玩家（排除自己）
-            let nearby_players = self.map_state.get_players_near(&map_name, pos_x, pos_y, VISION_RADIUS);
+            let nearby_players =
+                self.map_state
+                    .get_players_near(&map_name, pos_x, pos_y, VISION_RADIUS);
             for other in &nearby_players {
                 if other.id == player_id {
                     continue;
@@ -474,7 +476,10 @@ impl MapServer {
         }
 
         // 通过 MapState 直接修改存储的玩家属性（内部可变性）
-        if !self.map_state.allocate_player_stat(&player_id, status_id, amount as u16) {
+        if !self
+            .map_state
+            .allocate_player_stat(&player_id, status_id, amount as u16)
+        {
             return Some(build_status_change_ack(status_id, &player));
         }
 
@@ -502,11 +507,7 @@ impl MapServer {
     /// 3. 验证技能已学习且等级 < MAX_SINGLE_SKILL_LEVEL
     /// 4. 增加技能等级，消耗技能点
     /// 5. 返回 ZC_SKILLINFO_UPDATE (0x010E)
-    pub(super) fn handle_skill_up(
-        &self,
-        data: &[u8],
-        session: &mut Session,
-    ) -> Option<Vec<u8>> {
+    pub(super) fn handle_skill_up(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
 
         // 包体格式：skill_id(2) = 2 字节
@@ -622,14 +623,14 @@ fn build_skill_info_update(skill_id: u16, level: u8) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
+    use crate::game::item::Equipment;
+    use crate::game::map::MapState;
     use crate::game::map::channel::ChannelBus;
     use crate::game::map::player::{
         Attributes, CombatStats, Economy, LevelStats, PlayerState, Position, SavePoint,
     };
-    use crate::game::map::MapState;
     use crate::game::status::PlayerStatus;
-    use crate::game::item::Equipment;
-    use crate::game::constants;
     use parking_lot::RwLock;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -793,7 +794,7 @@ mod tests {
         }
 
         let player = map_state.get_player(&player_id).unwrap();
-        assert_eq!(player.str(), 11);  // 1 + 10
+        assert_eq!(player.str(), 11); // 1 + 10
         assert_eq!(player.agi(), 11);
         assert_eq!(player.vit(), 11);
         assert_eq!(player.int(), 11);
@@ -988,7 +989,11 @@ mod tests {
     }
 
     /// 创建带数据库技能的测试环境
-    fn setup_skill_test(skill_points: u16, skill_id: u16, skill_level: u8) -> (MapServer, Arc<MapState>, Uuid) {
+    fn setup_skill_test(
+        skill_points: u16,
+        skill_id: u16,
+        skill_level: u8,
+    ) -> (MapServer, Arc<MapState>, Uuid) {
         let map_state = Arc::new(MapState::new());
         let channel_bus = Arc::new(ChannelBus::new());
         let player = make_test_player_full(0, skill_points);
@@ -1001,7 +1006,10 @@ mod tests {
         crate::storage::schema::init_schema(&server.db).unwrap();
         // 创建测试账户和角色（满足 FOREIGN KEY 约束）
         server.db.create_account("test", "hash", 0).unwrap();
-        server.db.create_character(1, 0, "TestChar", 1, 1, 1, 1, 1, 1, 1, 0).unwrap();
+        server
+            .db
+            .create_character(1, 0, "TestChar", 1, 1, 1, 1, 1, 1, 1, 0)
+            .unwrap();
 
         // 在数据库中初始化技能
         if skill_level > 0 {
@@ -1075,7 +1083,8 @@ mod tests {
 
     #[test]
     fn test_skill_up_max_level() {
-        let (server, map_state, player_id) = setup_skill_test(5, 1, constants::MAX_SINGLE_SKILL_LEVEL);
+        let (server, map_state, player_id) =
+            setup_skill_test(5, 1, constants::MAX_SINGLE_SKILL_LEVEL);
 
         let mut session = Session::new();
         session.player_id = Some(player_id);

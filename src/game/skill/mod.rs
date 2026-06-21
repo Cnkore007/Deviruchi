@@ -14,7 +14,9 @@ pub mod skill_tree;
 pub mod yaml_loader;
 
 pub use data::{Skill, SkillDatabase, SkillTarget, SkillType};
-pub use executor::{AreaSkillResult, BuffSkillResult, DamageSkillResult, HealSkillResult, SkillExecutor};
+pub use executor::{
+    AreaSkillResult, BuffSkillResult, DamageSkillResult, HealSkillResult, SkillExecutor,
+};
 pub use handler::SkillHandler;
 pub use skill_tree::{SkillTree, SkillTreeNode};
 

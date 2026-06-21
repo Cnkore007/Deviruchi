@@ -328,12 +328,7 @@ impl TradeManager {
     }
 
     /// 添加物品到交易会话
-    pub fn add_item_to_session(
-        &self,
-        session_id: Uuid,
-        player_id: Uuid,
-        item: TradeItem,
-    ) -> bool {
+    pub fn add_item_to_session(&self, session_id: Uuid, player_id: Uuid, item: TradeItem) -> bool {
         let sessions = self.sessions.read();
         if let Some(session) = sessions.get(&session_id) {
             session.add_item(player_id, item)
@@ -356,9 +351,10 @@ impl TradeManager {
     pub fn lock_trade(&self, session_id: Uuid, player_id: Uuid) -> bool {
         let sessions = self.sessions.read();
         if let Some(session) = sessions.get(&session_id)
-            && session.lock(player_id) {
-                return session.is_fully_locked();
-            }
+            && session.lock(player_id)
+        {
+            return session.is_fully_locked();
+        }
         false
     }
 

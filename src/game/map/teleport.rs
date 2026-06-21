@@ -382,7 +382,11 @@ impl WarpService {
                 action.to_pos.0 as i32,
                 action.to_pos.1 as i32,
             ) {
-                tracing::error!("Failed to persist warp position for char_id={}: {}", char_id, e);
+                tracing::error!(
+                    "Failed to persist warp position for char_id={}: {}",
+                    char_id,
+                    e
+                );
             }
         }
 

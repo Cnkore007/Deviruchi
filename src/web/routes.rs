@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     extract::{Query, State},
     http::StatusCode,
-    Json,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -53,9 +53,7 @@ pub struct PartyDelQuery {
     pub id: Uuid,
 }
 
-pub async fn server_status(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn server_status(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let uptime_secs = state.start_time.elapsed().as_secs();
     let player_count = state.map_state.player_count();
     Json(serde_json::json!({
@@ -101,9 +99,7 @@ pub async fn player_list(
     }))
 }
 
-pub async fn party_list(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn party_list(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let entries = state.recruitment.read().clone();
     Json(serde_json::json!({
         "count": entries.len(),

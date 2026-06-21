@@ -21,8 +21,8 @@ pub struct Account {
 impl Database {
     pub fn create_account(&self, user_id: &str, password: &str, sex: u8) -> Result<u32> {
         let created_at = chrono_now();
-        let password_hash = crate::storage::password::hash_password(password)
-            .map_err(crate::error::Error::Game)?;
+        let password_hash =
+            crate::storage::password::hash_password(password).map_err(crate::error::Error::Game)?;
         self.execute_params(
             "INSERT INTO accounts (user_id, password_hash, sex, created_at)
              VALUES (?1, ?2, ?3, ?4)",

@@ -2,9 +2,9 @@
 //!
 //! 对应 rAthena 的 `clan.cpp`，管理公会数据和成员操作。
 
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use uuid::Uuid;
 
 use super::data::{AllianceType, Clan, ClanAlliance, ClanMember};
@@ -178,12 +178,7 @@ impl ClanManager {
                 // 验证发送者是公会成员
                 if clan.find_member_by_account(sender_account_id).is_some() {
                     // 实际发送需集成网络层，这里仅验证逻辑
-                    tracing::info!(
-                        "[Clan {}] {}: {}",
-                        clan.name,
-                        sender_account_id,
-                        message
-                    );
+                    tracing::info!("[Clan {}] {}: {}", clan.name, sender_account_id, message);
                     true
                 } else {
                     false

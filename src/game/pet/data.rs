@@ -256,26 +256,34 @@ impl PetDatabase {
                             let mob_id = mob_name_to_id(&template.mob_name);
                             if egg_id > 0 && mob_id > 0 {
                                 let pet_class = egg_id; // 使用 egg_id 作为 pet_class
-                                db.pets.insert(pet_class, PetData {
+                                db.pets.insert(
                                     pet_class,
-                                    name: template.mob_name.clone(),
-                                    mob_id,
-                                    egg_id,
-                                    equip_id: item_name_to_equip_id(&template.equip_item),
-                                    capture_rate: template.capture_rate as u16,
-                                    food: item_name_to_food_ids(&template.food_item),
-                                    hungry_delay: 60,
-                                    hunger_decrease: template.fullness,
-                                    intimacy_decrease: 1,
-                                    full_ratio: 500,
-                                    hungry_delay_min: 60,
-                                    script: None,
-                                    talk_convert: false,
-                                });
+                                    PetData {
+                                        pet_class,
+                                        name: template.mob_name.clone(),
+                                        mob_id,
+                                        egg_id,
+                                        equip_id: item_name_to_equip_id(&template.equip_item),
+                                        capture_rate: template.capture_rate as u16,
+                                        food: item_name_to_food_ids(&template.food_item),
+                                        hungry_delay: 60,
+                                        hunger_decrease: template.fullness,
+                                        intimacy_decrease: 1,
+                                        full_ratio: 500,
+                                        hungry_delay_min: 60,
+                                        script: None,
+                                        talk_convert: false,
+                                    },
+                                );
                                 yaml_loaded += 1;
                             }
                         }
-                        tracing::info!("从 {} 加载了 {} 个宠物模板（{} 个已转换）", path, count, yaml_loaded);
+                        tracing::info!(
+                            "从 {} 加载了 {} 个宠物模板（{} 个已转换）",
+                            path,
+                            count,
+                            yaml_loaded
+                        );
                         return db;
                     }
                     Ok(_) => {

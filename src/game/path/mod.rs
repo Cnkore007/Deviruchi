@@ -3,8 +3,8 @@
 //! 对应 rAthena 的 `src/map/path.cpp`，提供 A* 寻路和距离计算功能。
 //! 用于怪物 AI、NPC 移动、玩家移动验证等。
 
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 /// 方向枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -187,12 +187,7 @@ impl PathSearcher {
     /// A* 路径搜索
     ///
     /// 从起点到终点的最短路径，考虑地图碰撞。
-    pub fn search<C: CollisionMap>(
-        &self,
-        map: &C,
-        from: Point,
-        to: Point,
-    ) -> PathResult {
+    pub fn search<C: CollisionMap>(&self, map: &C, from: Point, to: Point) -> PathResult {
         if !map.is_walkable(from.x, from.y) || !map.is_walkable(to.x, to.y) {
             return PathResult {
                 path: vec![],
@@ -210,7 +205,8 @@ impl PathSearcher {
         }
 
         let mut open_set = BinaryHeap::new();
-        let mut came_from: std::collections::HashMap<Point, Point> = std::collections::HashMap::new();
+        let mut came_from: std::collections::HashMap<Point, Point> =
+            std::collections::HashMap::new();
         let mut g_score: std::collections::HashMap<Point, i32> = std::collections::HashMap::new();
         let mut visited = std::collections::HashSet::new();
         let mut steps = 0;
@@ -331,7 +327,11 @@ impl PathSearcher {
     }
 
     /// 重建路径
-    fn rebuild_path(&self, came_from: &std::collections::HashMap<Point, Point>, end: Point) -> Vec<Point> {
+    fn rebuild_path(
+        &self,
+        came_from: &std::collections::HashMap<Point, Point>,
+        end: Point,
+    ) -> Vec<Point> {
         let mut path = vec![end];
         let mut current = end;
 

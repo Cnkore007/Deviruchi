@@ -3,10 +3,10 @@
 //! 对应 rAthena 的 `src/map/log.cpp`，提供游戏事件日志记录功能。
 //! 包括物品获取/丢失、金币交易、聊天记录、GM 命令等。
 
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use uuid::Uuid;
 use chrono::{DateTime, Local};
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 /// 日志类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -482,7 +482,7 @@ impl LogManager {
     /// 刷新缓冲区（返回并清空）
     pub fn flush(&self) -> Vec<LogEntry> {
         let mut buffer = self.buffer.write();
-        
+
         buffer.drain(..).collect()
     }
 
@@ -534,7 +534,15 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_pick(
-            player_id, 1001, 2001, 501, 10, PickSource::Floor, "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            501,
+            10,
+            PickSource::Floor,
+            "prontera",
+            150,
+            150,
         );
 
         assert_eq!(manager.buffer_size(), 1);
@@ -558,7 +566,14 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_chat(
-            player_id, 1001, 2001, ChatType::Normal, "Hello!", "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            ChatType::Normal,
+            "Hello!",
+            "prontera",
+            150,
+            150,
         );
 
         assert_eq!(manager.buffer_size(), 1);
@@ -571,7 +586,14 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_atcommand(
-            player_id, 1001, 2001, "@warp", "prontera 150 150", "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            "@warp",
+            "prontera 150 150",
+            "prontera",
+            150,
+            150,
         );
 
         assert_eq!(manager.buffer_size(), 1);
@@ -588,7 +610,15 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_pick(
-            player_id, 1001, 2001, 501, 10, PickSource::Floor, "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            501,
+            10,
+            PickSource::Floor,
+            "prontera",
+            150,
+            150,
         );
 
         assert_eq!(manager.buffer_size(), 0);
@@ -604,7 +634,15 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_pick(
-            player_id, 1001, 2001, 501, 10, PickSource::Floor, "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            501,
+            10,
+            PickSource::Floor,
+            "prontera",
+            150,
+            150,
         );
 
         assert_eq!(manager.buffer_size(), 0);
@@ -620,7 +658,15 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_pick(
-            player_id, 1001, 2001, 501, 10, PickSource::Floor, "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            501,
+            10,
+            PickSource::Floor,
+            "prontera",
+            150,
+            150,
         );
         manager.log_zeny(player_id, 1001, 2001, 1000, "test", "prontera");
 
@@ -637,10 +683,26 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         manager.log_pick(
-            player_id, 1001, 2001, 501, 10, PickSource::Floor, "prontera", 150, 150,
+            player_id,
+            1001,
+            2001,
+            501,
+            10,
+            PickSource::Floor,
+            "prontera",
+            150,
+            150,
         );
         manager.log_pick(
-            player_id, 1001, 2001, 502, 5, PickSource::Monster, "gef_fild01", 100, 100,
+            player_id,
+            1001,
+            2001,
+            502,
+            5,
+            PickSource::Monster,
+            "gef_fild01",
+            100,
+            100,
         );
         manager.log_zeny(player_id, 1001, 2001, 1000, "test", "prontera");
 

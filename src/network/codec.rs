@@ -24,7 +24,11 @@ impl Decoder for PacketCodec {
         if length > MAX_PACKET_PAYLOAD + 4 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Packet too large: {} bytes (max {})", length, MAX_PACKET_PAYLOAD + 4),
+                format!(
+                    "Packet too large: {} bytes (max {})",
+                    length,
+                    MAX_PACKET_PAYLOAD + 4
+                ),
             ));
         }
 

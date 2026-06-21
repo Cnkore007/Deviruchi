@@ -126,7 +126,12 @@ impl Packed for CHEnterCharServer {
         let login_id1 = u32::from_le_bytes([slice[4], slice[5], slice[6], slice[7]]);
         let login_id2 = u32::from_le_bytes([slice[8], slice[9], slice[10], slice[11]]);
         let sex = slice[12];
-        Some(Self { account_id, login_id1, login_id2, sex })
+        Some(Self {
+            account_id,
+            login_id1,
+            login_id2,
+            sex,
+        })
     }
 }
 
@@ -284,11 +289,11 @@ impl Packed for HCCancelDeleteOk {
 /// 参考 rAthena: clif_damage() in clif.cpp
 #[derive(Debug, Clone)]
 pub struct ZCNotifyAct {
-    pub src_id: u32,       // 攻击者 GID
-    pub dst_id: u32,       // 目标 GID
-    pub damage: u32,       // 伤害值
-    pub action: u8,         // 0=damage, 5=critical, 14=pickup
-    pub left_damage: u32,  // 左侧伤害（分身后用）
+    pub src_id: u32,      // 攻击者 GID
+    pub dst_id: u32,      // 目标 GID
+    pub damage: u32,      // 伤害值
+    pub action: u8,       // 0=damage, 5=critical, 14=pickup
+    pub left_damage: u32, // 左侧伤害（分身后用）
 }
 
 impl Packed for ZCNotifyAct {
@@ -739,9 +744,18 @@ mod tests {
         };
         let bytes = pkt.to_packet();
         // PacketBuilder 使用小端序 (put_u32_le)，所以用 LE 读取
-        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 12345);
-        assert_eq!(u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 67890);
-        assert_eq!(u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]), 999);
+        assert_eq!(
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            12345
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            67890
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            999
+        );
     }
 }
 
@@ -831,9 +845,7 @@ pub struct ZcReqTakeoffEquipAck {
 impl Packed for ZcReqTakeoffEquipAck {
     fn to_packet(&self) -> Vec<u8> {
         let mut ctx = PacketBuilderCtx::new(0x00AC);
-        ctx = ctx
-            .put_u16(self.position)
-            .put_u8(self.result);
+        ctx = ctx.put_u16(self.position).put_u8(self.result);
         ctx.build()
     }
 
@@ -951,7 +963,10 @@ impl CzInsertCard {
         }
         let card_index = u16::from_le_bytes([data[0], data[1]]);
         let equip_index = u16::from_le_bytes([data[2], data[3]]);
-        Some(Self { card_index, equip_index })
+        Some(Self {
+            card_index,
+            equip_index,
+        })
     }
 }
 
@@ -984,9 +999,7 @@ pub struct ZcItemIdentifyAck {
 impl Packed for ZcItemIdentifyAck {
     fn to_packet(&self) -> Vec<u8> {
         let mut ctx = PacketBuilderCtx::new(0x01DC);
-        ctx = ctx
-            .put_u16(self.index)
-            .put_u8(self.result);
+        ctx = ctx.put_u16(self.index).put_u8(self.result);
         ctx.build()
     }
 
@@ -1024,9 +1037,7 @@ pub struct ZcWeaponRefineAck {
 impl Packed for ZcWeaponRefineAck {
     fn to_packet(&self) -> Vec<u8> {
         let mut ctx = PacketBuilderCtx::new(0x0223);
-        ctx = ctx
-            .put_u8(self.result)
-            .put_u16(self.index);
+        ctx = ctx.put_u8(self.result).put_u16(self.index);
         ctx.build()
     }
 
@@ -1063,9 +1074,7 @@ pub struct ZcEmotion {
 impl Packed for ZcEmotion {
     fn to_packet(&self) -> Vec<u8> {
         let mut ctx = PacketBuilderCtx::new(0x00C0);
-        ctx = ctx
-            .put_u32(self.entity_id)
-            .put_u8(self.emotion);
+        ctx = ctx.put_u32(self.entity_id).put_u8(self.emotion);
         ctx.build()
     }
 
@@ -1186,7 +1195,12 @@ impl CzCreateChatRoom {
             }
         }
 
-        Some(Self { size, is_public, password, title })
+        Some(Self {
+            size,
+            is_public,
+            password,
+            title,
+        })
     }
 }
 
@@ -1304,7 +1318,9 @@ impl CzMailSend {
         if data.len() < 24 {
             return None;
         }
-        let receiver = String::from_utf8_lossy(&data[0..24]).trim_matches('\0').to_string();
+        let receiver = String::from_utf8_lossy(&data[0..24])
+            .trim_matches('\0')
+            .to_string();
         let title_len = u16::from_le_bytes([data[24], data[25]]) as usize;
         let title = if data.len() > 26 + title_len {
             String::from_utf8_lossy(&data[26..26 + title_len]).to_string()
@@ -1316,7 +1332,11 @@ impl CzMailSend {
         } else {
             String::new()
         };
-        Some(Self { receiver, title, body })
+        Some(Self {
+            receiver,
+            title,
+            body,
+        })
     }
 }
 

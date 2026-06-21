@@ -126,7 +126,10 @@ impl SkillHandler {
                     actual
                 );
             }
-            SkillResult::Buff { buff_type, duration } => {
+            SkillResult::Buff {
+                buff_type,
+                duration,
+            } => {
                 // Buff 已在 SkillEffect::apply_support 中通过 target.add_status 施加
                 let buff_target = target.as_ref().unwrap_or(&caster);
                 tracing::info!(
@@ -137,7 +140,10 @@ impl SkillHandler {
                     duration
                 );
             }
-            SkillResult::Debuff { debuff_type, duration } => {
+            SkillResult::Debuff {
+                debuff_type,
+                duration,
+            } => {
                 // Debuff 已在 SkillEffect::apply_debuff 中通过 target.add_status 施加
                 if let Some(ref t) = target {
                     tracing::info!(

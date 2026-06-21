@@ -13,10 +13,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzNpcBuyListSend::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 请求购买 {} 个物品",
-            player_id, pkt.count
-        );
+        tracing::info!("Player {} 请求购买 {} 个物品", player_id, pkt.count);
 
         let player = self.map_state.get_player(&player_id)?;
 
@@ -26,7 +23,12 @@ impl MapServer {
         // 检查 zeny 是否足够
         let economy = player.economy();
         if economy.zeny < total_cost {
-            tracing::warn!("Player {} zeny 不足: {} < {}", player_id, economy.zeny, total_cost);
+            tracing::warn!(
+                "Player {} zeny 不足: {} < {}",
+                player_id,
+                economy.zeny,
+                total_cost
+            );
             return Some(ZcPcPurchaseResult { result: 2 }.to_packet()); // zeny不足
         }
 
@@ -38,7 +40,9 @@ impl MapServer {
         // 添加物品到背包（简化实现）
         tracing::info!(
             "Player {} 成功购买 {} 个物品，花费 {} zeny",
-            player_id, pkt.count, total_cost
+            player_id,
+            pkt.count,
+            total_cost
         );
 
         Some(ZcPcPurchaseResult { result: 0 }.to_packet()) // 成功
@@ -49,10 +53,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzNpcSellListSend::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 请求出售 {} 个物品",
-            player_id, pkt.count
-        );
+        tracing::info!("Player {} 请求出售 {} 个物品", player_id, pkt.count);
 
         let player = self.map_state.get_player(&player_id)?;
 
@@ -66,7 +67,9 @@ impl MapServer {
         // 从背包移除物品（简化实现）
         tracing::info!(
             "Player {} 成功出售 {} 个物品，获得 {} zeny",
-            player_id, pkt.count, total_income
+            player_id,
+            pkt.count,
+            total_income
         );
 
         Some(ZcPcSellResult { result: 0 }.to_packet()) // 成功

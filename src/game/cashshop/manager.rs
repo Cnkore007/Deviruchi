@@ -308,7 +308,10 @@ impl CashShopManager {
         );
 
         // 购买系统尚未完全实现（物品不会添加到背包），不扣除点数
-        warn!("Cash shop purchase not yet implemented: item_id={}, player={}", item_id, player.name);
+        warn!(
+            "Cash shop purchase not yet implemented: item_id={}, player={}",
+            item_id, player.name
+        );
         PurchaseResult::InternalError("Cash shop purchase system not yet implemented".to_string())
     }
 
@@ -339,9 +342,10 @@ impl CashShopManager {
 
         // 检查每日限制（假设只购买1个）
         if let Some(limit) = self.check_daily_limit(player.char_id, item_id, 1, &item)
-            && let PurchaseResult::DailyLimitReached { limit, item_name } = limit {
-                return GiftResult::DailyLimitReached { limit, item_name };
-            }
+            && let PurchaseResult::DailyLimitReached { limit, item_name } = limit
+        {
+            return GiftResult::DailyLimitReached { limit, item_name };
+        }
 
         // 计算价格（礼物固定为1个）
         let total_cost = item.actual_price();
@@ -358,7 +362,10 @@ impl CashShopManager {
         }
 
         // 赠送系统尚未完全实现，不扣除点数
-        warn!("Cash shop gift not yet implemented: item_id={}, to={}", item_id, target_name);
+        warn!(
+            "Cash shop gift not yet implemented: item_id={}, to={}",
+            item_id, target_name
+        );
         GiftResult::InternalError("Cash shop gift system not yet implemented".to_string())
     }
 

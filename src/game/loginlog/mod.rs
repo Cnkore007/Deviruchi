@@ -1,11 +1,11 @@
 //! 登录日志系统
-//! 
+//!
 //! 记录登录相关的日志信息。
 //! 对应 rAthena 的 loginlog.cpp。
 
-use std::collections::VecDeque;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 /// 登录事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,7 +94,7 @@ impl LoginLogManager {
 
         let mut logs = self.logs.write();
         logs.push_back(entry);
-        
+
         // 限制日志数量
         while logs.len() > self.max_logs {
             logs.pop_front();
@@ -156,7 +156,7 @@ mod tests {
     #[test]
     fn test_log_event() {
         let manager = LoginLogManager::new(100);
-        
+
         manager.log_event(
             1,
             "test_user".to_string(),
@@ -164,9 +164,9 @@ mod tests {
             LoginEvent::LoginSuccess,
             "登录成功".to_string(),
         );
-        
+
         assert_eq!(manager.count(), 1);
-        
+
         let logs = manager.get_recent_logs(10);
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].event, LoginEvent::LoginSuccess);
@@ -175,7 +175,7 @@ mod tests {
     #[test]
     fn test_max_logs() {
         let manager = LoginLogManager::new(2);
-        
+
         for i in 0..3 {
             manager.log_event(
                 i,
@@ -185,18 +185,36 @@ mod tests {
                 String::new(),
             );
         }
-        
+
         assert_eq!(manager.count(), 2);
     }
 
     #[test]
     fn test_filter_by_account() {
         let manager = LoginLogManager::new(100);
-        
-        manager.log_event(1, "user1".to_string(), "192.168.1.1".to_string(), LoginEvent::LoginSuccess, String::new());
-        manager.log_event(2, "user2".to_string(), "192.168.1.2".to_string(), LoginEvent::LoginSuccess, String::new());
-        manager.log_event(1, "user1".to_string(), "192.168.1.1".to_string(), LoginEvent::Logout, String::new());
-        
+
+        manager.log_event(
+            1,
+            "user1".to_string(),
+            "192.168.1.1".to_string(),
+            LoginEvent::LoginSuccess,
+            String::new(),
+        );
+        manager.log_event(
+            2,
+            "user2".to_string(),
+            "192.168.1.2".to_string(),
+            LoginEvent::LoginSuccess,
+            String::new(),
+        );
+        manager.log_event(
+            1,
+            "user1".to_string(),
+            "192.168.1.1".to_string(),
+            LoginEvent::Logout,
+            String::new(),
+        );
+
         let logs = manager.get_account_logs(1);
         assert_eq!(logs.len(), 2);
     }
@@ -204,10 +222,22 @@ mod tests {
     #[test]
     fn test_filter_by_ip() {
         let manager = LoginLogManager::new(100);
-        
-        manager.log_event(1, "user1".to_string(), "192.168.1.1".to_string(), LoginEvent::LoginSuccess, String::new());
-        manager.log_event(2, "user2".to_string(), "192.168.1.2".to_string(), LoginEvent::LoginSuccess, String::new());
-        
+
+        manager.log_event(
+            1,
+            "user1".to_string(),
+            "192.168.1.1".to_string(),
+            LoginEvent::LoginSuccess,
+            String::new(),
+        );
+        manager.log_event(
+            2,
+            "user2".to_string(),
+            "192.168.1.2".to_string(),
+            LoginEvent::LoginSuccess,
+            String::new(),
+        );
+
         let logs = manager.get_ip_logs("192.168.1.1");
         assert_eq!(logs.len(), 1);
     }

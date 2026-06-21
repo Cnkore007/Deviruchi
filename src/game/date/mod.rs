@@ -167,9 +167,7 @@ impl GameDate {
             DateType::Year => Self::year(),
             DateType::DayOfYear => Self::day_of_year() as i32,
             DateType::Yyyymmdd => {
-                Self::year() * 10000
-                    + Self::month() as i32 * 100
-                    + Self::day_of_month() as i32
+                Self::year() * 10000 + Self::month() as i32 * 100 + Self::day_of_month() as i32
             }
         }
     }
@@ -217,9 +215,18 @@ mod tests {
 
     #[test]
     fn test_day_of_week_from_chrono() {
-        assert_eq!(GameDayOfWeek::from_chrono(chrono::Weekday::Sun), GameDayOfWeek::Sunday);
-        assert_eq!(GameDayOfWeek::from_chrono(chrono::Weekday::Mon), GameDayOfWeek::Monday);
-        assert_eq!(GameDayOfWeek::from_chrono(chrono::Weekday::Sat), GameDayOfWeek::Saturday);
+        assert_eq!(
+            GameDayOfWeek::from_chrono(chrono::Weekday::Sun),
+            GameDayOfWeek::Sunday
+        );
+        assert_eq!(
+            GameDayOfWeek::from_chrono(chrono::Weekday::Mon),
+            GameDayOfWeek::Monday
+        );
+        assert_eq!(
+            GameDayOfWeek::from_chrono(chrono::Weekday::Sat),
+            GameDayOfWeek::Saturday
+        );
     }
 
     #[test]
@@ -299,7 +306,10 @@ mod tests {
         // date_get(X) 应与直接调用一致
         assert_eq!(GameDate::get(DateType::Year), GameDate::year());
         assert_eq!(GameDate::get(DateType::Month), GameDate::month() as i32);
-        assert_eq!(GameDate::get(DateType::DayOfMonth), GameDate::day_of_month() as i32);
+        assert_eq!(
+            GameDate::get(DateType::DayOfMonth),
+            GameDate::day_of_month() as i32
+        );
         assert_eq!(GameDate::get(DateType::Hour), GameDate::hour() as i32);
         assert_eq!(GameDate::get(DateType::Minute), GameDate::minute() as i32);
         assert_eq!(GameDate::get(DateType::Second), GameDate::second() as i32);

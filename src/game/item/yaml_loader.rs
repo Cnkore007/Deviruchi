@@ -102,7 +102,9 @@ fn map_locations(locations: &Option<HashMap<String, bool>>) -> u32 {
     let Some(locs) = locations else { return 0 };
     let mut mask: u32 = 0;
     for (name, enabled) in locs {
-        if !enabled { continue; }
+        if !enabled {
+            continue;
+        }
         match name.as_str() {
             "Head_Top" => mask |= 0x0100,
             "Head_Mid" => mask |= 0x0200,
@@ -127,8 +129,16 @@ impl ItemRathenaEntry {
         let equip_mask = map_locations(&self.locations);
 
         // 买卖价格：rAthena 中 Sell 默认为 Buy/2
-        let buy_price = if self.buy > 0 { self.buy } else { self.sell * 2 };
-        let sell_price = if self.sell > 0 { self.sell } else { self.buy / 2 };
+        let buy_price = if self.buy > 0 {
+            self.buy
+        } else {
+            self.sell * 2
+        };
+        let sell_price = if self.sell > 0 {
+            self.sell
+        } else {
+            self.buy / 2
+        };
 
         Item {
             id: self.Id,
@@ -186,20 +196,18 @@ pub fn load_item_name_to_id_map() -> HashMap<String, u16> {
             continue;
         }
         match fs::read_to_string(path) {
-            Ok(content) => {
-                match serde_yaml::from_str::<ItemRathenaFile>(&content) {
-                    Ok(yaml) => {
-                        if let Some(body) = yaml.Body {
-                            for entry in body {
-                                name_to_id.insert(entry.aegis_name, entry.Id);
-                            }
+            Ok(content) => match serde_yaml::from_str::<ItemRathenaFile>(&content) {
+                Ok(yaml) => {
+                    if let Some(body) = yaml.Body {
+                        for entry in body {
+                            name_to_id.insert(entry.aegis_name, entry.Id);
                         }
                     }
-                    Err(e) => {
-                        tracing::warn!("解析 {} 构建名称映射失败: {}", path, e);
-                    }
                 }
-            }
+                Err(e) => {
+                    tracing::warn!("解析 {} 构建名称映射失败: {}", path, e);
+                }
+            },
             Err(e) => {
                 tracing::warn!("读取 {} 构建名称映射失败: {}", path, e);
             }
@@ -286,36 +294,39 @@ fn load_legacy_format(path: &str) -> Result<HashMap<u16, Item>, Box<dyn Error>> 
     let yaml_items: Vec<ItemLegacyYaml> = serde_yaml::from_str(&content)?;
     let mut db = HashMap::new();
     for y in yaml_items {
-        db.insert(y.id, Item {
-            id: y.id,
-            name: y.name,
-            type_: match y.type_.as_str() {
-                "Heal" => ItemType::Heal,
-                "Weapon" => ItemType::Weapon,
-                "Armor" => ItemType::Armor,
-                "Card" => ItemType::Card,
-                "PetEgg" => ItemType::PetEgg,
-                "PetArmor" => ItemType::PetArmor,
-                _ => ItemType::Etc,
+        db.insert(
+            y.id,
+            Item {
+                id: y.id,
+                name: y.name,
+                type_: match y.type_.as_str() {
+                    "Heal" => ItemType::Heal,
+                    "Weapon" => ItemType::Weapon,
+                    "Armor" => ItemType::Armor,
+                    "Card" => ItemType::Card,
+                    "PetEgg" => ItemType::PetEgg,
+                    "PetArmor" => ItemType::PetArmor,
+                    _ => ItemType::Etc,
+                },
+                buy_price: y.buy_price,
+                sell_price: y.sell_price,
+                weight: y.weight,
+                flags: 0,
+                hp_restore: y.hp_restore,
+                sp_restore: y.sp_restore,
+                equip_mask: y.equip_mask,
+                atk: y.atk,
+                matk: 0,
+                defense: y.defense,
+                magic_defense: 0,
+                str_bonus: 0,
+                agi_bonus: 0,
+                vit_bonus: 0,
+                int_bonus: 0,
+                dex_bonus: 0,
+                luk_bonus: 0,
             },
-            buy_price: y.buy_price,
-            sell_price: y.sell_price,
-            weight: y.weight,
-            flags: 0,
-            hp_restore: y.hp_restore,
-            sp_restore: y.sp_restore,
-            equip_mask: y.equip_mask,
-            atk: y.atk,
-            matk: 0,
-            defense: y.defense,
-            magic_defense: 0,
-            str_bonus: 0,
-            agi_bonus: 0,
-            vit_bonus: 0,
-            int_bonus: 0,
-            dex_bonus: 0,
-            luk_bonus: 0,
-        });
+        );
     }
     Ok(db)
 }

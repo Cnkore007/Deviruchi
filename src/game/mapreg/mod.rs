@@ -7,8 +7,8 @@
 //! - `$` 前缀 + `$` 后缀：永久字符串变量
 //! - `@` 前缀：临时变量（不持久化）
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 /// 变量值类型
 #[derive(Debug, Clone, PartialEq)]

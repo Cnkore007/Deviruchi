@@ -4,8 +4,8 @@
 //!
 //! 权限组定义了玩家可以使用的命令和功能，如 @warp、@kick 等。
 
-use std::collections::{HashMap, HashSet};
 use parking_lot::RwLock;
+use std::collections::{HashMap, HashSet};
 
 /// 权限级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -104,12 +104,30 @@ impl PcGroupManager {
         let mut groups = HashMap::new();
 
         // 创建默认权限组
-        groups.insert(0, PlayerGroup::new(0, "Player".to_string(), GroupLevel::Player));
-        groups.insert(1, PlayerGroup::new(1, "Support".to_string(), GroupLevel::Support));
-        groups.insert(2, PlayerGroup::new(2, "Script".to_string(), GroupLevel::Script));
-        groups.insert(3, PlayerGroup::new(3, "Event".to_string(), GroupLevel::Event));
-        groups.insert(4, PlayerGroup::new(4, "Admin".to_string(), GroupLevel::Admin));
-        groups.insert(5, PlayerGroup::new(5, "Super".to_string(), GroupLevel::Super));
+        groups.insert(
+            0,
+            PlayerGroup::new(0, "Player".to_string(), GroupLevel::Player),
+        );
+        groups.insert(
+            1,
+            PlayerGroup::new(1, "Support".to_string(), GroupLevel::Support),
+        );
+        groups.insert(
+            2,
+            PlayerGroup::new(2, "Script".to_string(), GroupLevel::Script),
+        );
+        groups.insert(
+            3,
+            PlayerGroup::new(3, "Event".to_string(), GroupLevel::Event),
+        );
+        groups.insert(
+            4,
+            PlayerGroup::new(4, "Admin".to_string(), GroupLevel::Admin),
+        );
+        groups.insert(
+            5,
+            PlayerGroup::new(5, "Super".to_string(), GroupLevel::Super),
+        );
 
         Self {
             groups: RwLock::new(groups),

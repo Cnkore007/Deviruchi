@@ -8,12 +8,12 @@ pub mod setup_wizard;
 pub mod timer;
 pub mod version;
 
+use crate::game::GameLoop;
 use crate::game::battle::{BattleHandler, ExpDistributor};
 use crate::game::heal;
 use crate::game::map::data::MapDatabase;
 use crate::game::mob::{MobAI, MobSpawnManager};
 use crate::game::status::{StatusTickConfig, StatusTickService};
-use crate::game::GameLoop;
 
 pub use crate::game::AtCommandHandler;
 pub use config::{Config, HotReloadConfig};
@@ -22,10 +22,10 @@ pub use setup_wizard::SetupWizard;
 pub use version::VERSION;
 
 use crate::cli::Cli;
+use crate::game::AgentApi;
 use crate::game::map::{ChannelBus, DropManager, MapState};
 use crate::game::party::PartyManager;
 use crate::game::token::TokenStore;
-use crate::game::AgentApi;
 use crate::network::{AgentServer, GameServer, PacketHandler, SessionManager};
 use crate::storage::{Database, init_schema};
 use std::sync::Arc;
@@ -148,19 +148,22 @@ impl Core {
             battle_handler.clone(),
             Arc::new(crate::game::skill::SkillDatabase::new()),
         ));
-        let game_loop = Arc::new(GameLoop::new(
-            map_state.clone(),
-            drop_manager.clone(),
-            token_store.clone(),
-            mob_ai,
-            spawn_manager.clone(),
-            Arc::new(crate::game::mob::droptable::DropResolver),
-            channel_bus.clone(),
-            Arc::new(ExpDistributor),
-            self.heal_service.clone(),
-            Arc::new(crate::game::heal::FoodManager::new()),
-            guild_manager.clone(),
-        ).with_db(db.clone()));
+        let game_loop = Arc::new(
+            GameLoop::new(
+                map_state.clone(),
+                drop_manager.clone(),
+                token_store.clone(),
+                mob_ai,
+                spawn_manager.clone(),
+                Arc::new(crate::game::mob::droptable::DropResolver),
+                channel_bus.clone(),
+                Arc::new(ExpDistributor),
+                self.heal_service.clone(),
+                Arc::new(crate::game::heal::FoodManager::new()),
+                guild_manager.clone(),
+            )
+            .with_db(db.clone()),
+        );
         game_loop.clone().start();
         tracing::info!("GameLoop 已启动");
 
@@ -171,9 +174,9 @@ impl Core {
             let backup_path = self.config.database.path.clone();
             if backup_interval > 0 {
                 tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(
-                        std::time::Duration::from_secs(backup_interval as u64 * 3600)
-                    );
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                        backup_interval as u64 * 3600,
+                    ));
                     interval.tick().await; // 跳过首次立即触发
                     loop {
                         interval.tick().await;
@@ -247,10 +250,7 @@ impl Core {
 
         // Agent API 服务器
         if let Some(agent_port) = self.config.network.agent_port {
-            let agent_api = Arc::new(AgentApi::new(
-                self.cli.config.clone(),
-                map_state.clone(),
-            ));
+            let agent_api = Arc::new(AgentApi::new(self.cli.config.clone(), map_state.clone()));
             let agent_addr = format!("127.0.0.1:{}", agent_port);
             let agent_server = AgentServer::new(agent_addr, agent_api);
             handles.push(tokio::spawn(async move {
@@ -278,8 +278,9 @@ impl Core {
             let ctrl_c = tokio::signal::ctrl_c();
             #[cfg(unix)]
             {
-                let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                    .expect("无法注册 SIGTERM 处理器");
+                let mut sigterm =
+                    tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                        .expect("无法注册 SIGTERM 处理器");
                 tokio::select! {
                     _ = ctrl_c => tracing::info!("收到 SIGINT 信号，开始优雅关机..."),
                     _ = sigterm.recv() => tracing::info!("收到 SIGTERM 信号，开始优雅关机..."),

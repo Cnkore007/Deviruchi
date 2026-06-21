@@ -52,12 +52,14 @@ impl Row {
         match self.columns.get(index).map(|(_, v)| v) {
             Some(Value::Int(v)) => Ok(*v),
             Some(Value::BigInt(v)) => Ok(*v as i32),
-            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} is NULL", index),
-            )),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected Int, got {:?}", index, other),
-            )),
+            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} is NULL",
+                index
+            ))),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected Int, got {:?}",
+                index, other
+            ))),
         }
     }
 
@@ -66,12 +68,14 @@ impl Row {
         match self.columns.get(index).map(|(_, v)| v) {
             Some(Value::BigInt(v)) => Ok(*v),
             Some(Value::Int(v)) => Ok(*v as i64),
-            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} is NULL", index),
-            )),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected BigInt, got {:?}", index, other),
-            )),
+            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} is NULL",
+                index
+            ))),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected BigInt, got {:?}",
+                index, other
+            ))),
         }
     }
 
@@ -79,12 +83,14 @@ impl Row {
     pub fn get_f64(&self, index: usize) -> Result<f64> {
         match self.columns.get(index).map(|(_, v)| v) {
             Some(Value::Float(v)) => Ok(*v),
-            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} is NULL", index),
-            )),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected Float, got {:?}", index, other),
-            )),
+            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} is NULL",
+                index
+            ))),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected Float, got {:?}",
+                index, other
+            ))),
         }
     }
 
@@ -92,12 +98,14 @@ impl Row {
     pub fn get_string(&self, index: usize) -> Result<String> {
         match self.columns.get(index).map(|(_, v)| v) {
             Some(Value::Text(v)) => Ok(v.clone()),
-            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} is NULL", index),
-            )),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected Text, got {:?}", index, other),
-            )),
+            Some(Value::Null) => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} is NULL",
+                index
+            ))),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected Text, got {:?}",
+                index, other
+            ))),
         }
     }
 
@@ -107,9 +115,10 @@ impl Row {
             Some(Value::Text(v)) => Ok(Some(v.clone())),
             Some(Value::Null) => Ok(None),
             None => Ok(None),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected Text or Null, got {:?}", index, other),
-            )),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected Text or Null, got {:?}",
+                index, other
+            ))),
         }
     }
 
@@ -120,9 +129,10 @@ impl Row {
             Some(Value::Int(v)) => Ok(Some(*v as i64)),
             Some(Value::Null) => Ok(None),
             None => Ok(None),
-            other => Err(crate::error::Error::DatabaseBackend(
-                format!("column {} expected Int/BigInt or Null, got {:?}", index, other),
-            )),
+            other => Err(crate::error::Error::DatabaseBackend(format!(
+                "column {} expected Int/BigInt or Null, got {:?}",
+                index, other
+            ))),
         }
     }
 }

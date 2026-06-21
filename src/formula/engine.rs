@@ -1,4 +1,4 @@
-use rhai::{Engine, Scope, AST};
+use rhai::{AST, Engine, Scope};
 use std::path::Path;
 
 pub struct FormulaEngine {
@@ -15,7 +15,11 @@ impl FormulaEngine {
         engine.register_fn("sqrt", |a: f64| a.sqrt());
         engine.register_fn("clamp", |val: i64, lo: i64, hi: i64| val.clamp(lo, hi));
 
-        let mut this = Self { engine, battle_ast: None, status_ast: None };
+        let mut this = Self {
+            engine,
+            battle_ast: None,
+            status_ast: None,
+        };
         this.load_scripts();
         this
     }
@@ -37,25 +41,21 @@ impl FormulaEngine {
         }
     }
 
-    pub fn has_battle_formulas(&self) -> bool { self.battle_ast.is_some() }
-    pub fn has_status_formulas(&self) -> bool { self.status_ast.is_some() }
+    pub fn has_battle_formulas(&self) -> bool {
+        self.battle_ast.is_some()
+    }
+    pub fn has_status_formulas(&self) -> bool {
+        self.status_ast.is_some()
+    }
 
-    pub fn call_battle_fn(
-        &self,
-        name: &str,
-        args: Vec<rhai::Dynamic>,
-    ) -> Option<rhai::Dynamic> {
+    pub fn call_battle_fn(&self, name: &str, args: Vec<rhai::Dynamic>) -> Option<rhai::Dynamic> {
         let ast = self.battle_ast.as_ref()?;
         self.engine
             .call_fn::<rhai::Dynamic>(&mut Scope::new(), ast, name, args)
             .ok()
     }
 
-    pub fn call_status_fn(
-        &self,
-        name: &str,
-        args: Vec<rhai::Dynamic>,
-    ) -> Option<rhai::Dynamic> {
+    pub fn call_status_fn(&self, name: &str, args: Vec<rhai::Dynamic>) -> Option<rhai::Dynamic> {
         let ast = self.status_ast.as_ref()?;
         self.engine
             .call_fn::<rhai::Dynamic>(&mut Scope::new(), ast, name, args)

@@ -3136,9 +3136,7 @@ impl Expr {
                 let right_val = variables.get(right_name).copied().unwrap_or(0);
                 op.eval(left_val, right_val)
             }
-            Expr::VarTruthy(var_name) => {
-                variables.get(var_name).copied().unwrap_or(0) != 0
-            }
+            Expr::VarTruthy(var_name) => variables.get(var_name).copied().unwrap_or(0) != 0,
             Expr::IntTruthy(value) => *value != 0,
         }
     }
@@ -3290,7 +3288,11 @@ pub struct ParseError {
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "第 {} 行解析错误: {} (原文: '{}')", self.line, self.message, self.source)
+        write!(
+            f,
+            "第 {} 行解析错误: {} (原文: '{}')",
+            self.line, self.message, self.source
+        )
     }
 }
 

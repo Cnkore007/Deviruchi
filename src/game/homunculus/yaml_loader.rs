@@ -62,7 +62,9 @@ struct HomunDbEntry {
     Status: Vec<HomunStatusEntry>,
 }
 
-fn default_attack_delay() -> u32 { 700 }
+fn default_attack_delay() -> u32 {
+    700
+}
 
 #[derive(Deserialize, Debug)]
 struct HomunStatusEntry {
@@ -78,7 +80,8 @@ struct HomunStatusEntry {
 impl HomunDbEntry {
     fn to_template(&self) -> HomunculusTemplateYaml {
         let get_stat = |stat_type: &str| -> u32 {
-            self.Status.iter()
+            self.Status
+                .iter()
                 .find(|s| s.Type.eq_ignore_ascii_case(stat_type))
                 .map(|s| s.Base)
                 .unwrap_or(1)
@@ -89,15 +92,38 @@ impl HomunDbEntry {
             name: self.Name.clone().unwrap_or_else(|| self.Class.clone()),
             evolution_class: self.EvolutionClass.clone().unwrap_or_default(),
             race: self.Race.clone().unwrap_or_else(|| "Demihuman".to_string()),
-            element: self.Element.clone().unwrap_or_else(|| "Neutral".to_string()),
+            element: self
+                .Element
+                .clone()
+                .unwrap_or_else(|| "Neutral".to_string()),
             size: self.Size.clone().unwrap_or_else(|| "Small".to_string()),
             attack_delay: self.AttackDelay,
             hp_base: get_stat("Hp"),
-            hp_growth_min: self.Status.iter().find(|s| s.Type == "Hp").map(|s| s.GrowthMinimum).unwrap_or(0),
-            hp_growth_max: self.Status.iter().find(|s| s.Type == "Hp").map(|s| s.GrowthMaximum).unwrap_or(0),
+            hp_growth_min: self
+                .Status
+                .iter()
+                .find(|s| s.Type == "Hp")
+                .map(|s| s.GrowthMinimum)
+                .unwrap_or(0),
+            hp_growth_max: self
+                .Status
+                .iter()
+                .find(|s| s.Type == "Hp")
+                .map(|s| s.GrowthMaximum)
+                .unwrap_or(0),
             sp_base: get_stat("Sp"),
-            sp_growth_min: self.Status.iter().find(|s| s.Type == "Sp").map(|s| s.GrowthMinimum).unwrap_or(0),
-            sp_growth_max: self.Status.iter().find(|s| s.Type == "Sp").map(|s| s.GrowthMaximum).unwrap_or(0),
+            sp_growth_min: self
+                .Status
+                .iter()
+                .find(|s| s.Type == "Sp")
+                .map(|s| s.GrowthMinimum)
+                .unwrap_or(0),
+            sp_growth_max: self
+                .Status
+                .iter()
+                .find(|s| s.Type == "Sp")
+                .map(|s| s.GrowthMaximum)
+                .unwrap_or(0),
             str_base: get_stat("Str") as u16,
             agi_base: get_stat("Agi") as u16,
             vit_base: get_stat("Vit") as u16,
@@ -109,7 +135,9 @@ impl HomunDbEntry {
 }
 
 /// 从 rAthena homunculus_db.yml 加载生命体模板
-pub fn load_homunculus_db(path: &str) -> Result<HashMap<String, HomunculusTemplateYaml>, Box<dyn Error>> {
+pub fn load_homunculus_db(
+    path: &str,
+) -> Result<HashMap<String, HomunculusTemplateYaml>, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
     let yaml: HomunDbFile = serde_yaml::from_str(&content)?;
     let mut db = HashMap::new();

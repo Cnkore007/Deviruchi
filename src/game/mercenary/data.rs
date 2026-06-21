@@ -191,28 +191,35 @@ impl MercenaryDatabase {
                 _ => MercenaryClass::Archer,
             };
 
-            templates.insert(id, MercenaryData {
-                class_id: yt.id,
-                name: yt.name,
-                class_type,
-                level: yt.level,
-                hp: yt.hp,
-                sp: yt.sp,
-                atk: yt.attack,
-                atk2: yt.attack2,
-                defense: yt.defense,
-                magic_defense: yt.magic_defense,
-                str: yt.str,
-                agi: yt.agi,
-                vit: yt.vit,
-                int: yt.int,
-                dex: yt.dex,
-                luk: yt.luk,
-                attack_range: yt.attack_range,
-                walk_speed: yt.walk_speed,
-                contract_cost: 0,
-                skills: yt.skills.iter().map(|s| (s.name.clone(), s.max_level)).collect(),
-            });
+            templates.insert(
+                id,
+                MercenaryData {
+                    class_id: yt.id,
+                    name: yt.name,
+                    class_type,
+                    level: yt.level,
+                    hp: yt.hp,
+                    sp: yt.sp,
+                    atk: yt.attack,
+                    atk2: yt.attack2,
+                    defense: yt.defense,
+                    magic_defense: yt.magic_defense,
+                    str: yt.str,
+                    agi: yt.agi,
+                    vit: yt.vit,
+                    int: yt.int,
+                    dex: yt.dex,
+                    luk: yt.luk,
+                    attack_range: yt.attack_range,
+                    walk_speed: yt.walk_speed,
+                    contract_cost: 0,
+                    skills: yt
+                        .skills
+                        .iter()
+                        .map(|s| (s.name.clone(), s.max_level))
+                        .collect(),
+                },
+            );
         }
 
         Ok(templates)

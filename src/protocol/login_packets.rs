@@ -84,7 +84,9 @@ pub struct ACRefuseLogin {
 
 impl Packed for ACRefuseLogin {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilderCtx::new(0x006A).put_u8(self.error_code).build()
+        PacketBuilderCtx::new(0x006A)
+            .put_u8(self.error_code)
+            .build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {
@@ -100,7 +102,9 @@ pub struct SCNotifyBan {
 
 impl Packed for SCNotifyBan {
     fn to_packet(&self) -> Vec<u8> {
-        PacketBuilderCtx::new(0x0081).put_u32(self.error_code).build()
+        PacketBuilderCtx::new(0x0081)
+            .put_u32(self.error_code)
+            .build()
     }
 
     fn from_slice(_slice: &[u8]) -> Option<Self> {

@@ -115,7 +115,9 @@ impl SyncRecord {
             _ => {
                 tracing::warn!(
                     "非法状态转换: {:?} -> {:?} (char_id: {})",
-                    self.sync_state, target, self.char_id
+                    self.sync_state,
+                    target,
+                    self.char_id
                 );
                 false
             }

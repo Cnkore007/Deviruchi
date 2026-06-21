@@ -2,8 +2,8 @@
 //!
 //! 对应 rAthena 的 `src/map/duel.cpp`，提供 1v1 / 多人决斗功能。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// 决斗状态
@@ -197,12 +197,7 @@ impl DuelManager {
     }
 
     /// 邀请玩家加入决斗
-    pub fn invite_player(
-        &self,
-        duel_id: usize,
-        inviter_id: Uuid,
-        target_id: Uuid,
-    ) -> DuelResult {
+    pub fn invite_player(&self, duel_id: usize, inviter_id: Uuid, target_id: Uuid) -> DuelResult {
         let mut duels = self.duels.write();
         let duel = match duels.get_mut(&duel_id) {
             Some(d) => d,
@@ -493,10 +488,7 @@ mod tests {
         manager.leave_duel(player);
 
         // 冷却期内应失败
-        assert_eq!(
-            manager.create_duel(player, 0),
-            Err(DuelResult::Cooldown)
-        );
+        assert_eq!(manager.create_duel(player, 0), Err(DuelResult::Cooldown));
     }
 
     #[test]

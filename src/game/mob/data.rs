@@ -1,9 +1,9 @@
+use crate::game::battle::element::{Element, ElementLevel, MobSize};
+use crate::game::constants;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
-use crate::game::battle::element::{Element, ElementLevel, MobSize};
-use crate::game::constants;
 
 /// 怪物掉落物品
 #[derive(Debug, Clone)]
@@ -135,8 +135,7 @@ impl Default for MobBehaviorFlags {
 }
 
 /// 怪物种族
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MobRace {
     #[default]
     Formless,
@@ -150,7 +149,6 @@ pub enum MobRace {
     Angel,
     Dragon,
 }
-
 
 /// 怪物类型
 #[derive(Debug, Clone, Copy)]
@@ -179,8 +177,7 @@ pub enum MobBehavior {
 }
 
 /// 怪物技能目标类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MobSkillTarget {
     /// 对攻击目标（敌人）使用
     #[default]
@@ -189,10 +186,8 @@ pub enum MobSkillTarget {
     Self_,
 }
 
-
 /// 怪物技能触发条件类型
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MobSkillCondition {
     /// 无特殊条件（任何时候都可触发）
     #[default]
@@ -204,7 +199,6 @@ pub enum MobSkillCondition {
     /// HP 低于阈值时（rAthena: hpcertain）
     HpCertain,
 }
-
 
 /// 怪物技能数据
 #[derive(Debug, Clone)]
@@ -467,7 +461,8 @@ impl Mob {
 
     /// 设置实体 ID（由 MobSpawnManager 在注册时调用）
     pub fn set_entity_id(&self, id: u32) {
-        self.entity_id.store(id, std::sync::atomic::Ordering::Relaxed);
+        self.entity_id
+            .store(id, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// 获取当前 HP 百分比（0-100）
@@ -490,7 +485,10 @@ impl Mob {
     pub fn respawn(&self) {
         *self.hp.write() = self.max_hp;
         *self.sp.write() = self.max_sp;
-        *self.pos.write() = MobPosition { x: self.spawn_x, y: self.spawn_y };
+        *self.pos.write() = MobPosition {
+            x: self.spawn_x,
+            y: self.spawn_y,
+        };
         *self.ai_state.write() = MobAIState::Idle;
         *self.target_id.write() = None;
         *self.death_time.write() = None;
@@ -612,17 +610,15 @@ impl MobDatabase {
                 spawn_delay: 1000,
                 respawn_time: 60000,
                 behavior: MobBehavior::Passive,
-                skills: vec![
-                    MobSkill {
-                        skill_id: 28,   // Heal
-                        level: 3,
-                        chance: 1000,   // 10% 概率
-                        target: MobSkillTarget::Self_,
-                        condition: MobSkillCondition::HpCertain,
-                        condition_value: 50, // HP 低于 50% 时使用
-                        cooldown_ms: 10000,  // 10 秒冷却
-                    },
-                ],
+                skills: vec![MobSkill {
+                    skill_id: 28, // Heal
+                    level: 3,
+                    chance: 1000, // 10% 概率
+                    target: MobSkillTarget::Self_,
+                    condition: MobSkillCondition::HpCertain,
+                    condition_value: 50, // HP 低于 50% 时使用
+                    cooldown_ms: 10000,  // 10 秒冷却
+                }],
                 drops: vec![
                     MobDrop::new(910, 6000), // Fluff 60%
                     MobDrop::new(938, 200),  // Sticky Mucus 2%
@@ -700,17 +696,15 @@ impl MobDatabase {
                 spawn_delay: 1000,
                 respawn_time: 60000,
                 behavior: MobBehavior::Passive,
-                skills: vec![
-                    MobSkill {
-                        skill_id: 5,    // Bash (SM_BASH)
-                        level: 3,
-                        chance: 500,    // 5% 概率
-                        target: MobSkillTarget::Target,
-                        condition: MobSkillCondition::Any,
-                        condition_value: 0,
-                        cooldown_ms: 5000, // 5 秒冷却
-                    },
-                ],
+                skills: vec![MobSkill {
+                    skill_id: 5, // Bash (SM_BASH)
+                    level: 3,
+                    chance: 500, // 5% 概率
+                    target: MobSkillTarget::Target,
+                    condition: MobSkillCondition::Any,
+                    condition_value: 0,
+                    cooldown_ms: 5000, // 5 秒冷却
+                }],
                 drops: vec![
                     MobDrop::new(914, 5500), // Fluff 55%
                     MobDrop::new(949, 400),  // Feather 4%
@@ -731,13 +725,11 @@ impl MobDatabase {
 
     /// 获取怪物模板（返回引用，不存在则返回默认模板）
     pub fn get(&self, mob_id: u16) -> &MobTemplate {
-        self.templates
-            .get(&mob_id)
-            .unwrap_or_else(|| {
-                // 返回默认模板的静态引用
-                static DEFAULT: std::sync::OnceLock<MobTemplate> = std::sync::OnceLock::new();
-                DEFAULT.get_or_init(|| MobTemplate::default(0))
-            })
+        self.templates.get(&mob_id).unwrap_or_else(|| {
+            // 返回默认模板的静态引用
+            static DEFAULT: std::sync::OnceLock<MobTemplate> = std::sync::OnceLock::new();
+            DEFAULT.get_or_init(|| MobTemplate::default(0))
+        })
     }
 
     /// 获取怪物模板（可选引用）

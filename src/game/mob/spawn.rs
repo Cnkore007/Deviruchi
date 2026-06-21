@@ -39,7 +39,8 @@ impl MobSpawnManager {
 
     /// 分配下一个实体 ID
     fn next_entity_id(&self) -> u32 {
-        self.entity_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        self.entity_counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// 添加刷新点
@@ -94,10 +95,11 @@ impl MobSpawnManager {
 
     /// 根据客户端实体 ID (u32) 查找指定地图上的怪物
     pub fn find_mob_by_entity_id(&self, map_name: &str, entity_id: u32) -> Option<Arc<Mob>> {
-        self.active_mobs
-            .read()
-            .get(map_name)
-            .and_then(|mobs| mobs.iter().find(|m| m.get_entity_id() == entity_id).cloned())
+        self.active_mobs.read().get(map_name).and_then(|mobs| {
+            mobs.iter()
+                .find(|m| m.get_entity_id() == entity_id)
+                .cloned()
+        })
     }
 
     /// 获取所有地图上的所有活跃怪物
@@ -208,8 +210,8 @@ impl Default for MobSpawnManager {
 mod combat_integration_tests {
     use super::*;
     use crate::game::mob::MobAIState;
-    use uuid::Uuid;
     use std::time::{Duration, Instant};
+    use uuid::Uuid;
 
     #[test]
     fn test_mob_respawn_timer() {
@@ -222,16 +224,20 @@ mod combat_integration_tests {
         assert!(mob.death_time.read().is_some());
 
         // 重生时间未到，不应重生
-        *mob.death_time.write() = Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64 - 1000));
+        *mob.death_time.write() =
+            Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64 - 1000));
         let should_respawn = mob.death_time.read().map_or(false, |death_time| {
-            Instant::now().duration_since(death_time) >= Duration::from_millis(mob.respawn_time as u64)
+            Instant::now().duration_since(death_time)
+                >= Duration::from_millis(mob.respawn_time as u64)
         });
         assert!(!should_respawn);
 
         // 重生时间已到
-        *mob.death_time.write() = Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64));
+        *mob.death_time.write() =
+            Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64));
         let should_respawn = mob.death_time.read().map_or(false, |death_time| {
-            Instant::now().duration_since(death_time) >= Duration::from_millis(mob.respawn_time as u64)
+            Instant::now().duration_since(death_time)
+                >= Duration::from_millis(mob.respawn_time as u64)
         });
         assert!(should_respawn);
     }

@@ -16,9 +16,7 @@ use std::fs;
 
 /// 全局物品名称到 ID 映射（从 item_db YAML 动态加载）
 static ITEM_NAME_TO_ID: once_cell::sync::Lazy<std::collections::HashMap<String, u16>> =
-    once_cell::sync::Lazy::new(|| {
-        crate::game::item::yaml_loader::load_item_name_to_id_map()
-    });
+    once_cell::sync::Lazy::new(|| crate::game::item::yaml_loader::load_item_name_to_id_map());
 
 /// 物品名称到 ID 的映射
 ///
@@ -94,13 +92,10 @@ struct SkillDbMappingEntry {
 /// 从 skill_db.yml 的 Name 字段查找对应的技能 ID。
 /// 未找到时返回 0 并输出警告。
 pub fn skill_name_to_id(name: &str) -> u16 {
-    SKILL_NAME_TO_ID
-        .get(name)
-        .copied()
-        .unwrap_or_else(|| {
-            tracing::warn!("未知技能名称: {}，skill_id 设为 0", name);
-            0
-        })
+    SKILL_NAME_TO_ID.get(name).copied().unwrap_or_else(|| {
+        tracing::warn!("未知技能名称: {}，skill_id 设为 0", name);
+        0
+    })
 }
 
 /// rAthena mob_db.yml 文件结构
@@ -371,9 +366,10 @@ fn parse_behavior(ai: &str, modes: &Option<HashMap<String, bool>>) -> MobBehavio
         _ => {
             // 检查 Modes 中的 CanMove 字段
             if let Some(modes) = modes
-                && modes.get("CanMove").copied() == Some(false) {
-                    return MobBehavior::Immobile;
-                }
+                && modes.get("CanMove").copied() == Some(false)
+            {
+                return MobBehavior::Immobile;
+            }
             MobBehavior::Passive
         }
     }
@@ -457,8 +453,8 @@ pub fn load_mob_db(path: &str) -> Result<HashMap<u16, MobTemplate>, Box<dyn std:
                 matk: entry.Attack2,
                 defense: entry.Defense,
                 magic_defense: entry.MagicDefense,
-                hit: entry.Dex as i16,   // rAthena 用 Dex 作为 hit
-                flee: entry.Agi as i16,  // rAthena 用 Agi 作为 flee
+                hit: entry.Dex as i16,      // rAthena 用 Dex 作为 hit
+                flee: entry.Agi as i16,     // rAthena 用 Agi 作为 flee
                 crit: entry.Luk as i16 / 3, // 大约的 crit 值
                 walk_speed: entry.WalkSpeed,
                 atk_range: entry.AttackRange,
@@ -772,9 +768,18 @@ Body:
     #[test]
     fn test_parse_skill_condition() {
         assert_eq!(parse_skill_condition("any"), MobSkillCondition::Any);
-        assert_eq!(parse_skill_condition("hpcertain"), MobSkillCondition::HpCertain);
-        assert_eq!(parse_skill_condition("rudeattacked"), MobSkillCondition::RudeAttacked);
-        assert_eq!(parse_skill_condition("longrange"), MobSkillCondition::LongRange);
+        assert_eq!(
+            parse_skill_condition("hpcertain"),
+            MobSkillCondition::HpCertain
+        );
+        assert_eq!(
+            parse_skill_condition("rudeattacked"),
+            MobSkillCondition::RudeAttacked
+        );
+        assert_eq!(
+            parse_skill_condition("longrange"),
+            MobSkillCondition::LongRange
+        );
         assert_eq!(parse_skill_condition("ANY"), MobSkillCondition::Any);
         assert_eq!(parse_skill_condition("unknown"), MobSkillCondition::Any);
     }

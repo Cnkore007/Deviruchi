@@ -117,7 +117,8 @@ struct SkillRequires {
 /// 从按等级时间列表中获取指定等级的时间值（毫秒）
 fn get_level_time(v: &Option<Vec<LevelTime>>, level: u8) -> u32 {
     match v {
-        Some(times) => times.iter()
+        Some(times) => times
+            .iter()
             .find(|lt| lt.Level == level)
             .map(|lt| lt.Time)
             .unwrap_or(0),
@@ -129,12 +130,11 @@ fn get_level_time(v: &Option<Vec<LevelTime>>, level: u8) -> u32 {
 fn get_level_value(v: &Option<LevelOrValue>, level: u8) -> i32 {
     match v {
         Some(LevelOrValue::Single(val)) => *val,
-        Some(LevelOrValue::PerLevel(levels)) => {
-            levels.iter()
-                .find(|la| la.Level == level)
-                .map(|la| la.Amount)
-                .unwrap_or(0)
-        }
+        Some(LevelOrValue::PerLevel(levels)) => levels
+            .iter()
+            .find(|la| la.Level == level)
+            .map(|la| la.Amount)
+            .unwrap_or(0),
         None => 0,
     }
 }
@@ -143,18 +143,20 @@ fn get_level_value(v: &Option<LevelOrValue>, level: u8) -> i32 {
 fn get_level_element(v: &Option<LevelOrString>, level: u8) -> String {
     match v {
         Some(LevelOrString::Single(s)) => s.clone(),
-        Some(LevelOrString::PerLevel(levels)) => {
-            levels.iter()
-                .find(|le| le.Level == level)
-                .map(|le| le.Element.clone())
-                .unwrap_or_else(|| "Neutral".to_string())
-        }
+        Some(LevelOrString::PerLevel(levels)) => levels
+            .iter()
+            .find(|le| le.Level == level)
+            .map(|le| le.Element.clone())
+            .unwrap_or_else(|| "Neutral".to_string()),
         None => "Neutral".to_string(),
     }
 }
 
 /// 将 rAthena Type 映射到 Deviruchi SkillType
-fn map_skill_type(type_str: &Option<String>, damage_flags: &Option<HashMap<String, bool>>) -> SkillType {
+fn map_skill_type(
+    type_str: &Option<String>,
+    damage_flags: &Option<HashMap<String, bool>>,
+) -> SkillType {
     match type_str.as_deref() {
         Some("Weapon") => SkillType::Attack,
         Some("Magic") => SkillType::Attack,
@@ -164,9 +166,10 @@ fn map_skill_type(type_str: &Option<String>, damage_flags: &Option<HashMap<Strin
         _ => {
             // 从 DamageFlags 推断
             if let Some(flags) = damage_flags
-                && flags.get("NoDamage").copied() == Some(true) {
-                    return SkillType::Support;
-                }
+                && flags.get("NoDamage").copied() == Some(true)
+            {
+                return SkillType::Support;
+            }
             SkillType::Active
         }
     }
@@ -205,7 +208,9 @@ impl SkillDbEntry {
     fn to_skill(&self) -> Skill {
         let level = self.max_level.max(1);
         // SP 消耗：从 Requires.SpCost 的第一级获取
-        let sp_cost = self.requires.as_ref()
+        let sp_cost = self
+            .requires
+            .as_ref()
             .and_then(|r| r.sp_cost.as_ref())
             .and_then(|costs| costs.first())
             .map(|la| la.Amount.max(0) as u16)
@@ -214,7 +219,9 @@ impl SkillDbEntry {
         let element_str = get_level_element(&self.element, 1);
 
         // HP 消耗：从 Requires.HpCost 的第一级获取
-        let hp_cost = self.requires.as_ref()
+        let hp_cost = self
+            .requires
+            .as_ref()
             .and_then(|r| r.hp_cost.as_ref())
             .and_then(|costs| costs.first())
             .map(|la| la.Amount.max(0) as u32)
@@ -222,14 +229,16 @@ impl SkillDbEntry {
 
         // 时间相关字段：取第一级的值
         let cast_time = get_level_time(&self.cast_time, 1);
-        let cooldown = get_level_time(&self.cooldown, 1)
-            .max(get_level_time(&self.after_cast_delay, 1));
-        let skill_time = get_level_time(&self.duration1, 1)
-            .max(get_level_time(&self.duration2, 1));
+        let cooldown =
+            get_level_time(&self.cooldown, 1).max(get_level_time(&self.after_cast_delay, 1));
+        let skill_time = get_level_time(&self.duration1, 1).max(get_level_time(&self.duration2, 1));
 
         Skill {
             id: self.Id,
-            name: self.Description.clone().unwrap_or_else(|| self.Name.clone()),
+            name: self
+                .Description
+                .clone()
+                .unwrap_or_else(|| self.Name.clone()),
             type_: map_skill_type(&self.type_, &self.damage_flags),
             target: map_target_type(&self.target_type),
             level,
@@ -345,9 +354,18 @@ Body:
 
     #[test]
     fn test_map_skill_type() {
-        assert_eq!(map_skill_type(&Some("Weapon".to_string()), &None), SkillType::Attack);
-        assert_eq!(map_skill_type(&Some("Heal".to_string()), &None), SkillType::Healing);
-        assert_eq!(map_skill_type(&Some("Buff".to_string()), &None), SkillType::Support);
+        assert_eq!(
+            map_skill_type(&Some("Weapon".to_string()), &None),
+            SkillType::Attack
+        );
+        assert_eq!(
+            map_skill_type(&Some("Heal".to_string()), &None),
+            SkillType::Healing
+        );
+        assert_eq!(
+            map_skill_type(&Some("Buff".to_string()), &None),
+            SkillType::Support
+        );
         assert_eq!(map_skill_type(&None, &None), SkillType::Active);
     }
 }

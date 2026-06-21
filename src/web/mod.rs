@@ -1,9 +1,12 @@
 pub mod routes;
 
-use axum::{Router, routing::{get, post, delete}};
-use std::sync::Arc;
 use crate::game::map::MapState;
+use axum::{
+    Router,
+    routing::{delete, get, post},
+};
 use routes::AppState;
+use std::sync::Arc;
 
 pub struct WebServer {
     addr: String,

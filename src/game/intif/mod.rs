@@ -3,8 +3,8 @@
 //! 对应 rAthena 的 `src/map/intif.cpp`，提供 Map Server 与 Char Server 之间的通信功能。
 //! 包括组队、公会、聊天、仓库等跨服务器操作。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 type HandlerMap = HashMap<InterMessageType, Box<dyn Fn(&InterMessage) + Send + Sync>>;
@@ -329,7 +329,12 @@ impl InterServerManager {
     }
 
     /// 发送组队消息
-    pub fn party_message(&self, party_id: u32, sender_id: Uuid, message: &str) -> Result<(), InterError> {
+    pub fn party_message(
+        &self,
+        party_id: u32,
+        sender_id: Uuid,
+        message: &str,
+    ) -> Result<(), InterError> {
         let data = format!("{}:{}:{}", party_id, sender_id, message).into_bytes();
         let msg = InterMessage::new(InterMessageType::PartyMessage, self.local_server_id, data);
         self.send_message(msg)
@@ -343,14 +348,24 @@ impl InterServerManager {
     }
 
     /// 发送公会消息
-    pub fn guild_message(&self, guild_id: u32, sender_id: Uuid, message: &str) -> Result<(), InterError> {
+    pub fn guild_message(
+        &self,
+        guild_id: u32,
+        sender_id: Uuid,
+        message: &str,
+    ) -> Result<(), InterError> {
         let data = format!("{}:{}:{}", guild_id, sender_id, message).into_bytes();
         let msg = InterMessage::new(InterMessageType::GuildMessage, self.local_server_id, data);
         self.send_message(msg)
     }
 
     /// 发送密语消息
-    pub fn whisper_message(&self, sender_id: Uuid, target_name: &str, message: &str) -> Result<(), InterError> {
+    pub fn whisper_message(
+        &self,
+        sender_id: Uuid,
+        target_name: &str,
+        message: &str,
+    ) -> Result<(), InterError> {
         let data = format!("{}:{}:{}", sender_id, target_name, message).into_bytes();
         let msg = InterMessage::new(InterMessageType::WhisperMessage, self.local_server_id, data);
         self.send_message(msg)
@@ -366,7 +381,8 @@ impl InterServerManager {
     /// 请求仓库数据
     pub fn request_storage(&self, char_id: Uuid) -> Result<(), InterError> {
         let data = char_id.to_string().into_bytes();
-        let message = InterMessage::new(InterMessageType::StorageRequest, self.local_server_id, data);
+        let message =
+            InterMessage::new(InterMessageType::StorageRequest, self.local_server_id, data);
         self.send_message(message)
     }
 
@@ -460,8 +476,8 @@ mod tests {
 
         manager.register_server(info);
 
-        let message = InterMessage::new(InterMessageType::PartyCreate, 1, vec![1, 2, 3])
-            .with_target(2);
+        let message =
+            InterMessage::new(InterMessageType::PartyCreate, 1, vec![1, 2, 3]).with_target(2);
 
         let result = manager.send_message(message);
         assert!(result.is_ok());
@@ -472,8 +488,8 @@ mod tests {
     fn test_send_message_target_not_found() {
         let manager = InterServerManager::new(1);
 
-        let message = InterMessage::new(InterMessageType::PartyCreate, 1, vec![1, 2, 3])
-            .with_target(99);
+        let message =
+            InterMessage::new(InterMessageType::PartyCreate, 1, vec![1, 2, 3]).with_target(99);
 
         let result = manager.send_message(message);
         assert_eq!(result, Err(InterError::ServerNotFound));

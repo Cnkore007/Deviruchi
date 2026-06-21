@@ -490,14 +490,12 @@ impl Default for I18nConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct DayNightConfig {
     pub day_duration_ms: u64,
     pub night_duration_ms: u64,
     pub night_at_start: bool,
 }
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PincodeConfig {
@@ -514,12 +512,10 @@ impl Default for PincodeConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ClientHashConfig {
     pub client_hash_check: bool,
 }
-
 
 impl Default for Config {
     fn default() -> Self {
@@ -577,7 +573,9 @@ impl Config {
                 config.database.mysql_host = host;
             }
             if let Ok(port) = std::env::var("DEVIRUCHI_MYSQL_PORT") {
-                if let Ok(p) = port.parse() { config.database.mysql_port = p; }
+                if let Ok(p) = port.parse() {
+                    config.database.mysql_port = p;
+                }
             }
             if let Ok(user) = std::env::var("DEVIRUCHI_MYSQL_USER") {
                 config.database.mysql_user = user;
@@ -640,7 +638,11 @@ impl Config {
             let mut input = String::new();
             let _ = stdin.lock().read_line(&mut input);
             let input = input.trim().to_string();
-            if input.is_empty() { default.to_string() } else { input }
+            if input.is_empty() {
+                default.to_string()
+            } else {
+                input
+            }
         };
 
         // 1. 服务器名称

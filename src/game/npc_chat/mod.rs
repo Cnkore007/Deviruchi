@@ -8,8 +8,8 @@
 //! - `deactivatepset set_id` — 停用模式集（-1 = 停用全部）
 //! - `deletepset set_id` — 删除模式集
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// 模式匹配条目
@@ -50,10 +50,18 @@ impl PatternEntry {
         let caps = re.captures(text)?;
         let mut groups = Vec::new();
         // 第 0 组是整个匹配
-        groups.push(caps.get(0).map(|m| m.as_str().to_string()).unwrap_or_default());
+        groups.push(
+            caps.get(0)
+                .map(|m| m.as_str().to_string())
+                .unwrap_or_default(),
+        );
         // 后续组是捕获组
         for i in 1..caps.len() {
-            groups.push(caps.get(i).map(|m| m.as_str().to_string()).unwrap_or_default());
+            groups.push(
+                caps.get(i)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default(),
+            );
         }
         Some(groups)
     }
@@ -140,9 +148,7 @@ impl NpcChatManager {
         label: &str,
     ) -> Result<(), String> {
         let mut npc_patterns = self.npc_patterns.write();
-        let sets = npc_patterns
-            .entry(npc_id)
-            .or_default();
+        let sets = npc_patterns.entry(npc_id).or_default();
 
         let set = sets
             .entry(set_id)
@@ -157,9 +163,10 @@ impl NpcChatManager {
     pub fn activate_set(&self, npc_id: Uuid, set_id: i64) {
         let mut npc_patterns = self.npc_patterns.write();
         if let Some(sets) = npc_patterns.get_mut(&npc_id)
-            && let Some(set) = sets.get_mut(&set_id) {
-                set.active = true;
-            }
+            && let Some(set) = sets.get_mut(&set_id)
+        {
+            set.active = true;
+        }
     }
 
     /// 停用模式集
@@ -402,12 +409,8 @@ mod tests {
         let npc1 = Uuid::new_v4();
         let npc2 = Uuid::new_v4();
 
-        manager
-            .define_pattern(npc1, 1, r"hello", "greet1")
-            .unwrap();
-        manager
-            .define_pattern(npc2, 1, r"hello", "greet2")
-            .unwrap();
+        manager.define_pattern(npc1, 1, r"hello", "greet1").unwrap();
+        manager.define_pattern(npc2, 1, r"hello", "greet2").unwrap();
         manager.activate_set(npc1, 1);
         manager.activate_set(npc2, 1);
 

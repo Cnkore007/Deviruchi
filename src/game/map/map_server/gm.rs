@@ -9,10 +9,7 @@ use crate::protocol::teleport_packets::*;
 
 impl MapServer {
     /// 检查 GM 权限
-    pub(super) fn check_gm_permission(
-        player: &crate::game::map::Player,
-        min_level: i32,
-    ) -> bool {
+    pub(super) fn check_gm_permission(player: &crate::game::map::Player, min_level: i32) -> bool {
         player.group_id() >= min_level
     }
 
@@ -24,10 +21,14 @@ impl MapServer {
 
         // Check GM permissions
         if let Some(player) = self.map_state.get_player(&player_id)
-            && !Self::check_gm_permission(&player, 10) {
-                tracing::warn!("Player {} attempted GM warp without permission", player.name);
-                return None;
-            }
+            && !Self::check_gm_permission(&player, 10)
+        {
+            tracing::warn!(
+                "Player {} attempted GM warp without permission",
+                player.name
+            );
+            return None;
+        }
 
         // Check warp cooldown
         {
@@ -70,10 +71,14 @@ impl MapServer {
 
         // Check GM permissions
         if let Some(player) = self.map_state.get_player(&player_id)
-            && !Self::check_gm_permission(&player, 10) {
-                tracing::warn!("Player {} attempted GM goto without permission", player.name);
-                return None;
-            }
+            && !Self::check_gm_permission(&player, 10)
+        {
+            tracing::warn!(
+                "Player {} attempted GM goto without permission",
+                player.name
+            );
+            return None;
+        }
 
         // Check warp cooldown
         {

@@ -405,7 +405,10 @@ impl ItemIntegrationHandler {
 
         ItemUseResult::Success(format!(
             "使用了 {}",
-            self.item_db.get(item_id).map(|i| i.name.as_str()).unwrap_or("物品")
+            self.item_db
+                .get(item_id)
+                .map(|i| i.name.as_str())
+                .unwrap_or("物品")
         ))
     }
 

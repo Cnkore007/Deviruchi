@@ -1,11 +1,11 @@
 //! 角色服务器接口
-//! 
+//!
 //! 处理角色服务器与地图服务器之间的通信。
 //! 对应 rAthena 的 chrif.cpp。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 角色服务器操作类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -99,11 +99,7 @@ impl CharServerManager {
     }
 
     /// 注册角色服务器连接
-    pub fn register_connection(
-        &self,
-        address: String,
-        port: u16,
-    ) -> u32 {
+    pub fn register_connection(&self, address: String, port: u16) -> u32 {
         let mut next_id = self.next_connection_id.write();
         let id = *next_id;
         *next_id += 1;
@@ -125,11 +121,7 @@ impl CharServerManager {
     }
 
     /// 更新连接状态
-    pub fn update_connection_status(
-        &self,
-        connection_id: u32,
-        status: CharServerStatus,
-    ) -> bool {
+    pub fn update_connection_status(&self, connection_id: u32, status: CharServerStatus) -> bool {
         let mut connections = self.connections.write();
         if let Some(conn) = connections.get_mut(&connection_id) {
             conn.status = status;
@@ -160,7 +152,7 @@ impl CharServerManager {
     /// 角色上线
     pub fn char_online(&self, char_id: u32, account_id: u32, map_server_id: u32) {
         self.online_chars.write().insert(char_id, map_server_id);
-        
+
         let message = CharServerMessage {
             operation: CharServerOperation::Online,
             char_id,
@@ -179,7 +171,7 @@ impl CharServerManager {
     /// 角色下线
     pub fn char_offline(&self, char_id: u32) {
         self.online_chars.write().remove(&char_id);
-        
+
         let message = CharServerMessage {
             operation: CharServerOperation::Offline,
             char_id,
@@ -196,12 +188,7 @@ impl CharServerManager {
     }
 
     /// 同步角色数据
-    pub fn sync_char_data(
-        &self,
-        char_id: u32,
-        account_id: u32,
-        data: Vec<u8>,
-    ) {
+    pub fn sync_char_data(&self, char_id: u32, account_id: u32, data: Vec<u8>) {
         let message = CharServerMessage {
             operation: CharServerOperation::DataSync,
             char_id,
@@ -234,7 +221,10 @@ impl CharServerManager {
 
     /// 获取连接状态
     pub fn get_connection_status(&self, connection_id: u32) -> Option<CharServerStatus> {
-        self.connections.read().get(&connection_id).map(|c| c.status)
+        self.connections
+            .read()
+            .get(&connection_id)
+            .map(|c| c.status)
     }
 
     /// 移除连接
@@ -286,7 +276,7 @@ mod tests {
     fn test_register_connection() {
         let manager = CharServerManager::new();
         let id = manager.register_connection("127.0.0.1".to_string(), 6000);
-        
+
         assert_eq!(id, 1);
         assert_eq!(
             manager.get_connection_status(id),
@@ -297,11 +287,11 @@ mod tests {
     #[test]
     fn test_char_online_offline() {
         let manager = CharServerManager::new();
-        
+
         manager.char_online(1001, 1, 1);
         assert!(manager.is_char_online(1001));
         assert_eq!(manager.get_char_map_server(1001), Some(1));
-        
+
         manager.char_offline(1001);
         assert!(!manager.is_char_online(1001));
     }
@@ -309,10 +299,10 @@ mod tests {
     #[test]
     fn test_message_queue() {
         let manager = CharServerManager::new();
-        
+
         manager.char_online(1001, 1, 1);
         manager.char_online(1002, 2, 1);
-        
+
         let messages = manager.process_messages();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].char_id, 1001);
@@ -322,10 +312,10 @@ mod tests {
     #[test]
     fn test_sync_char_data() {
         let manager = CharServerManager::new();
-        
+
         let data = vec![1, 2, 3, 4, 5];
         manager.sync_char_data(1001, 1, data.clone());
-        
+
         let messages = manager.process_messages();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].operation, CharServerOperation::DataSync);
@@ -335,12 +325,12 @@ mod tests {
     #[test]
     fn test_multiple_connections() {
         let manager = CharServerManager::new();
-        
+
         let id1 = manager.register_connection("127.0.0.1".to_string(), 6000);
         let id2 = manager.register_connection("127.0.0.2".to_string(), 6001);
-        
+
         assert_eq!(manager.get_connections().len(), 2);
-        
+
         manager.remove_connection(id1);
         assert_eq!(manager.get_connections().len(), 1);
     }
@@ -349,7 +339,7 @@ mod tests {
     fn test_update_heartbeat() {
         let manager = CharServerManager::new();
         let id = manager.register_connection("127.0.0.1".to_string(), 6000);
-        
+
         let initial_status = manager.get_connection_status(id);
         assert!(manager.update_heartbeat(id));
     }

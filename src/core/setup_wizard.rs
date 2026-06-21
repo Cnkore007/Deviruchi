@@ -93,7 +93,12 @@ impl SetupWizard {
         config.server.name = Self::input("服务器名称", &config.server.name, None)?;
 
         // 运行模式
-        let mode_options = vec!["全部服务 (推荐)", "仅登录服务器", "仅角色服务器", "仅地图服务器"];
+        let mode_options = vec![
+            "全部服务 (推荐)",
+            "仅登录服务器",
+            "仅角色服务器",
+            "仅地图服务器",
+        ];
         let mode_idx = Self::select("运行模式", &mode_options, 0)?;
         config.server.mode = match mode_idx {
             0 => super::config::ServerMode::All,
@@ -144,7 +149,10 @@ impl SetupWizard {
         config.battle.item_drop_rate = drop;
         config.battle.zeny_rate = zeny;
 
-        println!("\n  ✓ 倍率设置: 经验 {}x/{}x, 掉落 {}x, Zeny {}x", exp, job_exp, drop, zeny);
+        println!(
+            "\n  ✓ 倍率设置: 经验 {}x/{}x, 掉落 {}x, Zeny {}x",
+            exp, job_exp, drop, zeny
+        );
         println!();
         Ok(config)
     }
@@ -179,7 +187,12 @@ impl SetupWizard {
         };
 
         // 死亡惩罚
-        let death_options = vec!["无惩罚 (推荐)", "掉落物品", "损失 1% 经验", "掉落物品 + 损失经验"];
+        let death_options = vec![
+            "无惩罚 (推荐)",
+            "掉落物品",
+            "损失 1% 经验",
+            "掉落物品 + 损失经验",
+        ];
         let death_idx = Self::select("死亡惩罚", &death_options, 0)?;
         config.game.death_drop_items = matches!(death_idx, 1 | 3);
 
@@ -285,7 +298,8 @@ impl SetupWizard {
                 config.database.mysql_host = Self::input("主机地址", "127.0.0.1", None)?;
                 config.database.mysql_port = Self::input_u16("端口", 3306)?;
                 config.database.mysql_user = Self::input("用户名", "deviruchi", None)?;
-                config.database.mysql_password = Self::input("密码", "", Some("（留空表示无密码）"))?;
+                config.database.mysql_password =
+                    Self::input("密码", "", Some("（留空表示无密码）"))?;
                 config.database.mysql_database = Self::input("数据库名", "deviruchi", None)?;
             }
         }
@@ -322,7 +336,13 @@ impl SetupWizard {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
         // 日志级别
-        let log_options = vec!["ERROR — 仅错误", "WARN — 警告和错误", "INFO — 常规信息 (推荐)", "DEBUG — 调试信息", "TRACE — 详细追踪"];
+        let log_options = vec![
+            "ERROR — 仅错误",
+            "WARN — 警告和错误",
+            "INFO — 常规信息 (推荐)",
+            "DEBUG — 调试信息",
+            "TRACE — 详细追踪",
+        ];
         let log_idx = Self::select("日志级别", &log_options, 2)?;
         config.logging.level = match log_idx {
             0 => "error".to_string(),
@@ -374,7 +394,11 @@ impl SetupWizard {
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ [server]                                                    │");
         println!("│ name = \"{}\" {:<45}│", config.server.name, "");
-        println!("│ mode = \"{}\" {:<45}│", format!("{:?}", config.server.mode).to_lowercase(), "");
+        println!(
+            "│ mode = \"{}\" {:<45}│",
+            format!("{:?}", config.server.mode).to_lowercase(),
+            ""
+        );
         println!("│                                                             │");
         println!("│ [game]                                                      │");
         println!("│ max_players = {:<47}│", config.game.max_players);
@@ -393,7 +417,10 @@ impl SetupWizard {
         println!("│ backend = \"{}\" {:<44}│", config.database.backend, "");
         #[cfg(feature = "mysql-backend")]
         if config.database.backend == "mysql" {
-            println!("│ mysql_host = \"{}\" {:<41}│", config.database.mysql_host, "");
+            println!(
+                "│ mysql_host = \"{}\" {:<41}│",
+                config.database.mysql_host, ""
+            );
         }
         println!("│                                                             │");
         println!("│ [network]                                                   │");
@@ -438,7 +465,9 @@ impl SetupWizard {
         if input.is_empty() {
             Ok(default)
         } else {
-            input.parse::<f64>().map_err(|e| anyhow::anyhow!("无效数字: {}", e))
+            input
+                .parse::<f64>()
+                .map_err(|e| anyhow::anyhow!("无效数字: {}", e))
         }
     }
 
@@ -454,7 +483,9 @@ impl SetupWizard {
         if input.is_empty() {
             Ok(default)
         } else {
-            input.parse::<u8>().map_err(|e| anyhow::anyhow!("无效数字: {}", e))
+            input
+                .parse::<u8>()
+                .map_err(|e| anyhow::anyhow!("无效数字: {}", e))
         }
     }
 
@@ -470,7 +501,9 @@ impl SetupWizard {
         if input.is_empty() {
             Ok(default)
         } else {
-            input.parse::<u16>().map_err(|e| anyhow::anyhow!("无效数字: {}", e))
+            input
+                .parse::<u16>()
+                .map_err(|e| anyhow::anyhow!("无效数字: {}", e))
         }
     }
 
@@ -491,7 +524,9 @@ impl SetupWizard {
         if input.is_empty() {
             Ok(default)
         } else {
-            let idx = input.parse::<usize>().map_err(|e| anyhow::anyhow!("无效选择: {}", e))?;
+            let idx = input
+                .parse::<usize>()
+                .map_err(|e| anyhow::anyhow!("无效选择: {}", e))?;
             if idx == 0 || idx > options.len() {
                 Err(anyhow::anyhow!("选择超出范围，请输入 1-{}", options.len()))
             } else {

@@ -73,11 +73,7 @@ impl MapServer {
     /// 2. 查找目标玩家是否在线
     /// 3. 在线：通过 ChannelBus 发送 ZC_WHISPER (0x0097) 给目标
     /// 4. 离线：发送 ZC_ACK_WHISPER (0x0098) status=1 给发送者
-    pub(super) fn handle_whisper(
-        &self,
-        data: &[u8],
-        session: &mut Session,
-    ) -> Option<Vec<u8>> {
+    pub(super) fn handle_whisper(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
 
         // 包体最小长度：length(2) + name(24) = 26 字节
@@ -166,14 +162,14 @@ impl MapServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::constants;
+    use crate::game::item::Equipment;
+    use crate::game::map::MapState;
     use crate::game::map::channel::ChannelBus;
     use crate::game::map::player::{
         Attributes, CombatStats, Economy, LevelStats, PlayerState, Position, SavePoint,
     };
-    use crate::game::map::MapState;
     use crate::game::status::PlayerStatus;
-    use crate::game::item::Equipment;
-    use crate::game::constants;
     use parking_lot::RwLock;
     use std::sync::Arc;
     use tokio::sync::mpsc;

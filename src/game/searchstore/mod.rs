@@ -94,9 +94,7 @@ pub struct SearchStoreManager {
 impl SearchStoreManager {
     /// 创建搜索管理器
     pub fn new() -> Self {
-        Self {
-            max_results: 100,
-        }
+        Self { max_results: 100 }
     }
 
     /// 设置最大搜索结果数
@@ -200,8 +198,18 @@ mod tests {
         let manager = SearchStoreManager::new();
 
         let vending = vec![
-            (1, Uuid::new_v4(), "Shop1".to_string(), vec![(1001, 1000, 10)]),
-            (2, Uuid::new_v4(), "Shop2".to_string(), vec![(1001, 2000, 5)]),
+            (
+                1,
+                Uuid::new_v4(),
+                "Shop1".to_string(),
+                vec![(1001, 1000, 10)],
+            ),
+            (
+                2,
+                Uuid::new_v4(),
+                "Shop2".to_string(),
+                vec![(1001, 2000, 5)],
+            ),
         ];
         let buying = vec![];
 
@@ -218,8 +226,18 @@ mod tests {
         let manager = SearchStoreManager::new();
 
         let vending = vec![
-            (1, Uuid::new_v4(), "Shop1".to_string(), vec![(1001, 1000, 10)]),
-            (2, Uuid::new_v4(), "Shop2".to_string(), vec![(1002, 2000, 5)]),
+            (
+                1,
+                Uuid::new_v4(),
+                "Shop1".to_string(),
+                vec![(1001, 1000, 10)],
+            ),
+            (
+                2,
+                Uuid::new_v4(),
+                "Shop2".to_string(),
+                vec![(1002, 2000, 5)],
+            ),
         ];
         let buying = vec![];
 
@@ -233,12 +251,18 @@ mod tests {
     fn test_search_mixed_stores() {
         let manager = SearchStoreManager::new();
 
-        let vending = vec![
-            (1, Uuid::new_v4(), "Vending".to_string(), vec![(1001, 1000, 10)]),
-        ];
-        let buying = vec![
-            (2, Uuid::new_v4(), "Buying".to_string(), vec![(1001, 500, 20)]),
-        ];
+        let vending = vec![(
+            1,
+            Uuid::new_v4(),
+            "Vending".to_string(),
+            vec![(1001, 1000, 10)],
+        )];
+        let buying = vec![(
+            2,
+            Uuid::new_v4(),
+            "Buying".to_string(),
+            vec![(1001, 500, 20)],
+        )];
 
         let filter = SearchFilter::new();
         let results = manager.search(&filter, &vending, &buying);
@@ -250,8 +274,18 @@ mod tests {
         let manager = SearchStoreManager::new().with_max_results(1);
 
         let vending = vec![
-            (1, Uuid::new_v4(), "Shop1".to_string(), vec![(1001, 1000, 10)]),
-            (2, Uuid::new_v4(), "Shop2".to_string(), vec![(1001, 2000, 5)]),
+            (
+                1,
+                Uuid::new_v4(),
+                "Shop1".to_string(),
+                vec![(1001, 1000, 10)],
+            ),
+            (
+                2,
+                Uuid::new_v4(),
+                "Shop2".to_string(),
+                vec![(1001, 2000, 5)],
+            ),
         ];
         let buying = vec![];
 

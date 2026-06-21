@@ -64,9 +64,7 @@ impl BattleFormula {
         let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk.saturating_sub(defense))
-            .saturating_mul(skill_damage_bonus))
-            / 100;
+        let damage = ((total_atk.saturating_sub(defense)).saturating_mul(skill_damage_bonus)) / 100;
 
         // 应用元素修正（普通攻击默认为无属性）
         let element_mod = super::element::get_element_modifier(
@@ -114,9 +112,7 @@ impl BattleFormula {
         let total_atk = base_atk.saturating_add(weapon_atk);
         let defense = defender.defense as i32;
 
-        let damage = ((total_atk.saturating_sub(defense))
-            .saturating_mul(skill_damage_bonus))
-            / 100;
+        let damage = ((total_atk.saturating_sub(defense)).saturating_mul(skill_damage_bonus)) / 100;
 
         // 应用元素修正（普通攻击默认为无属性）
         let element_mod = super::element::get_element_modifier(
@@ -160,7 +156,8 @@ impl BattleFormula {
         let magic_atk = matk.max(base_matk);
         let magic_defense = defender.magic_defense as i32;
 
-        let damage = ((magic_atk.saturating_sub(magic_defense)).max(1)
+        let damage = ((magic_atk.saturating_sub(magic_defense))
+            .max(1)
             .saturating_mul(skill_damage_bonus))
             / 100;
         // 魔法伤害方差：90%-110%，与物理伤害保持一致
@@ -189,7 +186,8 @@ impl BattleFormula {
         let magic_atk = matk.max(base_matk);
         let magic_defense = defender.magic_defense as i32;
 
-        let damage = ((magic_atk.saturating_sub(magic_defense)).max(1)
+        let damage = ((magic_atk.saturating_sub(magic_defense))
+            .max(1)
             .saturating_mul(skill_damage_bonus))
             / 100;
         let variance = 90 + (rng.rand_range(0, 20) as i32);
@@ -309,9 +307,8 @@ pub fn calc_pvp_physical_damage(
     target_element: u8,
 ) -> DamageResult {
     // 技能倍率：每级 +50%，最低 100%（level 1 = 100%，level 2 = 150%，以此类推）
-    let skill_multiplier = 100u32.saturating_add(
-        (skill_level as u32).saturating_sub(1).saturating_mul(50),
-    );
+    let skill_multiplier =
+        100u32.saturating_add((skill_level as u32).saturating_sub(1).saturating_mul(50));
 
     // 基础伤害 = (ATK - DEF) * 技能倍率%
     let base_damage = (atk as i64)
@@ -321,14 +318,19 @@ pub fn calc_pvp_physical_damage(
 
     // VIT 百分比减伤：vit 越高减伤越多，最高 99% 减伤
     let vit_reduction = (vit as i64).min(99);
-    let after_vit = base_damage.saturating_mul(100 - vit_reduction).saturating_div(100);
+    let after_vit = base_damage
+        .saturating_mul(100 - vit_reduction)
+        .saturating_div(100);
 
     // 应用元素修正
     let atk_elem = Element::from_u8(element).unwrap_or(Element::Neutral);
     let def_elem = Element::from_u8(target_element).unwrap_or(Element::Neutral);
     let elem_mod = super::element::get_element_modifier(atk_elem, def_elem, ElementLevel::Level1);
 
-    let final_damage = (after_vit.saturating_mul(elem_mod as i64).saturating_div(100)).max(1) as i32;
+    let final_damage = (after_vit
+        .saturating_mul(elem_mod as i64)
+        .saturating_div(100))
+    .max(1) as i32;
 
     DamageResult {
         damage: final_damage,
@@ -367,9 +369,8 @@ pub fn calc_pvp_magic_damage(
     target_element: u8,
 ) -> DamageResult {
     // 技能倍率：每级 +50%，最低 100%
-    let skill_multiplier = 100u32.saturating_add(
-        (skill_level as u32).saturating_sub(1).saturating_mul(50),
-    );
+    let skill_multiplier =
+        100u32.saturating_add((skill_level as u32).saturating_sub(1).saturating_mul(50));
 
     // 基础伤害 = (MATK - MDEF) * 技能倍率%
     let base_damage = (matk as i64)
@@ -379,14 +380,19 @@ pub fn calc_pvp_magic_damage(
 
     // INT 百分比减伤：int/2 提供减伤，最高 99% 减伤
     let int_reduction = ((int as i64) / 2).min(99);
-    let after_int = base_damage.saturating_mul(100 - int_reduction).saturating_div(100);
+    let after_int = base_damage
+        .saturating_mul(100 - int_reduction)
+        .saturating_div(100);
 
     // 应用元素修正
     let atk_elem = Element::from_u8(element).unwrap_or(Element::Neutral);
     let def_elem = Element::from_u8(target_element).unwrap_or(Element::Neutral);
     let elem_mod = super::element::get_element_modifier(atk_elem, def_elem, ElementLevel::Level1);
 
-    let final_damage = (after_int.saturating_mul(elem_mod as i64).saturating_div(100)).max(1) as i32;
+    let final_damage = (after_int
+        .saturating_mul(elem_mod as i64)
+        .saturating_div(100))
+    .max(1) as i32;
 
     DamageResult {
         damage: final_damage,
@@ -448,7 +454,8 @@ pub fn calc_magic_damage(
     _target_level: u32,
 ) -> DamageResult {
     // 技能倍率：每级 +50%，最低 100%（level 1 = 100%，level 2 = 150%，以此类推）
-    let skill_multiplier = 100u32.saturating_add((skill_level as u32).saturating_sub(1).saturating_mul(50));
+    let skill_multiplier =
+        100u32.saturating_add((skill_level as u32).saturating_sub(1).saturating_mul(50));
 
     // 基础伤害 = MATK * 技能倍率% - MDEF * 0.5
     let base_damage = (matk as i64)
@@ -457,12 +464,12 @@ pub fn calc_magic_damage(
         .saturating_sub((target_mdef as i64).saturating_div(2));
 
     // 应用元素修正
-    let elem_mod = super::element::get_element_modifier(
-        element,
-        target_element,
-        ElementLevel::Level1,
-    );
-    let final_damage = (base_damage.saturating_mul(elem_mod as i64).saturating_div(100)).max(1) as i32;
+    let elem_mod =
+        super::element::get_element_modifier(element, target_element, ElementLevel::Level1);
+    let final_damage = (base_damage
+        .saturating_mul(elem_mod as i64)
+        .saturating_div(100))
+    .max(1) as i32;
 
     DamageResult {
         damage: final_damage,
@@ -609,9 +616,19 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
+        let damage = BattleFormula::physical_damage(
+            &player,
+            &mob,
+            100,
+            1,
+            crate::game::rand::thread_rng().as_ref(),
+        );
         // 基础伤害 30，方差 90%-110%（27-33）
-        assert!(damage >= 27 && damage <= 33, "damage {} not in range 27-33", damage);
+        assert!(
+            damage >= 27 && damage <= 33,
+            "damage {} not in range 27-33",
+            damage
+        );
     }
 
     #[test]
@@ -627,9 +644,19 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 10, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
+        let damage = BattleFormula::physical_damage(
+            &player,
+            &mob,
+            100,
+            1,
+            crate::game::rand::thread_rng().as_ref(),
+        );
         // 基础伤害 22，方差 90%-110%（19-24）
-        assert!(damage >= 19 && damage <= 24, "damage {} not in range 19-24", damage);
+        assert!(
+            damage >= 19 && damage <= 24,
+            "damage {} not in range 19-24",
+            damage
+        );
     }
 
     #[test]
@@ -641,9 +668,19 @@ mod tests {
         let player = make_player(10, 10, 10, 10, 1, 1);
         let mob = make_mob(5, 0, 0, 0, 0);
 
-        let damage = BattleFormula::physical_damage(&player, &mob, 150, 1, crate::game::rand::thread_rng().as_ref());
+        let damage = BattleFormula::physical_damage(
+            &player,
+            &mob,
+            150,
+            1,
+            crate::game::rand::thread_rng().as_ref(),
+        );
         // 基础伤害 45，方差 90%-110%（40-49）
-        assert!(damage >= 40 && damage <= 49, "damage {} not in range 40-49", damage);
+        assert!(
+            damage >= 40 && damage <= 49,
+            "damage {} not in range 40-49",
+            damage
+        );
     }
 
     #[test]
@@ -669,7 +706,13 @@ mod tests {
         // Base ATK = 1*2 + 1 + 1/2 + 1/3 = 2 + 1 + 0 + 0 = 3
         // Defense = 100
         // Damage = ((3 - 100).max(1) * 100) / 100 = 1
-        let damage = BattleFormula::physical_damage(&player, &mob, 100, 1, crate::game::rand::thread_rng().as_ref());
+        let damage = BattleFormula::physical_damage(
+            &player,
+            &mob,
+            100,
+            1,
+            crate::game::rand::thread_rng().as_ref(),
+        );
         assert_eq!(damage, 1);
     }
 
@@ -680,11 +723,21 @@ mod tests {
         let player = make_player(10, 1, 15, 1, 20, 1);
         let mob = make_mob(5, 0, 5, 0, 0);
 
-        let damage = BattleFormula::magical_damage(&player, &mob, 100, 50, crate::game::rand::thread_rng().as_ref());
+        let damage = BattleFormula::magical_damage(
+            &player,
+            &mob,
+            100,
+            50,
+            crate::game::rand::thread_rng().as_ref(),
+        );
         // magic_atk = max(50, 47) = 50
         // magic_defense = 5
         // Damage = ((50 - 5).max(1) * 100) / 100 = 45, 方差 90%-110%（40-49）
-        assert!(damage >= 40 && damage <= 49, "damage {} not in range 40-49", damage);
+        assert!(
+            damage >= 40 && damage <= 49,
+            "damage {} not in range 40-49",
+            damage
+        );
     }
 
     #[test]
@@ -1125,7 +1178,11 @@ mod magic_damage_tests {
         // 多次调用验证结果在 [min, max] 范围内
         for _ in 0..100 {
             let result = calc_matk_variance(50, 100);
-            assert!(result >= 50 && result <= 100, "结果 {} 不在 [50, 100] 范围内", result);
+            assert!(
+                result >= 50 && result <= 100,
+                "结果 {} 不在 [50, 100] 范围内",
+                result
+            );
         }
     }
 

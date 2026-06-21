@@ -116,19 +116,21 @@ impl Clan {
     /// 成员上线
     pub fn member_online(&mut self, char_id: &Uuid) {
         if let Some(member) = self.members.get_mut(char_id)
-            && !member.online {
-                member.online = true;
-                self.connect_member += 1;
-            }
+            && !member.online
+        {
+            member.online = true;
+            self.connect_member += 1;
+        }
     }
 
     /// 成员下线
     pub fn member_offline(&mut self, char_id: &Uuid) {
         if let Some(member) = self.members.get_mut(char_id)
-            && member.online {
-                member.online = false;
-                self.connect_member -= 1;
-            }
+            && member.online
+        {
+            member.online = false;
+            self.connect_member -= 1;
+        }
     }
 
     /// 获取同盟/敌对数量

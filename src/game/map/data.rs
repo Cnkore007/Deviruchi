@@ -311,7 +311,12 @@ impl MapDatabase {
                 match GatParser::parse_file(&path) {
                     Ok(map_data) => {
                         let name = map_data.name.clone();
-                        tracing::info!("加载地图: {} ({}x{})", name, map_data.width, map_data.height);
+                        tracing::info!(
+                            "加载地图: {} ({}x{})",
+                            name,
+                            map_data.width,
+                            map_data.height
+                        );
                         self.maps.insert(name, map_data);
                         loaded += 1;
                     }

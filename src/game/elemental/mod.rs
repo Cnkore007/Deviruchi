@@ -4,8 +4,8 @@
 //!
 //! 精灵由特定职业（如 Elemental Master）召唤，有独立的 AI 和技能系统。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// 精灵元素类型
@@ -352,7 +352,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 600000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            600000,
         );
 
         let elemental = manager.get_player_elemental(&owner).unwrap();
@@ -371,7 +377,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 600000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            600000,
         );
 
         let mut elemental = manager.get_player_elemental(&owner).unwrap();
@@ -391,7 +403,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 600000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            600000,
         );
 
         let mut elemental = manager.get_player_elemental(&owner).unwrap();
@@ -410,7 +428,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 1000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            1000,
         );
 
         assert_eq!(manager.active_count(), 1);
@@ -431,7 +455,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 600000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            600000,
         );
         assert_eq!(manager.active_count(), 1);
 
@@ -440,7 +470,13 @@ mod tests {
             2115,
             ElementalElement::Water,
             owner,
-            12000, 6000, 600, 400, 120, 60, 600000,
+            12000,
+            6000,
+            600,
+            400,
+            120,
+            60,
+            600000,
         );
         assert_eq!(manager.active_count(), 1);
 
@@ -457,7 +493,13 @@ mod tests {
             2114,
             ElementalElement::Fire,
             owner,
-            10000, 5000, 500, 300, 100, 50, 600000,
+            10000,
+            5000,
+            500,
+            300,
+            100,
+            50,
+            600000,
         );
 
         assert!(manager.dismiss_elemental(id));

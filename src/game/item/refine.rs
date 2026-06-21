@@ -81,7 +81,11 @@ impl RefineSystem {
     ///
     /// 注意：当前实现对武器和防具使用相同的失败逻辑（50% 损坏率）。
     /// rAthena 中武器失败降低精炼等级，防具失败有损坏概率，后续可扩展差异化处理。
-    pub fn refine(item: &mut InventorySlot, _is_weapon: bool, rng: &Arc<dyn GameRng>) -> RefineResult {
+    pub fn refine(
+        item: &mut InventorySlot,
+        _is_weapon: bool,
+        rng: &Arc<dyn GameRng>,
+    ) -> RefineResult {
         let current = item.refine;
 
         // 检查是否已达最大等级
@@ -97,7 +101,9 @@ impl RefineSystem {
         if roll < rate {
             // 精炼成功
             item.refine += 1;
-            RefineResult::Success { new_refine: item.refine }
+            RefineResult::Success {
+                new_refine: item.refine,
+            }
         } else {
             // 精炼失败，50% 概率装备损坏（危险精炼）
             let break_roll = rng.rand_bp(5000);
@@ -163,8 +169,8 @@ mod tests {
         assert_eq!(RefineSystem::success_rate(5), 4000); // 40%
         assert_eq!(RefineSystem::success_rate(6), 2000); // 20%
         assert_eq!(RefineSystem::success_rate(7), 1000); // 10%
-        assert_eq!(RefineSystem::success_rate(8), 500);  // 5%
-        assert_eq!(RefineSystem::success_rate(9), 200);  // 2%
+        assert_eq!(RefineSystem::success_rate(8), 500); // 5%
+        assert_eq!(RefineSystem::success_rate(9), 200); // 2%
     }
 
     #[test]
@@ -224,7 +230,10 @@ mod tests {
         let rng: Arc<dyn GameRng> = Arc::new(MockRng::new(vec![0, 8000]));
         let result = RefineSystem::refine(&mut slot, true, &rng);
         // rate=0, 0 < 0 为 false => 失败
-        assert!(matches!(result, RefineResult::Failure | RefineResult::Broken));
+        assert!(matches!(
+            result,
+            RefineResult::Failure | RefineResult::Broken
+        ));
     }
 
     // ========== 属性加成测试 ==========

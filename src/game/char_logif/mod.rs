@@ -1,11 +1,11 @@
 //! 角色服务器日志接口
-//! 
+//!
 //! 处理角色服务器的日志记录。
 //! 对应 rAthena 的 char_logif.cpp。
 
-use std::collections::VecDeque;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 /// 角色日志事件类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ impl CharLogManager {
 
         let mut logs = self.logs.write();
         logs.push_back(entry);
-        
+
         // 限制日志数量
         while logs.len() > self.max_logs {
             logs.pop_front();
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_log_event() {
         let manager = CharLogManager::new(100);
-        
+
         manager.log_event(
             1001,
             1,
@@ -160,9 +160,9 @@ mod tests {
             CharLogEvent::CharCreate,
             "角色创建成功".to_string(),
         );
-        
+
         assert_eq!(manager.count(), 1);
-        
+
         let logs = manager.get_recent_logs(10);
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].event, CharLogEvent::CharCreate);
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn test_max_logs() {
         let manager = CharLogManager::new(2);
-        
+
         for i in 0..3 {
             manager.log_event(
                 i,
@@ -181,18 +181,36 @@ mod tests {
                 String::new(),
             );
         }
-        
+
         assert_eq!(manager.count(), 2);
     }
 
     #[test]
     fn test_filter_by_char() {
         let manager = CharLogManager::new(100);
-        
-        manager.log_event(1001, 1, "角色1".to_string(), CharLogEvent::CharOnline, String::new());
-        manager.log_event(1002, 1, "角色2".to_string(), CharLogEvent::CharOnline, String::new());
-        manager.log_event(1001, 1, "角色1".to_string(), CharLogEvent::CharOffline, String::new());
-        
+
+        manager.log_event(
+            1001,
+            1,
+            "角色1".to_string(),
+            CharLogEvent::CharOnline,
+            String::new(),
+        );
+        manager.log_event(
+            1002,
+            1,
+            "角色2".to_string(),
+            CharLogEvent::CharOnline,
+            String::new(),
+        );
+        manager.log_event(
+            1001,
+            1,
+            "角色1".to_string(),
+            CharLogEvent::CharOffline,
+            String::new(),
+        );
+
         let logs = manager.get_char_logs(1001);
         assert_eq!(logs.len(), 2);
     }
@@ -200,10 +218,22 @@ mod tests {
     #[test]
     fn test_filter_by_account() {
         let manager = CharLogManager::new(100);
-        
-        manager.log_event(1001, 1, "角色1".to_string(), CharLogEvent::CharOnline, String::new());
-        manager.log_event(1002, 2, "角色2".to_string(), CharLogEvent::CharOnline, String::new());
-        
+
+        manager.log_event(
+            1001,
+            1,
+            "角色1".to_string(),
+            CharLogEvent::CharOnline,
+            String::new(),
+        );
+        manager.log_event(
+            1002,
+            2,
+            "角色2".to_string(),
+            CharLogEvent::CharOnline,
+            String::new(),
+        );
+
         let logs = manager.get_account_logs(1);
         assert_eq!(logs.len(), 1);
     }

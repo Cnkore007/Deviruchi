@@ -96,7 +96,7 @@ pub enum StatusChange {
     Invincible = 80,
     /// 不可视化 - 隐身
     Invisible = 81,
-    Disguise = 83,  // 伪装状态（变身为怪物）
+    Disguise = 83, // 伪装状态（变身为怪物）
     /// 圣体 - 免疫异常状态
     HolyBody = 82,
 

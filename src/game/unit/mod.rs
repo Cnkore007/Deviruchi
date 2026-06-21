@@ -3,10 +3,10 @@
 //! 对应 rAthena 的 `src/map/unit.cpp`，提供单位移动、碰撞检测、寻路等功能。
 //! 用于玩家移动、怪物 AI、NPC 移动等。
 
-use std::collections::VecDeque;
-use parking_lot::RwLock;
-use uuid::Uuid;
 use crate::game::path::{Direction, PathSearcher, Point};
+use parking_lot::RwLock;
+use std::collections::VecDeque;
+use uuid::Uuid;
 
 /// 移动状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,7 +131,7 @@ impl MovementValidator {
     /// 创建移动验证器
     pub fn new() -> Self {
         Self {
-            max_speed: 100, // 最快 100ms/格
+            max_speed: 100,  // 最快 100ms/格
             min_speed: 1000, // 最慢 1000ms/格
             _allow_fly: false,
         }
@@ -260,11 +260,9 @@ impl UnitManager {
 
         // 使用空碰撞图作为简化实现
         // 完整实现需要从地图服务器获取 MapData 构建 RealCollisionMap
-        let path_result = self.pathfinder.search(
-            &NullCollisionMap,
-            unit.position,
-            target,
-        );
+        let path_result = self
+            .pathfinder
+            .search(&NullCollisionMap, unit.position, target);
 
         if path_result.reached {
             Ok(path_result.path)
@@ -298,7 +296,12 @@ impl UnitManager {
     }
 
     /// 击退单位
-    pub fn knockback(&self, unit_id: &Uuid, distance: i32, direction: Direction) -> Result<Point, MoveError> {
+    pub fn knockback(
+        &self,
+        unit_id: &Uuid,
+        distance: i32,
+        direction: Direction,
+    ) -> Result<Point, MoveError> {
         let units = self.units.read();
         let mut unit = units.get_mut(unit_id).ok_or(MoveError::UnitNotFound)?;
 
@@ -336,13 +339,14 @@ impl UnitManager {
 
         let elapsed = current_time.saturating_sub(unit.last_move_time);
         if elapsed >= unit.speed as u64
-            && let Some(next) = unit.next_waypoint() {
-                let dir = self.validator.validate_direction(unit.position, next);
-                unit.update_direction(dir);
-                unit.update_position(next.x, next.y);
-                unit.last_move_time = current_time;
-                return Some(next);
-            }
+            && let Some(next) = unit.next_waypoint()
+        {
+            let dir = self.validator.validate_direction(unit.position, next);
+            unit.update_direction(dir);
+            unit.update_position(next.x, next.y);
+            unit.last_move_time = current_time;
+            return Some(next);
+        }
 
         None
     }
@@ -376,7 +380,7 @@ pub enum MoveError {
 
 /// 空碰撞地图（用于测试）
 /// 真实碰撞地图实现
-/// 
+///
 /// 使用 MapData 进行碰撞检测。
 pub struct RealCollisionMap {
     map_data: std::sync::Arc<crate::game::map::data::MapData>,
@@ -449,11 +453,7 @@ mod tests {
         let id = Uuid::new_v4();
         let mut movement = UnitMovement::new(id, 0, 0);
 
-        let path = vec![
-            Point::new(1, 0),
-            Point::new(2, 0),
-            Point::new(3, 0),
-        ];
+        let path = vec![Point::new(1, 0), Point::new(2, 0), Point::new(3, 0)];
 
         movement.set_path(path);
         assert_eq!(movement.state, MoveState::Walking);
@@ -525,10 +525,7 @@ mod tests {
 
         manager.register_unit(id, 0, 0);
 
-        let path = vec![
-            Point::new(1, 0),
-            Point::new(2, 0),
-        ];
+        let path = vec![Point::new(1, 0), Point::new(2, 0)];
 
         let result = manager.set_path(&id, path);
         assert!(result.is_ok());

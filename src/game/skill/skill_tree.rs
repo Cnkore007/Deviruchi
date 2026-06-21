@@ -95,75 +95,93 @@ impl SkillTree {
         let mut trees = HashMap::new();
 
         // 初学者技能树（Job 0）
-        trees.insert(0, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(2, 1),   // 战斗呐喊
-        ]);
+        trees.insert(
+            0,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(2, 1), // 战斗呐喊
+            ],
+        );
 
         // 剑士技能树（Job 1）
-        trees.insert(1, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(5, 10)   // Bash（猛击）
-                .with_prerequisites(vec![(1, 1)]),  // 需要基础技能 Lv1
-            SkillTreeNode::new(6, 10)   // Provoke（挑衅）
-                .with_prerequisites(vec![(1, 5)]),  // 需要基础技能 Lv5
-            SkillTreeNode::new(7, 10)   // Magnum Break（狂击）
-                .with_prerequisites(vec![(5, 5)]),  // 需要猛击 Lv5
-            SkillTreeNode::new(8, 1)    // Endure（霸体）
-                .with_prerequisites(vec![(6, 5)]),  // 需要挑衅 Lv5
-        ]);
+        trees.insert(
+            1,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(5, 10) // Bash（猛击）
+                    .with_prerequisites(vec![(1, 1)]), // 需要基础技能 Lv1
+                SkillTreeNode::new(6, 10) // Provoke（挑衅）
+                    .with_prerequisites(vec![(1, 5)]), // 需要基础技能 Lv5
+                SkillTreeNode::new(7, 10) // Magnum Break（狂击）
+                    .with_prerequisites(vec![(5, 5)]), // 需要猛击 Lv5
+                SkillTreeNode::new(8, 1) // Endure（霸体）
+                    .with_prerequisites(vec![(6, 5)]), // 需要挑衅 Lv5
+            ],
+        );
 
         // 法师技能树（Job 2）
-        trees.insert(2, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(25, 10)  // Fire Ball（火球术）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(26, 10)  // Fire Wall（火墙术）
-                .with_prerequisites(vec![(25, 5)]),
-            SkillTreeNode::new(27, 10)  // Cold Bolt（冰箭术）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(28, 10)  // Lightning Bolt（雷击术）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(29, 10)  // Increase AGI（加速术）
-                .with_prerequisites(vec![(25, 3), (27, 3)]),  // 需要火球和冰箭各 Lv3
-        ]);
+        trees.insert(
+            2,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(25, 10) // Fire Ball（火球术）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(26, 10) // Fire Wall（火墙术）
+                    .with_prerequisites(vec![(25, 5)]),
+                SkillTreeNode::new(27, 10) // Cold Bolt（冰箭术）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(28, 10) // Lightning Bolt（雷击术）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(29, 10) // Increase AGI（加速术）
+                    .with_prerequisites(vec![(25, 3), (27, 3)]), // 需要火球和冰箭各 Lv3
+            ],
+        );
 
         // 弓箭手技能树（Job 3）
-        trees.insert(3, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(35, 10)  // Double Strafe（二连矢）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(36, 10)  // Arrow Shower（箭雨）
-                .with_prerequisites(vec![(35, 5)]),
-            SkillTreeNode::new(37, 10)  // Concentration（专注）
-                .with_prerequisites(vec![(1, 5)]),
-        ]);
+        trees.insert(
+            3,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(35, 10) // Double Strafe（二连矢）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(36, 10) // Arrow Shower（箭雨）
+                    .with_prerequisites(vec![(35, 5)]),
+                SkillTreeNode::new(37, 10) // Concentration（专注）
+                    .with_prerequisites(vec![(1, 5)]),
+            ],
+        );
 
         // 盗贼技能树（Job 4）
-        trees.insert(4, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(45, 10)  // Double Attack（二连击）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(46, 10)  // Steal（偷窃）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(47, 10)  // Hiding（隐匿）
-                .with_prerequisites(vec![(46, 5)]),
-            SkillTreeNode::new(48, 10)  // Envenom（涂毒）
-                .with_prerequisites(vec![(45, 3)]),
-        ]);
+        trees.insert(
+            4,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(45, 10) // Double Attack（二连击）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(46, 10) // Steal（偷窃）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(47, 10) // Hiding（隐匿）
+                    .with_prerequisites(vec![(46, 5)]),
+                SkillTreeNode::new(48, 10) // Envenom（涂毒）
+                    .with_prerequisites(vec![(45, 3)]),
+            ],
+        );
 
         // 服事技能树（Job 5）
-        trees.insert(5, vec![
-            SkillTreeNode::new(1, 9),   // 基础技能
-            SkillTreeNode::new(28, 10)  // Heal（治愈术）
-                .with_prerequisites(vec![(1, 1)]),
-            SkillTreeNode::new(29, 10)  // Increase AGI（加速术）
-                .with_prerequisites(vec![(28, 3)]),
-            SkillTreeNode::new(55, 10)  // Angelus（天使之护）
-                .with_prerequisites(vec![(1, 5)]),
-            SkillTreeNode::new(56, 10)  // Blessing（祝福）
-                .with_prerequisites(vec![(28, 5)]),
-        ]);
+        trees.insert(
+            5,
+            vec![
+                SkillTreeNode::new(1, 9), // 基础技能
+                SkillTreeNode::new(28, 10) // Heal（治愈术）
+                    .with_prerequisites(vec![(1, 1)]),
+                SkillTreeNode::new(29, 10) // Increase AGI（加速术）
+                    .with_prerequisites(vec![(28, 3)]),
+                SkillTreeNode::new(55, 10) // Angelus（天使之护）
+                    .with_prerequisites(vec![(1, 5)]),
+                SkillTreeNode::new(56, 10) // Blessing（祝福）
+                    .with_prerequisites(vec![(28, 5)]),
+            ],
+        );
 
         Self { trees }
     }
@@ -238,26 +256,29 @@ impl SkillTree {
 
     /// 获取指定技能的前置技能要求
     pub fn get_prerequisites(&self, job: u16, skill_id: u16) -> Option<&Vec<(u16, u8)>> {
-        self.find_node(job, skill_id).map(|node| &node.prerequisite_skills)
+        self.find_node(job, skill_id)
+            .map(|node| &node.prerequisite_skills)
     }
 
     /// 在指定职业的技能树中查找技能节点
     fn find_node(&self, job: u16, skill_id: u16) -> Option<&SkillTreeNode> {
         // 先在指定职业的技能树中查找
         if let Some(tree) = self.trees.get(&job)
-            && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
-                return Some(node);
-            }
+            && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id)
+        {
+            return Some(node);
+        }
 
         // 如果指定职业没有该技能，在通用技能树（job=0）中查找
         if job != 0
             && let Some(tree) = self.trees.get(&0)
-                && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id) {
-                    // 只有 required_job == 0 的技能才对所有职业开放
-                    if node.required_job == 0 {
-                        return Some(node);
-                    }
-                }
+            && let Some(node) = tree.iter().find(|n| n.skill_id == skill_id)
+        {
+            // 只有 required_job == 0 的技能才对所有职业开放
+            if node.required_job == 0 {
+                return Some(node);
+            }
+        }
 
         None
     }
@@ -278,9 +299,10 @@ impl SkillTree {
 
         // 添加通用技能（job=0 且 required_job=0）
         if job != 0
-            && let Some(tree) = self.trees.get(&0) {
-                skills.extend(tree.iter().filter(|n| n.required_job == 0));
-            }
+            && let Some(tree) = self.trees.get(&0)
+        {
+            skills.extend(tree.iter().filter(|n| n.required_job == 0));
+        }
 
         skills
     }
@@ -373,18 +395,28 @@ mod tests {
         tree.add_node(0, SkillTreeNode::new(1, 9));
 
         // 剑士技能
-        tree.add_node(1, SkillTreeNode::new(5, 10)
-            .with_prerequisites(vec![(1, 1)]));
-        tree.add_node(1, SkillTreeNode::new(6, 10)
-            .with_prerequisites(vec![(1, 5)]));
-        tree.add_node(1, SkillTreeNode::new(7, 10)
-            .with_prerequisites(vec![(5, 5)]));
+        tree.add_node(
+            1,
+            SkillTreeNode::new(5, 10).with_prerequisites(vec![(1, 1)]),
+        );
+        tree.add_node(
+            1,
+            SkillTreeNode::new(6, 10).with_prerequisites(vec![(1, 5)]),
+        );
+        tree.add_node(
+            1,
+            SkillTreeNode::new(7, 10).with_prerequisites(vec![(5, 5)]),
+        );
 
         // 法师技能
-        tree.add_node(2, SkillTreeNode::new(25, 10)
-            .with_prerequisites(vec![(1, 1)]));
-        tree.add_node(2, SkillTreeNode::new(26, 10)
-            .with_prerequisites(vec![(25, 5)]));
+        tree.add_node(
+            2,
+            SkillTreeNode::new(25, 10).with_prerequisites(vec![(1, 1)]),
+        );
+        tree.add_node(
+            2,
+            SkillTreeNode::new(26, 10).with_prerequisites(vec![(25, 5)]),
+        );
 
         tree
     }

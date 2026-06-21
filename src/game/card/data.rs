@@ -38,9 +38,17 @@ pub enum CardEffect {
     /// 技能冷却减少 (skill_id, percent%)
     ReduceSkillCooldown { skill_id: u16, percent: i32 },
     /// 物理攻击时概率触发技能 (skill_id, chance_percent, level)
-    AutoSpellOnAttack { skill_id: u16, chance: i32, level: u8 },
+    AutoSpellOnAttack {
+        skill_id: u16,
+        chance: i32,
+        level: u8,
+    },
     /// 被攻击时概率触发技能
-    AutoSpellOnHit { skill_id: u16, chance: i32, level: u8 },
+    AutoSpellOnHit {
+        skill_id: u16,
+        chance: i32,
+        level: u8,
+    },
     /// 使武器附魔 (element)
     EnchantWeapon { element: u8 },
     /// 使护甲附魔
@@ -283,11 +291,15 @@ impl CardDatabase {
         self.register(CardData {
             card_id: 4047,
             name: "Ghostring Card".to_string(),
-            description: "Enchants armor with Ghost property. Decreases HP recovery by 25%".to_string(),
+            description: "Enchants armor with Ghost property. Decreases HP recovery by 25%"
+                .to_string(),
             equip_slots: vec![EquipSlotForCard::Armor],
             effects: vec![
                 CardEffect::EnchantArmor { element: 8 }, // Ghost element
-                CardEffect::AddStat { stat: CardStat::MaxHp, value: -25 },
+                CardEffect::AddStat {
+                    stat: CardStat::MaxHp,
+                    value: -25,
+                },
             ],
             is_mvp: false,
             is_mini_boss: false,
@@ -301,7 +313,10 @@ impl CardDatabase {
             equip_slots: vec![EquipSlotForCard::Shield],
             effects: vec![
                 CardEffect::IgnoreMdefPercent(100),
-                CardEffect::AddStat { stat: CardStat::MaxSp, value: -100 },
+                CardEffect::AddStat {
+                    stat: CardStat::MaxSp,
+                    value: -100,
+                },
             ],
             is_mvp: true,
             is_mini_boss: false,
@@ -315,7 +330,10 @@ impl CardDatabase {
             equip_slots: vec![EquipSlotForCard::HeadTop, EquipSlotForCard::HeadMid],
             effects: vec![
                 CardEffect::ImmuneStatus { status_id: 1 }, // Stun
-                CardEffect::AddStat { stat: CardStat::Vit, value: 3 },
+                CardEffect::AddStat {
+                    stat: CardStat::Vit,
+                    value: 3,
+                },
             ],
             is_mvp: true,
             is_mini_boss: false,

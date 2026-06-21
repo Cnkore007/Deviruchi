@@ -76,7 +76,12 @@ impl GameServer {
         while let Some((std_stream, addr)) = rx.recv().await {
             // 连接数限制检查：超过阈值时拒绝新连接
             if session_manager.count() >= max_conn {
-                warn!("连接数已满 ({}/{}), 拒绝新连接: {}", session_manager.count(), max_conn, addr);
+                warn!(
+                    "连接数已满 ({}/{}), 拒绝新连接: {}",
+                    session_manager.count(),
+                    max_conn,
+                    addr
+                );
                 drop(std_stream);
                 continue;
             }

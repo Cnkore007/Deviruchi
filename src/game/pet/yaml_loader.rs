@@ -55,8 +55,12 @@ struct PetDbEntry {
     CaptureRate: u32,
 }
 
-fn default_fullness() -> u32 { 3 }
-fn default_intimacy() -> u32 { 50 }
+fn default_fullness() -> u32 {
+    3
+}
+fn default_intimacy() -> u32 {
+    50
+}
 
 impl PetDbEntry {
     fn to_template(&self) -> PetTemplate {

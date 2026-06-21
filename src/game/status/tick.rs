@@ -340,10 +340,7 @@ impl StatusTickService {
                     let result = processor.tick_player(&player, &player.status);
 
                     if result.player_died {
-                        tracing::info!(
-                            "Player {} died from status effect DOT",
-                            player.name
-                        );
+                        tracing::info!("Player {} died from status effect DOT", player.name);
                     }
 
                     if result.has_effect() {

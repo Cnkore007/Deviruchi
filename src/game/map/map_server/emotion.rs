@@ -11,10 +11,7 @@ impl MapServer {
         let player_id = session.player_id?;
         let pkt = CzEmotion::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 发送表情: {}",
-            player_id, pkt.emotion
-        );
+        tracing::info!("Player {} 发送表情: {}", player_id, pkt.emotion);
 
         // 广播表情给周围玩家（简化实现）
         // TODO: 广播表情给周围玩家（当前仅发回发送者）
@@ -28,9 +25,12 @@ impl MapServer {
             player_id.as_bytes()[3],
         ]);
 
-        Some(ZcEmotion {
-            entity_id,
-            emotion: pkt.emotion,
-        }.to_packet())
+        Some(
+            ZcEmotion {
+                entity_id,
+                emotion: pkt.emotion,
+            }
+            .to_packet(),
+        )
     }
 }

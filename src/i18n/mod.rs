@@ -1,9 +1,9 @@
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
-use unic_langid::LanguageIdentifier;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::RwLock;
+use unic_langid::LanguageIdentifier;
 
 pub struct I18n {
     bundles: RwLock<HashMap<String, FluentBundle<FluentResource>>>,
@@ -71,11 +71,7 @@ impl I18n {
                             }
                             Err((_, errs)) => {
                                 for e in errs {
-                                    tracing::warn!(
-                                        "Fluent parse error in {:?}: {}",
-                                        ftl_path,
-                                        e
-                                    );
+                                    tracing::warn!("Fluent parse error in {:?}: {}", ftl_path, e);
                                 }
                             }
                         },
@@ -88,10 +84,7 @@ impl I18n {
 
             if loaded > 0 {
                 tracing::info!("Loaded i18n locale '{}': {} file(s)", locale_name, loaded);
-                self.bundles
-                    .write()
-                    .unwrap()
-                    .insert(locale_name, bundle);
+                self.bundles.write().unwrap().insert(locale_name, bundle);
             }
         }
     }
@@ -158,7 +151,8 @@ mod tests {
     use std::fs;
 
     fn setup_test_locales() -> String {
-        let dir = std::env::temp_dir().join(format!("deviruchi_i18n_test_{}", rand::random::<u32>()));
+        let dir =
+            std::env::temp_dir().join(format!("deviruchi_i18n_test_{}", rand::random::<u32>()));
         let zh_dir = dir.join("zh-CN");
         let en_dir = dir.join("en-US");
         fs::create_dir_all(&zh_dir).unwrap();
@@ -182,7 +176,10 @@ mod tests {
         let dir = setup_test_locales();
         let i18n = I18n::new(&dir, "zh-CN");
 
-        assert_eq!(i18n.t("server-starting"), "\u{670d}\u{52a1}\u{5668}\u{542f}\u{52a8}\u{4e2d}...");
+        assert_eq!(
+            i18n.t("server-starting"),
+            "\u{670d}\u{52a1}\u{5668}\u{542f}\u{52a8}\u{4e2d}..."
+        );
         assert_eq!(i18n.t("nonexistent-key"), "nonexistent-key");
 
         let _ = fs::remove_dir_all(&dir);

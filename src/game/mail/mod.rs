@@ -1,7 +1,7 @@
 pub mod data;
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -67,7 +67,10 @@ impl MailSystem {
             sent.entry(sender_id).or_default().push(mail);
         }
 
-        debug!("Mail sent: {} -> {} ({})", sender_name, recipient_name, mail_id);
+        debug!(
+            "Mail sent: {} -> {} ({})",
+            sender_name, recipient_name, mail_id
+        );
         Ok(mail_id)
     }
 
@@ -118,10 +121,11 @@ impl MailSystem {
     pub fn read_mail(&self, player_id: &Uuid, mail_id: &Uuid) -> Option<MailMessage> {
         let mut inboxes = self.inboxes.write();
         if let Some(mails) = inboxes.get_mut(player_id)
-            && let Some(mail) = mails.iter_mut().find(|m| &m.mail_id == mail_id) {
-                mail.read = true;
-                return Some(mail.clone());
-            }
+            && let Some(mail) = mails.iter_mut().find(|m| &m.mail_id == mail_id)
+        {
+            mail.read = true;
+            return Some(mail.clone());
+        }
         None
     }
 
@@ -132,9 +136,7 @@ impl MailSystem {
         mail_id: &Uuid,
     ) -> Result<MailMessage, MailError> {
         let mut inboxes = self.inboxes.write();
-        let mails = inboxes
-            .get_mut(player_id)
-            .ok_or(MailError::MailNotFound)?;
+        let mails = inboxes.get_mut(player_id).ok_or(MailError::MailNotFound)?;
 
         let mail = mails
             .iter_mut()
@@ -227,7 +229,14 @@ mod tests {
         let recipient = make_id(2);
 
         let mail_id = system
-            .send_mail(sender, "Sender", recipient, "Receiver", "Hello", "Body text")
+            .send_mail(
+                sender,
+                "Sender",
+                recipient,
+                "Receiver",
+                "Hello",
+                "Body text",
+            )
             .unwrap();
 
         let inbox = system.get_inbox_list(&recipient);
@@ -256,7 +265,14 @@ mod tests {
         for i in 0..100 {
             let sender = make_id(100 + i);
             system
-                .send_mail(sender, &format!("Sender{}", i), recipient, "Recv", "Hi", "Body")
+                .send_mail(
+                    sender,
+                    &format!("Sender{}", i),
+                    recipient,
+                    "Recv",
+                    "Hi",
+                    "Body",
+                )
                 .unwrap();
         }
 
@@ -273,7 +289,14 @@ mod tests {
         let recipient = make_id(2);
 
         let mail_id = system
-            .send_mail(sender, "Sender", recipient, "Receiver", "With items", "Body")
+            .send_mail(
+                sender,
+                "Sender",
+                recipient,
+                "Receiver",
+                "With items",
+                "Body",
+            )
             .unwrap();
 
         let result = system.claim_attachment(&recipient, &mail_id);

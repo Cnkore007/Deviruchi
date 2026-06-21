@@ -90,11 +90,11 @@ mod collision_tests {
         let map = GatParser::parse_bytes(&data, "test_gat").unwrap();
 
         // 偶数索引可行走，奇数索引是墙
-        assert!(map.is_walkable(0, 0));   // (0,0) = index 0
-        assert!(!map.is_walkable(1, 0));  // (1,0) = index 1
-        assert!(map.is_walkable(2, 0));   // (2,0) = index 2
-        assert!(!map.is_walkable(0, 1));  // (0,1) = index 3
-        assert!(map.is_walkable(1, 1));   // (1,1) = index 4
+        assert!(map.is_walkable(0, 0)); // (0,0) = index 0
+        assert!(!map.is_walkable(1, 0)); // (1,0) = index 1
+        assert!(map.is_walkable(2, 0)); // (2,0) = index 2
+        assert!(!map.is_walkable(0, 1)); // (0,1) = index 3
+        assert!(map.is_walkable(1, 1)); // (1,1) = index 4
     }
 
     #[test]
@@ -108,9 +108,9 @@ mod collision_tests {
 
         // 真实碰撞检测
         assert!(!state.is_walkable("test_collision.gat", 0, 0)); // 墙
-        assert!(state.is_walkable("test_collision.gat", 1, 1));   // 地面
-        assert!(!state.is_walkable("test_collision.gat", 3, 3));  // 水
-        assert!(state.is_walkable("test_collision.gat", 7, 7));   // NPC
+        assert!(state.is_walkable("test_collision.gat", 1, 1)); // 地面
+        assert!(!state.is_walkable("test_collision.gat", 3, 3)); // 水
+        assert!(state.is_walkable("test_collision.gat", 7, 7)); // NPC
 
         // 不存在的地图
         assert!(!state.is_walkable("no_such_map.gat", 0, 0));

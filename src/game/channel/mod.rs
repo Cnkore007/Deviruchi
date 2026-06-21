@@ -1,11 +1,11 @@
 //! 频道系统
-//! 
+//!
 //! 实现公共/私人频道，支持玩家聊天、频道管理等功能。
 //! 对应 rAthena 的 channel.cpp。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 频道 ID
 pub type ChannelId = u32;
@@ -255,11 +255,7 @@ impl ChannelManager {
     }
 
     /// 创建频道
-    pub fn create_channel(
-        &self,
-        config: ChannelConfig,
-        owner_id: Option<u32>,
-    ) -> ChannelId {
+    pub fn create_channel(&self, config: ChannelConfig, owner_id: Option<u32>) -> ChannelId {
         let mut next_id = self.next_id.write();
         let id = *next_id;
         *next_id += 1;
@@ -385,11 +381,7 @@ impl ChannelManager {
 
     /// 获取总成员数
     pub fn total_members(&self) -> usize {
-        self.channels
-            .read()
-            .values()
-            .map(|c| c.members.len())
-            .sum()
+        self.channels.read().values().map(|c| c.members.len()).sum()
     }
 }
 
@@ -462,7 +454,7 @@ mod tests {
         let id = manager.create_channel(config, Some(1));
 
         manager.join_channel(id, 2, "玩家2".to_string(), false);
-        
+
         // 静音玩家
         {
             let mut channels = manager.channels.write();

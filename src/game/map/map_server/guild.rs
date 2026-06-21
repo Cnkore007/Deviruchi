@@ -123,11 +123,7 @@ impl MapServer {
     }
 
     /// Handle guild expel (0x016C)
-    pub(super) fn handle_guild_expel(
-        &self,
-        data: &[u8],
-        session: &mut Session,
-    ) -> Option<Vec<u8>> {
+    pub(super) fn handle_guild_expel(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CZGuildExpel::from_slice(data)?;
 
@@ -207,11 +203,7 @@ impl MapServer {
     }
 
     /// Handle guild chat (0x01EC)
-    pub(super) fn handle_guild_chat(
-        &self,
-        data: &[u8],
-        session: &mut Session,
-    ) -> Option<Vec<u8>> {
+    pub(super) fn handle_guild_chat(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CZGuildChat::from_slice(data)?;
 

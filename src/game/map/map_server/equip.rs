@@ -4,7 +4,7 @@ use super::MapServer;
 use crate::game::item::EquipSlot;
 use crate::network::session::Session;
 use crate::protocol::map_packets::{
-    CzReqWearEquip, CzReqTakeoffEquip, ZcReqWearEquipAck, ZcReqTakeoffEquipAck,
+    CzReqTakeoffEquip, CzReqWearEquip, ZcReqTakeoffEquipAck, ZcReqWearEquipAck,
 };
 use crate::protocol::packet_builder::Packed;
 
@@ -16,7 +16,9 @@ impl MapServer {
 
         tracing::info!(
             "Player {} 请求穿戴装备: index={}, position={}",
-            player_id, pkt.index, pkt.position
+            player_id,
+            pkt.index,
+            pkt.position
         );
 
         let player = self.map_state.get_player(&player_id)?;
@@ -25,11 +27,14 @@ impl MapServer {
         let slots = EquipSlot::from_mask(pkt.position as u32);
         if slots.is_empty() {
             tracing::warn!("无效的装备位置: {}", pkt.position);
-            return Some(ZcReqWearEquipAck {
-                index: pkt.index,
-                position: pkt.position,
-                result: 1, // 失败
-            }.to_packet());
+            return Some(
+                ZcReqWearEquipAck {
+                    index: pkt.index,
+                    position: pkt.position,
+                    result: 1, // 失败
+                }
+                .to_packet(),
+            );
         }
 
         // 获取背包中的物品
@@ -51,26 +56,31 @@ impl MapServer {
         let mut equipment = player.equipment.write();
         let _old_item = equipment.equip(slot, item);
 
-        tracing::info!(
-            "Player {} 成功穿戴装备到 {:?}",
-            player_id, slot
-        );
+        tracing::info!("Player {} 成功穿戴装备到 {:?}", player_id, slot);
 
-        Some(ZcReqWearEquipAck {
-            index: pkt.index,
-            position: pkt.position,
-            result: 0, // 成功
-        }.to_packet())
+        Some(
+            ZcReqWearEquipAck {
+                index: pkt.index,
+                position: pkt.position,
+                result: 0, // 成功
+            }
+            .to_packet(),
+        )
     }
 
     /// 处理卸下装备请求 (0x00AB)
-    pub(super) fn handle_unequip_item(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_unequip_item(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CzReqTakeoffEquip::from_slice(data)?;
 
         tracing::info!(
             "Player {} 请求卸下装备: position={}",
-            player_id, pkt.position
+            player_id,
+            pkt.position
         );
 
         let player = self.map_state.get_player(&player_id)?;
@@ -79,10 +89,13 @@ impl MapServer {
         let slots = EquipSlot::from_mask(pkt.position as u32);
         if slots.is_empty() {
             tracing::warn!("无效的装备位置: {}", pkt.position);
-            return Some(ZcReqTakeoffEquipAck {
-                position: pkt.position,
-                result: 1, // 失败
-            }.to_packet());
+            return Some(
+                ZcReqTakeoffEquipAck {
+                    position: pkt.position,
+                    result: 1, // 失败
+                }
+                .to_packet(),
+            );
         }
 
         // 卸下装备
@@ -91,21 +104,23 @@ impl MapServer {
         let removed = equipment.unequip(slot);
 
         if removed.is_some() {
-            tracing::info!(
-                "Player {} 成功卸下 {:?} 的装备",
-                player_id, slot
-            );
-            Some(ZcReqTakeoffEquipAck {
-                position: pkt.position,
-                result: 0, // 成功
-            }.to_packet())
+            tracing::info!("Player {} 成功卸下 {:?} 的装备", player_id, slot);
+            Some(
+                ZcReqTakeoffEquipAck {
+                    position: pkt.position,
+                    result: 0, // 成功
+                }
+                .to_packet(),
+            )
         } else {
             tracing::warn!("Player {} 在 {:?} 没有装备", player_id, slot);
-            Some(ZcReqTakeoffEquipAck {
-                position: pkt.position,
-                result: 1, // 失败
-            }.to_packet())
+            Some(
+                ZcReqTakeoffEquipAck {
+                    position: pkt.position,
+                    result: 1, // 失败
+                }
+                .to_packet(),
+            )
         }
     }
-
 }

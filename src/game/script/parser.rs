@@ -186,29 +186,31 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
     // 脚本作者应在 for 之前手动编写初始化命令。
     // 循环体由 ForStart 和 ForEnd 之间的命令组成，配合 endloop 使用。
     if let Some(rest) = line.strip_prefix("for ")
-        && let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')')) {
-            let parts: Vec<&str> = inner.splitn(3, ';').collect();
-            if parts.len() == 3 {
-                let cond_expr = parse_expr(parts[1].trim());
-                let step_cmd = parse_line(parts[2].trim());
+        && let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')'))
+    {
+        let parts: Vec<&str> = inner.splitn(3, ';').collect();
+        if parts.len() == 3 {
+            let cond_expr = parse_expr(parts[1].trim());
+            let step_cmd = parse_line(parts[2].trim());
 
-                let mut inc_cmds = Vec::new();
-                if let Some(cmd) = step_cmd {
-                    inc_cmds.push(cmd);
-                }
+            let mut inc_cmds = Vec::new();
+            if let Some(cmd) = step_cmd {
+                inc_cmds.push(cmd);
+            }
 
-                if let Some(expr) = cond_expr {
-                    return Some(ScriptCommand::ForStart(expr, inc_cmds));
-                }
+            if let Some(expr) = cond_expr {
+                return Some(ScriptCommand::ForStart(expr, inc_cmds));
             }
         }
+    }
 
     // while (条件) —— 等价于 ForStart(条件, 空增量)
     if let Some(rest) = line.strip_prefix("while ")
         && let Some(inner) = rest.strip_prefix('(').and_then(|s| s.strip_suffix(')'))
-            && let Some(expr) = parse_expr(inner.trim()) {
-                return Some(ScriptCommand::ForStart(expr, Vec::new()));
-            }
+        && let Some(expr) = parse_expr(inner.trim())
+    {
+        return Some(ScriptCommand::ForStart(expr, Vec::new()));
+    }
 
     // endloop —— 标记循环结束，对应 ForEnd
     if line == "endloop" {
@@ -277,44 +279,78 @@ fn parse_line(line: &str) -> Option<ScriptCommand> {
     // ================================================================
 
     // countitem(<item_id>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("countitem(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("countitem(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let item_id: u16 = inner.trim().parse().ok()?;
         // 结果变量名默认为 @countitem_result
-        return Some(ScriptCommand::CountItem(item_id, "@countitem_result".to_string()));
+        return Some(ScriptCommand::CountItem(
+            item_id,
+            "@countitem_result".to_string(),
+        ));
     }
 
     // checkweight(<item_id>, <amount>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("checkweight(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("checkweight(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let parts: Vec<&str> = inner.split(',').collect();
         if parts.len() >= 2 {
             let item_id: u16 = parts[0].trim().parse().ok()?;
             let amount: u16 = parts[1].trim().parse().ok()?;
-            return Some(ScriptCommand::CheckWeight(item_id, amount, "@checkweight_result".to_string()));
+            return Some(ScriptCommand::CheckWeight(
+                item_id,
+                amount,
+                "@checkweight_result".to_string(),
+            ));
         }
     }
 
     // getcharid(<type>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("getcharid(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("getcharid(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let type_id: u8 = inner.trim().parse().ok()?;
-        return Some(ScriptCommand::GetCharId(type_id, "@charid_result".to_string()));
+        return Some(ScriptCommand::GetCharId(
+            type_id,
+            "@charid_result".to_string(),
+        ));
     }
 
     // getarg(<index>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("getarg(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("getarg(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let index: u16 = inner.trim().parse().ok()?;
         return Some(ScriptCommand::GetArg(index, "@getarg_result".to_string()));
     }
 
     // strcharinfo(<type>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("strcharinfo(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("strcharinfo(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let type_id: u8 = inner.trim().parse().ok()?;
-        return Some(ScriptCommand::StrCharInfo(type_id, "@strcharinfo_result".to_string()));
+        return Some(ScriptCommand::StrCharInfo(
+            type_id,
+            "@strcharinfo_result".to_string(),
+        ));
     }
 
     // readparam(<param>) -> 存入结果变量
-    if let Some(inner) = line.strip_prefix("readparam(").and_then(|s| s.strip_suffix(')')) {
+    if let Some(inner) = line
+        .strip_prefix("readparam(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
         let param_id: u16 = inner.trim().parse().ok()?;
-        return Some(ScriptCommand::ReadParam(param_id, "@readparam_result".to_string()));
+        return Some(ScriptCommand::ReadParam(
+            param_id,
+            "@readparam_result".to_string(),
+        ));
     }
 
     // ================================================================

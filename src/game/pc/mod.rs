@@ -1,11 +1,11 @@
 //! 玩家角色系统
-//! 
+//!
 //! 处理玩家角色的详细机制，包括属性计算、状态管理等。
 //! 对应 rAthena 的 pc.cpp。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// 玩家属性类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -270,49 +270,27 @@ impl PlayerCharacter {
 
     /// 重新计算属性
     pub fn recalculate_stats(&mut self) {
-        self.stats.max_hp = StatCalculator::calculate_max_hp(
-            self.stats.base_level,
-            self.stats.vit,
-            self.job_class,
-        );
-        self.stats.max_sp = StatCalculator::calculate_max_sp(
-            self.stats.base_level,
-            self.stats.int,
-            self.job_class,
-        );
-        self.stats.attack = StatCalculator::calculate_attack(
-            self.stats.str,
-            self.stats.dex,
-            self.stats.base_level,
-        );
+        self.stats.max_hp =
+            StatCalculator::calculate_max_hp(self.stats.base_level, self.stats.vit, self.job_class);
+        self.stats.max_sp =
+            StatCalculator::calculate_max_sp(self.stats.base_level, self.stats.int, self.job_class);
+        self.stats.attack =
+            StatCalculator::calculate_attack(self.stats.str, self.stats.dex, self.stats.base_level);
         self.stats.magic_attack = StatCalculator::calculate_magic_attack(
             self.stats.int,
             self.stats.dex,
             self.stats.base_level,
         );
-        self.stats.defense = StatCalculator::calculate_defense(
-            self.stats.vit,
-            self.stats.agi,
-        );
-        self.stats.magic_defense = StatCalculator::calculate_magic_defense(
-            self.stats.int,
-            self.stats.vit,
-        );
-        self.stats.hit = StatCalculator::calculate_hit(
-            self.stats.dex,
-            self.stats.luk,
-            self.stats.base_level,
-        );
-        self.stats.flee = StatCalculator::calculate_flee(
-            self.stats.agi,
-            self.stats.luk,
-            self.stats.base_level,
-        );
+        self.stats.defense = StatCalculator::calculate_defense(self.stats.vit, self.stats.agi);
+        self.stats.magic_defense =
+            StatCalculator::calculate_magic_defense(self.stats.int, self.stats.vit);
+        self.stats.hit =
+            StatCalculator::calculate_hit(self.stats.dex, self.stats.luk, self.stats.base_level);
+        self.stats.flee =
+            StatCalculator::calculate_flee(self.stats.agi, self.stats.luk, self.stats.base_level);
         self.stats.critical = StatCalculator::calculate_critical(self.stats.luk);
-        self.stats.attack_speed = StatCalculator::calculate_attack_speed(
-            self.stats.agi,
-            self.stats.dex,
-        );
+        self.stats.attack_speed =
+            StatCalculator::calculate_attack_speed(self.stats.agi, self.stats.dex);
     }
 
     /// 增加属性点
@@ -484,7 +462,7 @@ mod tests {
     fn test_level_up() {
         let mut char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
         char.level_up_base();
-        
+
         assert_eq!(char.stats.base_level, 2);
         assert_eq!(char.stat_points, 5);
     }
@@ -493,7 +471,7 @@ mod tests {
     fn test_add_stat_point() {
         let mut char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
         char.stat_points = 10;
-        
+
         assert!(char.add_stat_point(StatType::Str, 5));
         assert_eq!(char.stats.str, 6);
         assert_eq!(char.stat_points, 5);
@@ -503,13 +481,13 @@ mod tests {
     fn test_heal_consume() {
         let mut char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
         char.stats.current_hp = 50;
-        
+
         char.heal_hp(30);
         assert_eq!(char.stats.current_hp, 80);
-        
+
         assert!(char.consume_hp(20));
         assert_eq!(char.stats.current_hp, 60);
-        
+
         assert!(!char.consume_hp(100));
     }
 
@@ -517,7 +495,7 @@ mod tests {
     fn test_zeny() {
         let mut char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
         char.add_zeny(1000);
-        
+
         assert_eq!(char.zeny, 1000);
         assert!(char.consume_zeny(500));
         assert_eq!(char.zeny, 500);
@@ -527,7 +505,7 @@ mod tests {
     #[test]
     fn test_status_effects() {
         let mut char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
-        
+
         let effect = StatusEffect {
             id: 1,
             name: "中毒".to_string(),
@@ -535,10 +513,10 @@ mod tests {
             start_time: 0,
             params: HashMap::new(),
         };
-        
+
         char.add_status_effect(effect);
         assert!(char.has_status_effect(1));
-        
+
         char.remove_status_effect(1);
         assert!(!char.has_status_effect(1));
     }
@@ -547,10 +525,10 @@ mod tests {
     fn test_manager() {
         let manager = PlayerCharacterManager::new();
         let char = PlayerCharacter::new(1, 1, "测试角色".to_string(), 0);
-        
+
         manager.add_character(char);
         assert_eq!(manager.online_count(), 1);
-        
+
         let char = manager.get_character(1).unwrap();
         assert_eq!(char.name, "测试角色");
     }

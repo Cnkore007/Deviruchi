@@ -67,7 +67,8 @@ impl BattleHandler {
         let is_crit = self.rand_chance(crit_chance) && skill_id != 25;
 
         let rng_guard = self.rng.lock();
-        let base_damage = BattleFormula::physical_damage(attacker, defender, skill_damage, 1, &**rng_guard);
+        let base_damage =
+            BattleFormula::physical_damage(attacker, defender, skill_damage, 1, &**rng_guard);
 
         let damage = if is_crit {
             ((base_damage as i64 * BattleFormula::crit_multiplier() as i64) / 100) as i32
@@ -93,7 +94,8 @@ impl BattleHandler {
     ) -> AttackResult {
         let matk = (attacker.int() as i32) * 2 + (attacker.dex() as i32) / 3;
         let rng_guard = self.rng.lock();
-        let damage = BattleFormula::magical_damage(attacker, defender, skill_damage, matk, &**rng_guard);
+        let damage =
+            BattleFormula::magical_damage(attacker, defender, skill_damage, matk, &**rng_guard);
 
         let killed = defender.take_damage(safe_damage(damage));
 

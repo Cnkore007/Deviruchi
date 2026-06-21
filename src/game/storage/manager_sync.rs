@@ -100,7 +100,10 @@ impl StorageSyncManager {
                     .task_sender()
                     .try_send(SyncTask::MarkClean(char_id))
                 {
-                    tracing::error!("Storage sync channel full or closed, data may be lost: {}", e);
+                    tracing::error!(
+                        "Storage sync channel full or closed, data may be lost: {}",
+                        e
+                    );
                 }
 
                 // 返回数据
@@ -152,7 +155,10 @@ impl StorageSyncManager {
             .task_sender()
             .try_send(SyncTask::MarkDirty(char_id))
         {
-            tracing::error!("Storage sync channel full or closed, data may be lost: {}", e);
+            tracing::error!(
+                "Storage sync channel full or closed, data may be lost: {}",
+                e
+            );
         }
 
         // 保存到数据库
@@ -165,7 +171,10 @@ impl StorageSyncManager {
                     .task_sender()
                     .try_send(SyncTask::MarkClean(char_id))
                 {
-                    tracing::error!("Storage sync channel full or closed, data may be lost: {}", e);
+                    tracing::error!(
+                        "Storage sync channel full or closed, data may be lost: {}",
+                        e
+                    );
                 }
                 StorageResponse::success(char_id)
             }
@@ -280,7 +289,10 @@ impl StorageSyncManager {
             .task_sender()
             .try_send(SyncTask::MarkClean(char_id))
         {
-            tracing::error!("Storage sync channel full or closed, data may be lost: {}", e);
+            tracing::error!(
+                "Storage sync channel full or closed, data may be lost: {}",
+                e
+            );
         }
 
         Ok(())
@@ -585,7 +597,9 @@ mod tests {
         let sync_mgr = setup();
 
         // Load
-        let response = sync_mgr.handle_request(StorageRequest::Load { char_id: 1 }).await;
+        let response = sync_mgr
+            .handle_request(StorageRequest::Load { char_id: 1 })
+            .await;
         assert!(matches!(response, StorageResponse::Data { char_id: 1, .. }));
 
         // SyncStatus
@@ -595,7 +609,9 @@ mod tests {
         assert!(matches!(response, StorageResponse::SyncStatus { .. }));
 
         // Unlock
-        let response = sync_mgr.handle_request(StorageRequest::Unlock { char_id: 1 }).await;
+        let response = sync_mgr
+            .handle_request(StorageRequest::Unlock { char_id: 1 })
+            .await;
         assert!(matches!(response, StorageResponse::Saved { char_id: 1 }));
     }
 }

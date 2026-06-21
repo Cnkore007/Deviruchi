@@ -13,7 +13,11 @@ use uuid::Uuid;
 
 impl MapServer {
     /// Handle NPC interact (0x0190)
-    pub(super) fn handle_npc_interact(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_npc_interact(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let npc_pkt = CZContactNpc::from_slice(data)?;
         let npc = self.npc_handler.get_npc(npc_pkt.npc_id)?;
@@ -53,11 +57,13 @@ impl MapServer {
             }
             crate::game::npc::data::NpcType::Warp => {
                 // Warp NPC 的目标坐标已存储在 dest_map/dest_x/dest_y
-                let dest_map = npc.dest_map.clone()
-                    .unwrap_or_else(|| npc.map_name.clone());
+                let dest_map = npc.dest_map.clone().unwrap_or_else(|| npc.map_name.clone());
                 tracing::info!(
                     "NPC warp: {} -> {} ({}, {})",
-                    npc.id, dest_map, npc.dest_x, npc.dest_y
+                    npc.id,
+                    dest_map,
+                    npc.dest_x,
+                    npc.dest_y
                 );
                 Some(ZcCloseDialog { npc_id: npc.id }.to_packet())
             }

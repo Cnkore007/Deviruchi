@@ -67,8 +67,6 @@ pub struct CharacterTransfer {
     pub account_level: u32,
 }
 
-
-
 /// Inter-Server 数据包枚举
 #[derive(Debug, Clone)]
 pub enum InterServerPacket {
@@ -222,8 +220,6 @@ impl InterServerComm {
             connections: RwLock::new(HashMap::new()),
         }
     }
-
-
 }
 
 impl Default for InterServerComm {

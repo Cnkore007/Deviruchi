@@ -217,11 +217,7 @@ impl JobType {
     /// - 一转：50
     /// - 二转/进阶二转：50（后续可扩展到 70）
     pub fn max_job_level(self) -> u16 {
-        if self.is_novice() {
-            10
-        } else {
-            50
-        }
+        if self.is_novice() { 10 } else { 50 }
     }
 
     /// 获取该职业的基础最大 HP（BaseLv 1 时）
@@ -326,8 +322,8 @@ pub fn check_job_change_requirements(
     target_job_id: u16,
     base_level: u16,
 ) -> Result<(), JobChangeError> {
-    let target = JobType::from_u16(target_job_id)
-        .ok_or(JobChangeError::InvalidJob(target_job_id))?;
+    let target =
+        JobType::from_u16(target_job_id).ok_or(JobChangeError::InvalidJob(target_job_id))?;
 
     let current = JobType::from_u16(current_job);
 
@@ -372,16 +368,18 @@ fn is_same_job_line(current: JobType, prerequisite: JobType) -> bool {
 
     // 检查当前职业的一转前置是否匹配
     if let Some(first_class) = current.prerequisite_first_class()
-        && first_class == prerequisite {
-            return true;
-        }
+        && first_class == prerequisite
+    {
+        return true;
+    }
 
     // 检查当前职业的二转前置，再看二转前置的一转是否匹配
     if let Some(second_class) = current.prerequisite_second_class()
         && let Some(first_class) = second_class.prerequisite_first_class()
-            && first_class == prerequisite {
-                return true;
-            }
+        && first_class == prerequisite
+    {
+        return true;
+    }
 
     false
 }

@@ -93,8 +93,12 @@ struct MercDbEntry {
     Skills: Vec<MercSkillYaml>,
 }
 
-fn default_one_u16() -> u16 { 1 }
-fn default_walk_speed() -> u16 { 200 }
+fn default_one_u16() -> u16 {
+    1
+}
+fn default_walk_speed() -> u16 {
+    200
+}
 
 #[derive(Deserialize, Debug)]
 struct MercSkillYaml {
@@ -103,13 +107,18 @@ struct MercSkillYaml {
     MaxLevel: u8,
 }
 
-fn default_one_u8() -> u8 { 1 }
+fn default_one_u8() -> u8 {
+    1
+}
 
 impl MercDbEntry {
     fn to_template(&self) -> MercenaryTemplateYaml {
         MercenaryTemplateYaml {
             id: self.Id,
-            name: self.Name.clone().unwrap_or_else(|| format!("Mercenary_{}", self.Id)),
+            name: self
+                .Name
+                .clone()
+                .unwrap_or_else(|| format!("Mercenary_{}", self.Id)),
             level: if self.Level == 0 { 1 } else { self.Level },
             hp: if self.Hp == 0 { 1 } else { self.Hp },
             sp: if self.Sp == 0 { 1 } else { self.Sp },
@@ -125,16 +134,22 @@ impl MercDbEntry {
             luk: self.Luk,
             attack_range: self.AttackRange,
             walk_speed: self.WalkSpeed,
-            skills: self.Skills.iter().map(|s| MercenarySkillEntry {
-                name: s.Name.clone(),
-                max_level: s.MaxLevel,
-            }).collect(),
+            skills: self
+                .Skills
+                .iter()
+                .map(|s| MercenarySkillEntry {
+                    name: s.Name.clone(),
+                    max_level: s.MaxLevel,
+                })
+                .collect(),
         }
     }
 }
 
 /// 从 rAthena mercenary_db.yml 加载佣兵模板
-pub fn load_mercenary_db(path: &str) -> Result<HashMap<u16, MercenaryTemplateYaml>, Box<dyn Error>> {
+pub fn load_mercenary_db(
+    path: &str,
+) -> Result<HashMap<u16, MercenaryTemplateYaml>, Box<dyn Error>> {
     let content = fs::read_to_string(path)?;
     let yaml: MercDbFile = serde_yaml::from_str(&content)?;
     let mut db = HashMap::new();

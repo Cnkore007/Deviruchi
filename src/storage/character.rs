@@ -143,11 +143,11 @@ impl Database {
          FROM characters";
 
     pub fn get_characters_by_account(&self, account_id: u32) -> Result<Vec<Character>> {
-        let sql = format!("{} WHERE account_id = ?1 ORDER BY char_num", Self::CHARACTER_SELECT_SQL);
-        let rows = self.query_rows(
-            &sql,
-            &[&(account_id as i32) as &dyn IntoValue],
-        )?;
+        let sql = format!(
+            "{} WHERE account_id = ?1 ORDER BY char_num",
+            Self::CHARACTER_SELECT_SQL
+        );
+        let rows = self.query_rows(&sql, &[&(account_id as i32) as &dyn IntoValue])?;
         let mut characters = Vec::new();
         for row in &rows {
             characters.push(Self::character_from_row(row)?);
@@ -235,7 +235,12 @@ impl Database {
     /// 保存角色仓库（事务包裹）
     pub fn save_storage(&self, storage: &Storage) -> Result<()> {
         let char_id = storage.char_id();
-        let slots: Vec<_> = storage.slots().iter().filter(|s| !s.is_empty()).cloned().collect();
+        let slots: Vec<_> = storage
+            .slots()
+            .iter()
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .collect();
 
         self.with_transaction(|tx| {
             tx.execute_params(
@@ -671,7 +676,9 @@ impl Database {
         if affected > 0 {
             tracing::info!(
                 "Character {} marked for deletion at {} (in {} seconds)",
-                char_id, delete_timer, delete_after_secs
+                char_id,
+                delete_timer,
+                delete_after_secs
             );
             Ok(true)
         } else {
@@ -684,11 +691,7 @@ impl Database {
     }
 
     /// 取消角色删除标记
-    pub fn cancel_character_deletion(
-        &self,
-        char_id: u32,
-        account_id: u32,
-    ) -> Result<bool> {
+    pub fn cancel_character_deletion(&self, char_id: u32, account_id: u32) -> Result<bool> {
         let affected = self.execute_params(
             "UPDATE characters SET delete_timer = 0
              WHERE char_id = ?1 AND account_id = ?2 AND delete_timer > 0",
@@ -713,11 +716,7 @@ impl Database {
     /// 按名称查找角色（用于名称重复检查）
     pub fn get_character_by_name(&self, name: &str) -> Result<Option<Character>> {
         let sql = format!("{} WHERE name = ?1", Self::CHARACTER_SELECT_SQL);
-        self.query_row_optional(
-            &sql,
-            &[&name as &dyn IntoValue],
-            Self::character_from_row,
-        )
+        self.query_row_optional(&sql, &[&name as &dyn IntoValue], Self::character_from_row)
     }
 
     /// 加载角色快捷键
@@ -1096,26 +1095,27 @@ mod tests {
         .expect("Failed to set delete_timer");
 
         // 清理已过期的角色
-        let deleted = db
-            .cleanup_deleted_characters()
-            .expect("Failed to cleanup");
+        let deleted = db.cleanup_deleted_characters().expect("Failed to cleanup");
         assert_eq!(deleted, 1, "Should have deleted 1 expired character");
 
         // 验证：正常角色仍在
-        assert!(db
-            .get_character_by_id(_char1_id)
-            .expect("query failed")
-            .is_some());
+        assert!(
+            db.get_character_by_id(_char1_id)
+                .expect("query failed")
+                .is_some()
+        );
         // 验证：已过期角色被删除
-        assert!(db
-            .get_character_by_id(char2_id)
-            .expect("query failed")
-            .is_none());
+        assert!(
+            db.get_character_by_id(char2_id)
+                .expect("query failed")
+                .is_none()
+        );
         // 验证：待删除但未过期角色仍在
-        assert!(db
-            .get_character_by_id(_char3_id)
-            .expect("query failed")
-            .is_some());
+        assert!(
+            db.get_character_by_id(_char3_id)
+                .expect("query failed")
+                .is_some()
+        );
     }
 
     #[test]
@@ -1129,7 +1129,9 @@ mod tests {
             .unwrap();
 
         // 标记删除（24小时后）
-        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        let result = db
+            .mark_character_for_deletion(char_id, account_id, 86400)
+            .unwrap();
         assert!(result, "标记删除应成功");
 
         // 验证 delete_timer 已设置
@@ -1156,7 +1158,9 @@ mod tests {
             .unwrap();
 
         // 用错误的 account_id 尝试标记删除
-        let result = db.mark_character_for_deletion(char_id, 9999, 86400).unwrap();
+        let result = db
+            .mark_character_for_deletion(char_id, 9999, 86400)
+            .unwrap();
         assert!(!result, "错误账户标记删除应失败");
 
         // 验证角色未被标记
@@ -1170,7 +1174,8 @@ mod tests {
         crate::storage::schema::init_schema(&db).unwrap();
         let account_id = setup_test_account(&db);
 
-        db.create_character(account_id, 0, "UniqueName", 5, 5, 5, 5, 5, 5, 1, 0).unwrap();
+        db.create_character(account_id, 0, "UniqueName", 5, 5, 5, 5, 5, 5, 1, 0)
+            .unwrap();
 
         // 查找存在的角色
         let result = db.get_character_by_name("UniqueName").unwrap();
@@ -1193,11 +1198,15 @@ mod tests {
             .unwrap();
 
         // 第一次标记成功
-        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        let result = db
+            .mark_character_for_deletion(char_id, account_id, 86400)
+            .unwrap();
         assert!(result);
 
         // 第二次标记应失败（已标记）
-        let result = db.mark_character_for_deletion(char_id, account_id, 86400).unwrap();
+        let result = db
+            .mark_character_for_deletion(char_id, account_id, 86400)
+            .unwrap();
         assert!(!result, "重复标记删除应返回 false");
     }
 }

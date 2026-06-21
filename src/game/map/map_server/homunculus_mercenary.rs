@@ -6,14 +6,15 @@ use crate::protocol::map_packets::{CzHomMenu, CzMercenaryAction};
 
 impl MapServer {
     /// 处理半魔娘操作 (0x022D)
-    pub(super) fn handle_homunculus_menu(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_homunculus_menu(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CzHomMenu::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 半魔娘操作: action={}",
-            player_id, pkt.action
-        );
+        tracing::info!("Player {} 半魔娘操作: action={}", player_id, pkt.action);
 
         match pkt.action {
             0 => tracing::info!("Player {} 查看半魔娘信息", player_id),
@@ -29,14 +30,15 @@ impl MapServer {
     }
 
     /// 处理佣兵操作 (0x022F)
-    pub(super) fn handle_mercenary_action(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_mercenary_action(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CzMercenaryAction::from_slice(data)?;
 
-        tracing::info!(
-            "Player {} 佣兵操作: action={}",
-            player_id, pkt.action
-        );
+        tracing::info!("Player {} 佣兵操作: action={}", player_id, pkt.action);
 
         match pkt.action {
             0 => tracing::info!("Player {} 查看佣兵信息", player_id),

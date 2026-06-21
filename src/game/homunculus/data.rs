@@ -359,27 +359,82 @@ impl HomunculusDatabase {
 
         for (class, yt) in yaml_db {
             let race = HomunculusRace::from_name(&yt.race);
-            templates.insert(class, HomunculusTemplate {
-                class_name: yt.class_name,
-                name: yt.name,
-                evolution_class: if yt.evolution_class.is_empty() { None } else { Some(yt.evolution_class) },
-                food_item: None,
-                hungry_delay: 60000,
-                race,
-                element: yt.element,
-                size: yt.size,
-                evolution_size: None,
-                attack_delay: yt.attack_delay,
-                hp_growth: StatGrowth { base: yt.hp_base, growth_min: yt.hp_growth_min, growth_max: yt.hp_growth_max, evolution_min: 0, evolution_max: 0 },
-                sp_growth: StatGrowth { base: yt.sp_base, growth_min: yt.sp_growth_min, growth_max: yt.sp_growth_max, evolution_min: 0, evolution_max: 0 },
-                str_growth: StatGrowth { base: yt.str_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                agi_growth: StatGrowth { base: yt.agi_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                vit_growth: StatGrowth { base: yt.vit_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                int_growth: StatGrowth { base: yt.int_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                dex_growth: StatGrowth { base: yt.dex_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                luk_growth: StatGrowth { base: yt.luk_base as u32, growth_min: 0, growth_max: 0, evolution_min: 0, evolution_max: 0 },
-                skill_tree: Vec::new(),
-            });
+            templates.insert(
+                class,
+                HomunculusTemplate {
+                    class_name: yt.class_name,
+                    name: yt.name,
+                    evolution_class: if yt.evolution_class.is_empty() {
+                        None
+                    } else {
+                        Some(yt.evolution_class)
+                    },
+                    food_item: None,
+                    hungry_delay: 60000,
+                    race,
+                    element: yt.element,
+                    size: yt.size,
+                    evolution_size: None,
+                    attack_delay: yt.attack_delay,
+                    hp_growth: StatGrowth {
+                        base: yt.hp_base,
+                        growth_min: yt.hp_growth_min,
+                        growth_max: yt.hp_growth_max,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    sp_growth: StatGrowth {
+                        base: yt.sp_base,
+                        growth_min: yt.sp_growth_min,
+                        growth_max: yt.sp_growth_max,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    str_growth: StatGrowth {
+                        base: yt.str_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    agi_growth: StatGrowth {
+                        base: yt.agi_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    vit_growth: StatGrowth {
+                        base: yt.vit_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    int_growth: StatGrowth {
+                        base: yt.int_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    dex_growth: StatGrowth {
+                        base: yt.dex_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    luk_growth: StatGrowth {
+                        base: yt.luk_base as u32,
+                        growth_min: 0,
+                        growth_max: 0,
+                        evolution_min: 0,
+                        evolution_max: 0,
+                    },
+                    skill_tree: Vec::new(),
+                },
+            );
         }
 
         Ok(templates)
@@ -865,21 +920,12 @@ mod tests {
 
     #[test]
     fn test_type_from_class() {
-        assert_eq!(
-            Homunculus::type_from_class("Lif"),
-            HomunculusType::Lif
-        );
-        assert_eq!(
-            Homunculus::type_from_class("Lif2"),
-            HomunculusType::Lif
-        );
+        assert_eq!(Homunculus::type_from_class("Lif"), HomunculusType::Lif);
+        assert_eq!(Homunculus::type_from_class("Lif2"), HomunculusType::Lif);
         assert_eq!(
             Homunculus::type_from_class("Amistr"),
             HomunculusType::Amistr
         );
-        assert_eq!(
-            Homunculus::type_from_class("unknown"),
-            HomunculusType::Lif
-        );
+        assert_eq!(Homunculus::type_from_class("unknown"), HomunculusType::Lif);
     }
 }

@@ -3,15 +3,12 @@
 //! 负责生命体的创建、召唤、喂食、经验、进化等操作。
 //! 所有写操作实时持久化到数据库。
 
-use super::data::{
-    EvolutionStage, Homunculus, HomunculusDatabase, HomunculusRace,
-    HomunculusType,
-};
+use super::data::{EvolutionStage, Homunculus, HomunculusDatabase, HomunculusRace, HomunculusType};
 use crate::storage::Database;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use thiserror::Error;
 
 /// 生命体错误类型
@@ -151,9 +148,7 @@ impl HomunculusManager {
             let homun = Homunculus {
                 homun_id,
                 owner_id: row.get_i32(1).unwrap_or(0) as u32,
-                homunculus_type: HomunculusType::from_name(
-                    &row.get_string(2).unwrap_or_default(),
-                ),
+                homunculus_type: HomunculusType::from_name(&row.get_string(2).unwrap_or_default()),
                 name: row.get_string(3).unwrap_or_default(),
                 level: row.get_i32(4).unwrap_or(1) as u16,
                 exp: row.get_i64(5).unwrap_or(0) as u64,
@@ -172,7 +167,8 @@ impl HomunculusManager {
                 evolved: row.get_i32(18).unwrap_or(0) != 0,
                 alive: row.get_i32(19).unwrap_or(1) != 0,
                 race: HomunculusRace::from_name(
-                    &row.get_string(20).unwrap_or_else(|_| "Formless".to_string()),
+                    &row.get_string(20)
+                        .unwrap_or_else(|_| "Formless".to_string()),
                 ),
                 element: row.get_string(21).unwrap_or_else(|_| "Neutral".to_string()),
                 // element_level (index 21) 在数据库中存在但 Homunculus 结构体中无对应字段，
@@ -290,9 +286,7 @@ impl HomunculusManager {
     /// 喂食生命体（UPDATE hunger, intimacy 到数据库）
     pub fn feed(&self, char_id: u32, _item_id: u16) -> Result<(), HomunculusError> {
         let summoned = self.summoned.read();
-        let homun_id = summoned
-            .get(&char_id)
-            .ok_or(HomunculusError::NotSummoned)?;
+        let homun_id = summoned.get(&char_id).ok_or(HomunculusError::NotSummoned)?;
 
         let mut homunculi = self.homunculi.write();
         let homun = homunculi
@@ -322,9 +316,7 @@ impl HomunculusManager {
     /// 增加经验（返回是否升级，实时写库）
     pub fn add_exp(&self, char_id: u32, exp: u64) -> Result<bool, HomunculusError> {
         let summoned = self.summoned.read();
-        let homun_id = summoned
-            .get(&char_id)
-            .ok_or(HomunculusError::NotSummoned)?;
+        let homun_id = summoned.get(&char_id).ok_or(HomunculusError::NotSummoned)?;
 
         let mut homunculi = self.homunculi.write();
         let homun = homunculi
@@ -399,9 +391,7 @@ impl HomunculusManager {
     /// 进化生命体（实时写库）
     pub fn evolve(&self, char_id: u32) -> Result<(), HomunculusError> {
         let summoned = self.summoned.read();
-        let homun_id = summoned
-            .get(&char_id)
-            .ok_or(HomunculusError::NotSummoned)?;
+        let homun_id = summoned.get(&char_id).ok_or(HomunculusError::NotSummoned)?;
 
         let mut homunculi = self.homunculi.write();
         let homun = homunculi
@@ -612,9 +602,7 @@ mod tests {
     fn test_cannot_summon_twice() {
         let manager = create_test_manager();
         let homun1 = manager.create(100, HomunculusType::Lif, "Lif1").unwrap();
-        let homun2 = manager
-            .create(100, HomunculusType::Amistr, "Ami1")
-            .unwrap();
+        let homun2 = manager.create(100, HomunculusType::Amistr, "Ami1").unwrap();
 
         manager.summon(100, homun1.homun_id).unwrap();
         assert!(matches!(
@@ -704,7 +692,9 @@ mod tests {
     #[test]
     fn test_persistence_create_and_load() {
         let manager = create_test_manager();
-        let homun = manager.create(100, HomunculusType::Lif, "PersistLif").unwrap();
+        let homun = manager
+            .create(100, HomunculusType::Lif, "PersistLif")
+            .unwrap();
 
         // 清空内存缓存
         manager.homunculi.write().clear();
@@ -802,8 +792,12 @@ mod tests {
     #[test]
     fn test_multi_character_isolation() {
         let manager = create_test_manager();
-        manager.create(100, HomunculusType::Lif, "Char100_Lif").unwrap();
-        manager.create(200, HomunculusType::Amistr, "Char200_Ami").unwrap();
+        manager
+            .create(100, HomunculusType::Lif, "Char100_Lif")
+            .unwrap();
+        manager
+            .create(200, HomunculusType::Amistr, "Char200_Ami")
+            .unwrap();
 
         let loaded_100 = manager.load_for_character(100).unwrap();
         let loaded_200 = manager.load_for_character(200).unwrap();

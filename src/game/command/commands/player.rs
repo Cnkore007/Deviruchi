@@ -166,7 +166,9 @@ pub fn cmd_jobchange(player: &mut Player, args: &[String], _map_state: &MapState
     // 更新最大负重
     player.update_max_weight();
 
-    let old_name = JobType::from_u16(old_job).map(|j| j.name()).unwrap_or("未知");
+    let old_name = JobType::from_u16(old_job)
+        .map(|j| j.name())
+        .unwrap_or("未知");
     CommandResult::Success(format!(
         "转职成功: {} -> {} (ID: {})",
         old_name,

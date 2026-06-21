@@ -2,8 +2,8 @@
 
 use super::MapServer;
 use crate::game::item::ItemDatabase;
-use crate::game::map::channel::{ChatType, GameEvent, map_channel_name, party_channel_name};
 use crate::game::map::Player;
+use crate::game::map::channel::{ChatType, GameEvent, map_channel_name, party_channel_name};
 use crate::game::trade::TradeItem;
 use crate::game::zeny::ZenyManager;
 use crate::network::session::Session;
@@ -18,7 +18,11 @@ use uuid::Uuid;
 
 impl MapServer {
     /// Handle create party (0x0100)
-    pub(super) fn handle_party_create(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_party_create(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CZMakeParty::from_slice(data)?;
 
@@ -44,7 +48,11 @@ impl MapServer {
     }
 
     /// Handle party invite (0x0101)
-    pub(super) fn handle_party_invite(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
+    pub(super) fn handle_party_invite(
+        &self,
+        data: &[u8],
+        session: &mut Session,
+    ) -> Option<Vec<u8>> {
         let player_id = session.player_id?;
         let pkt = CZReqPartyInvite::from_slice(data)?;
 
@@ -53,7 +61,9 @@ impl MapServer {
         let inviter = self.map_state.get_player(&player_id)?;
 
         // Find target player
-        let target = self.map_state.find_player_by_account_id(pkt.target_account_id)?;
+        let target = self
+            .map_state
+            .find_player_by_account_id(pkt.target_account_id)?;
 
         tracing::info!(
             "Player {} ({}) invited player {} ({}) to party {} ({})",
@@ -275,7 +285,11 @@ impl MapServer {
         let target_id = target.id;
 
         // Don't allow if either player is already in a trade
-        if self.trade_manager.find_session_for_player(player_id).is_some() {
+        if self
+            .trade_manager
+            .find_session_for_player(player_id)
+            .is_some()
+        {
             return None;
         }
         if self
@@ -433,8 +447,7 @@ impl MapServer {
         let cancel_pkt = ZCTradeCancel { reason: 0 }.to_packet();
         self.channel_bus
             .send_to_player(&player1_id, cancel_pkt.clone());
-        self.channel_bus
-            .send_to_player(&player2_id, cancel_pkt);
+        self.channel_bus.send_to_player(&player2_id, cancel_pkt);
         self.trade_manager.end_trade(session_id);
     }
 
@@ -546,17 +559,9 @@ impl MapServer {
             }
 
             // Transfer items (zeny already validated, so this cannot leave partial state)
-            Self::transfer_items(
-                &player1,
-                &player2,
-                &execution.items_for_player2,
-            );
+            Self::transfer_items(&player1, &player2, &execution.items_for_player2);
 
-            Self::transfer_items(
-                &player2,
-                &player1,
-                &execution.items_for_player1,
-            );
+            Self::transfer_items(&player2, &player1, &execution.items_for_player1);
 
             // 物品转移后重新计算双方负重
             Self::recalc_inventory_weight(&player1, &item_db);
@@ -598,11 +603,7 @@ impl MapServer {
     }
 
     /// 将物品从发送者转移到接收者的背包
-    fn transfer_items(
-        sender: &Player,
-        receiver: &Player,
-        items: &[TradeItem],
-    ) {
+    fn transfer_items(sender: &Player, receiver: &Player, items: &[TradeItem]) {
         for item in items {
             // 从发送者背包中移除物品
             {

@@ -3,11 +3,11 @@
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+use crate::game::ipban::IpBanManager;
 use crate::network::session::{Session, SessionManager};
 use crate::protocol::login_packets::{ACAceptLogin, ACRefuseLogin, CALogin};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
-use crate::game::ipban::IpBanManager;
 
 /// Char Server 连接信息
 #[derive(Debug, Clone)]
@@ -73,10 +73,11 @@ impl LoginServer {
     fn handle_ca_login(&self, data: &[u8], session: &mut Session) -> Option<Vec<u8>> {
         // IP 封禁检查：拦截被封禁 IP 的登录请求
         if let Some(ref addr) = session.client_addr
-            && self.ip_ban_manager.is_banned(addr) {
-                warn!("Login rejected: IP {} is banned", addr);
-                return Some(ACRefuseLogin { error_code: 0 }.to_packet());
-            }
+            && self.ip_ban_manager.is_banned(addr)
+        {
+            warn!("Login rejected: IP {} is banned", addr);
+            return Some(ACRefuseLogin { error_code: 0 }.to_packet());
+        }
 
         // 解析登录包
         let login = CALogin::from_slice(data)?;
@@ -94,7 +95,10 @@ impl LoginServer {
                 return Some(ACRefuseLogin { error_code: 0 }.to_packet());
             }
             Err(e) => {
-                error!("Database error during login for user={}: {}", login.username, e);
+                error!(
+                    "Database error during login for user={}: {}",
+                    login.username, e
+                );
                 return Some(ACRefuseLogin { error_code: 0 }.to_packet());
             }
         };
@@ -104,9 +108,10 @@ impl LoginServer {
             warn!("Login failed: invalid password for user={}", login.username);
             // 暴力破解检测：记录失败尝试，超过阈值自动封禁 IP
             if let Some(ref addr) = session.client_addr
-                && self.ip_ban_manager.record_attempt(addr) {
-                    error!("IP {} auto-banned due to brute force attempts", addr);
-                }
+                && self.ip_ban_manager.record_attempt(addr)
+            {
+                error!("IP {} auto-banned due to brute force attempts", addr);
+            }
             return Some(ACRefuseLogin { error_code: 0 }.to_packet());
         }
 
@@ -121,7 +126,10 @@ impl LoginServer {
             let is_allowed = match self.db.check_and_clear_ban(&mut account) {
                 Ok(allowed) => allowed,
                 Err(e) => {
-                    error!("Failed to check ban status for user={}: {}", login.username, e);
+                    error!(
+                        "Failed to check ban status for user={}: {}",
+                        login.username, e
+                    );
                     return Some(ACRefuseLogin { error_code: 0 }.to_packet());
                 }
             };
@@ -178,7 +186,7 @@ mod tests {
     use super::*;
     use crate::protocol::login_packets::CALogin;
     use crate::protocol::packet_builder::Packed;
-    use crate::storage::{init_schema, Database};
+    use crate::storage::{Database, init_schema};
 
     /// 创建测试用的 LoginServer，内部包含内存数据库和已初始化的 schema
     fn create_test_server() -> (LoginServer, Arc<Database>) {
@@ -220,7 +228,10 @@ mod tests {
 
         // 验证 session 已更新
         assert!(session.authenticated, "登录成功后 session 应标记为已认证");
-        assert!(session.account_id.is_some(), "登录成功后 session 应有 account_id");
+        assert!(
+            session.account_id.is_some(),
+            "登录成功后 session 应有 account_id"
+        );
     }
 
     #[test]
@@ -239,14 +250,21 @@ mod tests {
         assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin (0x006A)");
 
         // 验证 session 未被修改
-        assert!(!session.authenticated, "登录失败后 session 不应标记为已认证");
-        assert!(session.account_id.is_none(), "登录失败后 session 不应有 account_id");
+        assert!(
+            !session.authenticated,
+            "登录失败后 session 不应标记为已认证"
+        );
+        assert!(
+            session.account_id.is_none(),
+            "登录失败后 session 不应有 account_id"
+        );
     }
 
     #[test]
     fn test_login_wrong_password() {
         let (server, db) = create_test_server();
-        db.create_account("testuser", "correct_password", 1).unwrap();
+        db.create_account("testuser", "correct_password", 1)
+            .unwrap();
 
         let packet = make_login_packet("testuser", "wrong_password", 20);
         let mut session = Session::new();
@@ -257,7 +275,10 @@ mod tests {
         let response = result.unwrap();
         let packet_id = u16::from_le_bytes([response[2], response[3]]);
         assert_eq!(packet_id, 0x006A, "应返回 ACRefuseLogin (0x006A)");
-        assert!(!session.authenticated, "密码错误后 session 不应标记为已认证");
+        assert!(
+            !session.authenticated,
+            "密码错误后 session 不应标记为已认证"
+        );
     }
 
     #[test]
@@ -269,7 +290,8 @@ mod tests {
         db.execute_params(
             "UPDATE accounts SET state = 5 WHERE account_id = ?1",
             &[&(account_id as i32) as &dyn crate::storage::backend::IntoValue],
-        ).unwrap();
+        )
+        .unwrap();
 
         let packet = make_login_packet("banned_user", "password", 20);
         let mut session = Session::new();
@@ -309,7 +331,10 @@ mod tests {
         // 发送截断的数据包（长度不足）
         let truncated = vec![0u8; 10];
         let result = server.handle_ca_login(&truncated, &mut session);
-        assert!(result.is_none(), "截断的包应返回 None（CALogin::from_slice 失败）");
+        assert!(
+            result.is_none(),
+            "截断的包应返回 None（CALogin::from_slice 失败）"
+        );
     }
 
     #[test]
@@ -325,10 +350,19 @@ mod tests {
         let login_id1 = u32::from_le_bytes([result[8], result[9], result[10], result[11]]);
         let login_id2 = u32::from_le_bytes([result[12], result[13], result[14], result[15]]);
         // 验证 login_id 被正确设置到 session 中，且与响应包一致
-        assert_eq!(session.login_id1, login_id1, "session.login_id1 应与响应包一致");
-        assert_eq!(session.login_id2, login_id2, "session.login_id2 应与响应包一致");
+        assert_eq!(
+            session.login_id1, login_id1,
+            "session.login_id1 应与响应包一致"
+        );
+        assert_eq!(
+            session.login_id2, login_id2,
+            "session.login_id2 应与响应包一致"
+        );
         // login_id 应为非零随机值（极小概率为 0，可接受）
-        assert!(session.login_id1 != 0 || session.login_id2 != 0, "login_id 不应全为 0");
+        assert!(
+            session.login_id1 != 0 || session.login_id2 != 0,
+            "login_id 不应全为 0"
+        );
     }
 
     #[test]
@@ -344,7 +378,8 @@ mod tests {
                 &past_time as &dyn crate::storage::backend::IntoValue,
                 &(account_id as i32) as &dyn crate::storage::backend::IntoValue,
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let packet = make_login_packet("tempban", "pass", 20);
         let mut session = Session::new();
@@ -371,7 +406,8 @@ mod tests {
                 &past_time as &dyn crate::storage::backend::IntoValue,
                 &(account_id as i32) as &dyn crate::storage::backend::IntoValue,
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let packet = make_login_packet("expired", "pass", 20);
         let mut session = Session::new();

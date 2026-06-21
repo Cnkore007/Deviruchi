@@ -138,7 +138,10 @@ impl Clone for CombatStats {
 }
 impl Clone for Position {
     fn clone(&self) -> Self {
-        Self { x: self.x, y: self.y }
+        Self {
+            x: self.x,
+            y: self.y,
+        }
     }
 }
 impl Clone for LevelStats {
@@ -230,7 +233,8 @@ impl Player {
             economy: RwLock::new(Economy {
                 zeny: char.zeny,
                 current_weight: 0,
-                max_weight: constants::BASE_MAX_WEIGHT + (char.str as u32) * constants::WEIGHT_PER_STR,
+                max_weight: constants::BASE_MAX_WEIGHT
+                    + (char.str as u32) * constants::WEIGHT_PER_STR,
                 job: char.class,
                 shop_id: None,
                 group_id: 0,
@@ -246,7 +250,6 @@ impl Player {
             hotkeys: RwLock::new(Vec::new()),
         }
     }
-
 
     // ==================== 分组锁访问器 ====================
 
@@ -1049,14 +1052,14 @@ impl Player {
         let level = self.level_stats();
         let attrs = self.attributes();
         let economy = self.economy();
-        
+
         // 构建背包物品映射
         let inventory = self.inventory.read();
         let mut inventory_map = std::collections::HashMap::new();
         for item in inventory.iter() {
             *inventory_map.entry(item.item_id).or_insert(0) += 1;
         }
-        
+
         ScriptContext {
             char_id: self.char_id,
             char_name: self.name.clone(),

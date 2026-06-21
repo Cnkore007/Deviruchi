@@ -5,8 +5,8 @@
 //! 收购商店与摆摊（vending）相反：玩家发布想要购买的物品和价格，
 //! 其他玩家可以出售物品给收购商店。
 
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// 收购商品条目
@@ -193,11 +193,7 @@ impl BuyingStoreManager {
         self.stores.write().insert(store_id, store);
         self.player_stores.write().insert(owner_id, store_id);
 
-        tracing::info!(
-            "BuyingStore {} created by player {:?}",
-            store_id,
-            owner_id
-        );
+        tracing::info!("BuyingStore {} created by player {:?}", store_id, owner_id);
         Ok(store_id)
     }
 
@@ -343,7 +339,9 @@ mod tests {
         let manager = BuyingStoreManager::new();
         let owner = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Buying Ores".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Buying Ores".to_string(), 100000)
+            .unwrap();
         assert!(store_id > 0);
         assert_eq!(manager.store_count(), 1);
     }
@@ -353,7 +351,9 @@ mod tests {
         let manager = BuyingStoreManager::new();
         let owner = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 100000)
+            .unwrap();
 
         let result = manager.add_item(store_id, 1001, 1000, 100);
         assert_eq!(result, BuyingStoreResult::Success);
@@ -369,7 +369,9 @@ mod tests {
         let owner = Uuid::new_v4();
         let seller = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 100000)
+            .unwrap();
         manager.add_item(store_id, 1001, 1000, 100);
 
         let result = manager.sell_to_store(store_id, seller, 1001, 10);
@@ -385,7 +387,9 @@ mod tests {
         let manager = BuyingStoreManager::new();
         let owner = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 100000)
+            .unwrap();
         manager.add_item(store_id, 1001, 1000, 100);
 
         let result = manager.sell_to_store(store_id, owner, 1001, 10);
@@ -398,7 +402,9 @@ mod tests {
         let owner = Uuid::new_v4();
         let seller = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 500).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 500)
+            .unwrap();
         manager.add_item(store_id, 1001, 1000, 100);
 
         let result = manager.sell_to_store(store_id, seller, 1001, 1);
@@ -411,7 +417,9 @@ mod tests {
         let owner = Uuid::new_v4();
         let seller = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 100000)
+            .unwrap();
         manager.add_item(store_id, 1001, 1000, 2);
 
         manager.sell_to_store(store_id, seller, 1001, 1);
@@ -426,7 +434,9 @@ mod tests {
         let manager = BuyingStoreManager::new();
         let owner = Uuid::new_v4();
 
-        let store_id = manager.create_store(owner, "Test".to_string(), 100000).unwrap();
+        let store_id = manager
+            .create_store(owner, "Test".to_string(), 100000)
+            .unwrap();
 
         let result = manager.close_store(store_id, &owner);
         assert_eq!(result, BuyingStoreResult::Success);
@@ -439,8 +449,12 @@ mod tests {
         let owner1 = Uuid::new_v4();
         let owner2 = Uuid::new_v4();
 
-        let store1 = manager.create_store(owner1, "Store1".to_string(), 100000).unwrap();
-        let store2 = manager.create_store(owner2, "Store2".to_string(), 200000).unwrap();
+        let store1 = manager
+            .create_store(owner1, "Store1".to_string(), 100000)
+            .unwrap();
+        let store2 = manager
+            .create_store(owner2, "Store2".to_string(), 200000)
+            .unwrap();
 
         manager.add_item(store1, 1001, 1000, 100);
         manager.add_item(store2, 1001, 2000, 50);

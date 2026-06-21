@@ -599,8 +599,22 @@ mod tests {
     #[test]
     fn from_slots_roundtrip() {
         let slots = vec![
-            StorageSlot { index: 0, item_id: 501, amount: 5, identified: true, refine: 0, cards: [0; 4] },
-            StorageSlot { index: 1, item_id: 601, amount: 1, identified: true, refine: 7, cards: [4001, 0, 0, 0] },
+            StorageSlot {
+                index: 0,
+                item_id: 501,
+                amount: 5,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
+            StorageSlot {
+                index: 1,
+                item_id: 601,
+                amount: 1,
+                identified: true,
+                refine: 7,
+                cards: [4001, 0, 0, 0],
+            },
         ];
         let storage = Storage::from_slots(42, 10, slots);
         assert_eq!(storage.used_count(), 2);
@@ -614,9 +628,30 @@ mod tests {
     #[test]
     fn from_slots_ignores_out_of_bounds() {
         let slots = vec![
-            StorageSlot { index: 0, item_id: 501, amount: 1, identified: true, refine: 0, cards: [0; 4] },
-            StorageSlot { index: 1, item_id: 502, amount: 1, identified: true, refine: 0, cards: [0; 4] },
-            StorageSlot { index: 2, item_id: 503, amount: 1, identified: true, refine: 0, cards: [0; 4] },
+            StorageSlot {
+                index: 0,
+                item_id: 501,
+                amount: 1,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
+            StorageSlot {
+                index: 1,
+                item_id: 502,
+                amount: 1,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
+            StorageSlot {
+                index: 2,
+                item_id: 503,
+                amount: 1,
+                identified: true,
+                refine: 0,
+                cards: [0; 4],
+            },
         ];
         // max_size=2，第三个元素应被忽略
         let storage = Storage::from_slots(1, 2, slots);

@@ -95,8 +95,7 @@ impl NpcHandler {
             }
             super::data::NpcType::Warp => {
                 // 返回传送目标坐标（而非 NPC 自身坐标）
-                let dest_map = npc.dest_map.clone()
-                    .unwrap_or_else(|| npc.map_name.clone());
+                let dest_map = npc.dest_map.clone().unwrap_or_else(|| npc.map_name.clone());
                 NpcResponse::Warp {
                     map: dest_map,
                     x: npc.dest_x,
@@ -246,9 +245,10 @@ impl NpcHandler {
         {
             let learned = self.learned_skills.read();
             if let Some(skills) = learned.get(&player.char_id)
-                && skills.contains(&skill_id) {
-                    return LearnResult::AlreadyLearned;
-                }
+                && skills.contains(&skill_id)
+            {
+                return LearnResult::AlreadyLearned;
+            }
         }
 
         // 4. 检查 Zeny 是否足够
@@ -262,10 +262,7 @@ impl NpcHandler {
         // 6. 记录已学习
         {
             let mut learned = self.learned_skills.write();
-            learned
-                .entry(player.char_id)
-                .or_default()
-                .insert(skill_id);
+            learned.entry(player.char_id).or_default().insert(skill_id);
         }
 
         LearnResult::Success { skill_id }
@@ -554,7 +551,7 @@ mod tests {
         let skills = npc.skills.read();
         assert_eq!(skills.len(), 2);
         assert_eq!(skills[0].skill_id, 28); // Heal
-        assert_eq!(skills[0].price, 0);     // 免费
+        assert_eq!(skills[0].price, 0); // 免费
     }
 
     #[test]

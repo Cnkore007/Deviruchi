@@ -131,7 +131,9 @@ impl Default for RespawnService {
 mod tests {
     use super::*;
     use crate::game::constants;
-    use crate::game::map::player::{Player, PlayerState, CombatStats, Position, LevelStats, Attributes, Economy, SavePoint};
+    use crate::game::map::player::{
+        Attributes, CombatStats, Economy, LevelStats, Player, PlayerState, Position, SavePoint,
+    };
     use parking_lot::RwLock;
     use uuid::Uuid;
 

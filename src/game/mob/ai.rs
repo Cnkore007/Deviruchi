@@ -174,11 +174,12 @@ impl MobAI {
                     // 检查该怪物是否正在被玩家攻击（有伤害记录且处于战斗状态）
                     let other_state = *other_mob.ai_state.read();
                     if matches!(other_state, MobAIState::Chase | MobAIState::Attack)
-                        && let Some(attacker_id) = *other_mob.target_id.read() {
-                            *mob.ai_state.write() = MobAIState::Chase;
-                            *mob.target_id.write() = Some(attacker_id);
-                            return;
-                        }
+                        && let Some(attacker_id) = *other_mob.target_id.read()
+                    {
+                        *mob.ai_state.write() = MobAIState::Chase;
+                        *mob.target_id.write() = Some(attacker_id);
+                        return;
+                    }
                 }
             }
             MobBehavior::PassiveAssist => {
@@ -197,11 +198,12 @@ impl MobAI {
                         }
                         let other_state = *other_mob.ai_state.read();
                         if matches!(other_state, MobAIState::Chase | MobAIState::Attack)
-                            && let Some(attacker_id) = *other_mob.target_id.read() {
-                                *mob.ai_state.write() = MobAIState::Chase;
-                                *mob.target_id.write() = Some(attacker_id);
-                                return;
-                            }
+                            && let Some(attacker_id) = *other_mob.target_id.read()
+                        {
+                            *mob.ai_state.write() = MobAIState::Chase;
+                            *mob.target_id.write() = Some(attacker_id);
+                            return;
+                        }
                     }
                 }
             }
@@ -460,17 +462,14 @@ impl MobAI {
     }
 
     /// 执行对自身使用的技能（治疗/增益）
-    fn execute_self_skill(
-        &self,
-        mob: &Arc<Mob>,
-        skill: &MobSkill,
-        skill_type: Option<SkillType>,
-    ) {
+    fn execute_self_skill(&self, mob: &Arc<Mob>, skill: &MobSkill, skill_type: Option<SkillType>) {
         // 未知技能跳过执行，避免误判类型
         if skill_type.is_none() {
             tracing::warn!(
                 "怪物 {}({}) 使用未知技能 ID={}，跳过执行",
-                mob.name, mob.mob_id, skill.skill_id
+                mob.name,
+                mob.mob_id,
+                skill.skill_id
             );
             return;
         }
@@ -519,7 +518,9 @@ impl MobAI {
         if skill_type.is_none() {
             tracing::warn!(
                 "怪物 {}({}) 对目标使用未知技能 ID={}，跳过执行",
-                mob.name, mob.mob_id, skill.skill_id
+                mob.name,
+                mob.mob_id,
+                skill.skill_id
             );
             return;
         }
@@ -767,7 +768,9 @@ mod tests {
     use super::*;
     use crate::game::constants;
     use crate::game::map::{MapState, Player};
-    use crate::game::mob::data::{MobPathManager, MobPosition, MobSkill, MobSkillCondition, MobSkillTarget};
+    use crate::game::mob::data::{
+        MobPathManager, MobPosition, MobSkill, MobSkillCondition, MobSkillTarget,
+    };
     use crate::game::rand::{GameRng, MockRng};
 
     fn create_test_mob_ai(values: Vec<u32>) -> MobAI {
@@ -810,7 +813,10 @@ mod tests {
             entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "TestMob".to_string(),
-            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(MobPosition {
+                x: position.0,
+                y: position.1,
+            }),
             map_name: "test_map".to_string(),
             level,
             hp: parking_lot::RwLock::new(500),
@@ -875,7 +881,10 @@ mod tests {
                 walk_speed: constants::DEFAULT_WALK_SPEED,
                 direction: 0,
             }),
-            pos: parking_lot::RwLock::new(crate::game::map::player::Position { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(crate::game::map::player::Position {
+                x: position.0,
+                y: position.1,
+            }),
             level: parking_lot::RwLock::new(crate::game::map::player::LevelStats {
                 base_level: level,
                 job_level: 5,
@@ -966,7 +975,10 @@ mod tests {
             entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "PassiveMob".to_string(),
-            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(MobPosition {
+                x: position.0,
+                y: position.1,
+            }),
             map_name: "test_map".to_string(),
             level: 5,
             hp: parking_lot::RwLock::new(500),
@@ -1011,7 +1023,6 @@ mod tests {
             dmglog: parking_lot::RwLock::new(std::collections::HashMap::new()),
             flee_from: parking_lot::RwLock::new(None),
         });
-
 
         let player = create_test_player((105, 105), 10); // Distance = 7.07 < sight_range
 
@@ -1317,7 +1328,10 @@ mod tests {
             entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1002,
             name: "SkilledMob".to_string(),
-            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(MobPosition {
+                x: position.0,
+                y: position.1,
+            }),
             map_name: "test_map".to_string(),
             level,
             hp: parking_lot::RwLock::new(500),
@@ -1403,8 +1417,10 @@ mod tests {
     #[test]
     fn test_is_skill_ready_no_cooldown() {
         let ai = create_test_mob_ai(vec![]);
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 5,
                 level: 1,
                 chance: 1000,
@@ -1412,8 +1428,8 @@ mod tests {
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 5000,
-            },
-        ]);
+            }],
+        );
 
         // 从未使用过，应该可用
         assert!(ai.is_skill_ready(&mob, &mob.skills[0]));
@@ -1422,8 +1438,10 @@ mod tests {
     #[test]
     fn test_is_skill_ready_on_cooldown() {
         let ai = create_test_mob_ai(vec![]);
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 5,
                 level: 1,
                 chance: 1000,
@@ -1431,8 +1449,8 @@ mod tests {
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 60000, // 60秒冷却
-            },
-        ]);
+            }],
+        );
 
         // 刚刚使用过
         mob.skill_cooldowns.write().insert(5, Instant::now());
@@ -1465,8 +1483,10 @@ mod tests {
             Arc::new(SkillDatabase::new()),
         );
 
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 5,
                 level: 3,
                 chance: 10000, // 100% 概率
@@ -1474,8 +1494,8 @@ mod tests {
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 0, // 无冷却
-            },
-        ]);
+            }],
+        );
 
         let player = create_test_player((100, 101), 10);
         let map_state = create_test_map_state();
@@ -1489,8 +1509,10 @@ mod tests {
     fn test_try_use_skill_does_not_trigger_on_zero_chance() {
         let ai = create_test_mob_ai(vec![5000]); // roll = 5000 > 0 概率
 
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 5,
                 level: 3,
                 chance: 0, // 0% 概率
@@ -1498,8 +1520,8 @@ mod tests {
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 0,
-            },
-        ]);
+            }],
+        );
 
         let player = create_test_player((100, 101), 10);
         let map_state = create_test_map_state();
@@ -1513,8 +1535,10 @@ mod tests {
     fn test_try_use_skill_hp_condition_blocks() {
         let ai = create_test_mob_ai(vec![0]);
 
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 28,
                 level: 3,
                 chance: 10000, // 100%
@@ -1522,8 +1546,8 @@ mod tests {
                 condition: MobSkillCondition::HpCertain,
                 condition_value: 50, // HP 低于 50% 才触发
                 cooldown_ms: 0,
-            },
-        ]);
+            }],
+        );
 
         let player = create_test_player((100, 101), 10);
         let map_state = create_test_map_state();
@@ -1541,8 +1565,10 @@ mod tests {
     fn test_try_use_skill_cooldown_blocks() {
         let ai = create_test_mob_ai(vec![0]);
 
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
                 skill_id: 5,
                 level: 3,
                 chance: 10000, // 100%
@@ -1550,8 +1576,8 @@ mod tests {
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 60000, // 60 秒冷却
-            },
-        ]);
+            }],
+        );
 
         let player = create_test_player((100, 101), 10);
         let map_state = create_test_map_state();
@@ -1578,17 +1604,19 @@ mod tests {
             Arc::new(SkillDatabase::new()),
         );
 
-        let mob = create_test_mob_with_skills((100, 100), 5, vec![
-            MobSkill {
-                skill_id: 1,    // Bash (硬编码 id=1)
+        let mob = create_test_mob_with_skills(
+            (100, 100),
+            5,
+            vec![MobSkill {
+                skill_id: 1, // Bash (硬编码 id=1)
                 level: 3,
-                chance: 10000,  // 100%
+                chance: 10000, // 100%
                 target: MobSkillTarget::Target,
                 condition: MobSkillCondition::Any,
                 condition_value: 0,
                 cooldown_ms: 5000, // 有冷却
-            },
-        ]);
+            }],
+        );
 
         let player = create_test_player((100, 101), 10);
         *mob.target_id.write() = Some(player.id);
@@ -1601,15 +1629,22 @@ mod tests {
 
         // 验证技能被使用：冷却应该被设置
         let cooldowns = mob.skill_cooldowns.read();
-        assert!(cooldowns.contains_key(&1), "技能 ID=1 的冷却应该被设置，说明技能被触发了");
+        assert!(
+            cooldowns.contains_key(&1),
+            "技能 ID=1 的冷却应该被设置，说明技能被触发了"
+        );
         drop(cooldowns);
 
         // 验证伤害记录被更新（技能执行时会记录伤害）
         let damage_log = mob.damage_log.read();
-        assert!(damage_log.contains_key(&player.id),
-            "伤害记录应该包含对玩家的伤害");
-        assert!(*damage_log.get(&player.id).unwrap() > 0,
-            "技能应该造成正数伤害");
+        assert!(
+            damage_log.contains_key(&player.id),
+            "伤害记录应该包含对玩家的伤害"
+        );
+        assert!(
+            *damage_log.get(&player.id).unwrap() > 0,
+            "技能应该造成正数伤害"
+        );
     }
 
     // ============================================
@@ -1699,7 +1734,10 @@ mod tests {
             entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "FleeMob".to_string(),
-            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(MobPosition {
+                x: position.0,
+                y: position.1,
+            }),
             map_name: "test_map".to_string(),
             level: 5,
             hp: parking_lot::RwLock::new(hp),
@@ -1846,7 +1884,12 @@ mod tests {
         // 怪物应该向远离攻击者的方向移动
         let (new_x, new_y) = mob.get_position();
         // 攻击者在右边 (103, 100)，怪物应该向左移动
-        assert!(new_x < 100, "怪物应该向左移动远离攻击者，实际位置: ({}, {})", new_x, new_y);
+        assert!(
+            new_x < 100,
+            "怪物应该向左移动远离攻击者，实际位置: ({}, {})",
+            new_x,
+            new_y
+        );
     }
 
     #[test]
@@ -1901,13 +1944,19 @@ mod tests {
     // ============================================
 
     /// 创建 Assist 行为的测试怪物
-    fn create_assist_mob(position: (u16, u16), behavior: crate::game::mob::MobBehavior) -> Arc<Mob> {
+    fn create_assist_mob(
+        position: (u16, u16),
+        behavior: crate::game::mob::MobBehavior,
+    ) -> Arc<Mob> {
         Arc::new(Mob {
             id: Uuid::new_v4(),
             entity_id: std::sync::atomic::AtomicU32::new(0),
             mob_id: 1001,
             name: "AssistMob".to_string(),
-            pos: parking_lot::RwLock::new(MobPosition { x: position.0, y: position.1 }),
+            pos: parking_lot::RwLock::new(MobPosition {
+                x: position.0,
+                y: position.1,
+            }),
             map_name: "test_map".to_string(),
             level: 5,
             hp: parking_lot::RwLock::new(500),
@@ -2027,7 +2076,8 @@ mod tests {
     #[test]
     fn passive_assist_mob_chases_after_being_attacked() {
         // PassiveAssist 怪物被攻击后才会协助
-        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
+        let assist_mob =
+            create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
         let other_mob = create_test_mob((105, 105), 5);
         let player = create_test_player((106, 106), 10);
 
@@ -2064,7 +2114,8 @@ mod tests {
     #[test]
     fn passive_assist_mob_stays_idle_without_damage() {
         // PassiveAssist 怪物未被攻击时不应协助
-        let assist_mob = create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
+        let assist_mob =
+            create_assist_mob((100, 100), crate::game::mob::MobBehavior::PassiveAssist);
         let other_mob = create_test_mob((105, 105), 5);
         let player = create_test_player((106, 106), 10);
 

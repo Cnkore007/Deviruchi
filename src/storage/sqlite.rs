@@ -66,9 +66,10 @@ impl Database {
         F: FnOnce(&Row) -> Result<T>,
     {
         let rows = self.backend.query_rows(sql, params)?;
-        let row = rows.into_iter().next().ok_or_else(|| {
-            crate::error::Error::DatabaseBackend("query returned no rows".into())
-        })?;
+        let row = rows
+            .into_iter()
+            .next()
+            .ok_or_else(|| crate::error::Error::DatabaseBackend("query returned no rows".into()))?;
         f(&row)
     }
 

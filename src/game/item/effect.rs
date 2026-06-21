@@ -655,8 +655,7 @@ fn parse_command(line: &str) -> Option<ItemEffect> {
             // getitem2 <item_id>,<count>,<rate>
             let item_id = parse_int(parts.get(1).unwrap_or(&"0")) as u16;
             let count = parse_int(parts.get(2).unwrap_or(&"1")).max(1) as u16;
-            let rate = parse_int(parts.get(3).unwrap_or(&"10000"))
-                .clamp(1, 10000) as u16;
+            let rate = parse_int(parts.get(3).unwrap_or(&"10000")).clamp(1, 10000) as u16;
             Some(ItemEffect::GetItem {
                 item_id,
                 count,

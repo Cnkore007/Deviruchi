@@ -17,15 +17,17 @@ impl ScriptedBattleFormula {
 
     pub fn hit_rate(&self, attacker: &Player, defender: &Mob) -> i32 {
         if let Some(ref engine) = self.engine
-            && let Some(rate) = engine.call_battle_fn(
-                "hit_rate",
-                vec![
-                    rhai::Dynamic::from(attacker.base_level() as i64),
-                    rhai::Dynamic::from(attacker.dex() as i64),
-                    rhai::Dynamic::from(attacker.luk() as i64),
-                    rhai::Dynamic::from(defender.flee as i64),
-                ],
-            ).and_then(|v| v.as_int().ok())
+            && let Some(rate) = engine
+                .call_battle_fn(
+                    "hit_rate",
+                    vec![
+                        rhai::Dynamic::from(attacker.base_level() as i64),
+                        rhai::Dynamic::from(attacker.dex() as i64),
+                        rhai::Dynamic::from(attacker.luk() as i64),
+                        rhai::Dynamic::from(defender.flee as i64),
+                    ],
+                )
+                .and_then(|v| v.as_int().ok())
         {
             return rate as i32;
         }

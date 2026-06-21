@@ -7,7 +7,7 @@ use crate::game::guild::{Guild, GuildMember, GuildPosition};
 use crate::storage::Database;
 use crate::storage::backend::IntoValue;
 use crate::storage::chrono_now;
-use crate::storage::{safe_u32_from_i64, safe_u16_from_i64, safe_u8_from_i64, safe_u64_from_i64};
+use crate::storage::{safe_u8_from_i64, safe_u16_from_i64, safe_u32_from_i64, safe_u64_from_i64};
 
 /// 公会数据库持久化
 pub struct GuildStorage {
@@ -223,10 +223,7 @@ impl GuildStorage {
 
     /// 加载所有公会
     pub fn load_all_guilds(&self) -> Result<Vec<Guild>> {
-        let rows = self.db.query_rows(
-            "SELECT guild_uuid FROM guilds",
-            &[],
-        )?;
+        let rows = self.db.query_rows("SELECT guild_uuid FROM guilds", &[])?;
 
         let mut guilds = Vec::new();
         for row in &rows {

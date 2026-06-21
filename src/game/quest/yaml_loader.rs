@@ -52,11 +52,16 @@ struct QuestDrop {
     Rate: u32,
 }
 
-fn default_one() -> u32 { 1 }
+fn default_one() -> u32 {
+    1
+}
 
 impl QuestDbEntry {
     fn to_quest(&self) -> Quest {
-        let title = self.Title.clone().unwrap_or_else(|| format!("Quest {}", self.Id));
+        let title = self
+            .Title
+            .clone()
+            .unwrap_or_else(|| format!("Quest {}", self.Id));
         let mut objectives = Vec::new();
         let mut obj_id = 1u32;
 
@@ -92,8 +97,7 @@ impl QuestDbEntry {
             QuestType::Custom
         };
 
-        Quest::new(self.Id, &title, &title, quest_type)
-            .with_objectives(objectives)
+        Quest::new(self.Id, &title, &title, quest_type).with_objectives(objectives)
     }
 }
 

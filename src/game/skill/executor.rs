@@ -136,14 +136,15 @@ impl SkillExecutor {
         // element == 0 (Neutral/Weapon) 使用物理公式，其他使用魔法公式
         let raw_damage = if skill.element == 0 {
             // 物理伤害：base_atk * multiplier / 100
-            let base_atk = caster_base_level * 2
-                + caster.str() as i32
-                + caster.dex() as i32 / 2;
+            let base_atk = caster_base_level * 2 + caster.str() as i32 + caster.dex() as i32 / 2;
             base_atk * skill_multiplier / 100
         } else {
             // 魔法伤害：使用 calc_magic_damage 公式
             let matk = caster_int * 2 + caster_dex;
-            let DamageResult { damage, element_modifier: _ } = formula::calc_magic_damage(
+            let DamageResult {
+                damage,
+                element_modifier: _,
+            } = formula::calc_magic_damage(
                 matk as u32,
                 skill_level,
                 skill_element,
@@ -305,7 +306,10 @@ impl SkillExecutor {
         let result = SkillEffect::apply(skill, caster, target, skill_level);
 
         match result {
-            SkillResult::Buff { buff_type, duration } => {
+            SkillResult::Buff {
+                buff_type,
+                duration,
+            } => {
                 tracing::info!(
                     "Buff 技能 {} 施加给 {}，持续 {}ms",
                     skill.name,
@@ -422,11 +426,7 @@ impl SkillExecutor {
 
         let hit_count = (damages.len() + heals.len()) as u32;
 
-        tracing::info!(
-            "范围技能 {} 命中 {} 个目标",
-            skill.name,
-            hit_count
-        );
+        tracing::info!("范围技能 {} 命中 {} 个目标", skill.name, hit_count);
 
         Some(AreaSkillResult {
             hit_count,
@@ -440,10 +440,12 @@ impl SkillExecutor {
 mod tests {
     use super::*;
     use crate::game::constants;
-    use crate::game::map::player::{CombatStats, PlayerState, Position, LevelStats, Attributes, Economy, SavePoint};
     use crate::game::item::Equipment;
-    use crate::game::status::PlayerStatus;
     use crate::game::map::MapState;
+    use crate::game::map::player::{
+        Attributes, CombatStats, Economy, LevelStats, PlayerState, Position, SavePoint,
+    };
+    use crate::game::status::PlayerStatus;
     use parking_lot::RwLock;
     use std::sync::Arc;
     use uuid::Uuid;
@@ -485,7 +487,7 @@ mod tests {
                 str: 10,
                 agi: 10,
                 vit: 10,
-                int: 30,  // 高智力用于魔法伤害测试
+                int: 30, // 高智力用于魔法伤害测试
                 dex: 20,
                 luk: 5,
             }),
@@ -768,20 +770,14 @@ mod tests {
     fn test_execute_area_skill_excludes_out_of_range() {
         let map_state = MapState::new();
         let caster = make_player("Caster", 100, 100);
-        let near_target = make_player("Near", 105, 100);   // 距离 5，在范围内
-        let far_target = make_player("Far", 200, 200);     // 距离 100，超出范围
+        let near_target = make_player("Near", 105, 100); // 距离 5，在范围内
+        let far_target = make_player("Far", 200, 200); // 距离 100，超出范围
 
         map_state.add_player((*caster).clone());
         map_state.add_player((*near_target).clone());
         map_state.add_player((*far_target).clone());
 
-        let result = SkillExecutor::execute_area_skill(
-            25,
-            1,
-            &caster,
-            (100, 100),
-            &map_state,
-        );
+        let result = SkillExecutor::execute_area_skill(25, 1, &caster, (100, 100), &map_state);
 
         assert!(result.is_some());
         let r = result.unwrap();
@@ -797,13 +793,7 @@ mod tests {
         map_state.add_player((*caster).clone());
         map_state.add_player((*target).clone());
 
-        let result = SkillExecutor::execute_area_skill(
-            25,
-            1,
-            &caster,
-            (100, 100),
-            &map_state,
-        );
+        let result = SkillExecutor::execute_area_skill(25, 1, &caster, (100, 100), &map_state);
 
         assert!(result.is_some());
         let r = result.unwrap();
@@ -826,13 +816,7 @@ mod tests {
         map_state.add_player((*ally2).clone());
 
         // 治愈术 (ID=28) range=9
-        let result = SkillExecutor::execute_area_skill(
-            28,
-            1,
-            &caster,
-            (100, 100),
-            &map_state,
-        );
+        let result = SkillExecutor::execute_area_skill(28, 1, &caster, (100, 100), &map_state);
 
         assert!(result.is_some());
         let r = result.unwrap();
@@ -852,13 +836,7 @@ mod tests {
         let caster = make_player("Caster", 100, 100);
         map_state.add_player((*caster).clone());
 
-        let result = SkillExecutor::execute_area_skill(
-            25,
-            1,
-            &caster,
-            (100, 100),
-            &map_state,
-        );
+        let result = SkillExecutor::execute_area_skill(25, 1, &caster, (100, 100), &map_state);
 
         assert!(result.is_some());
         let r = result.unwrap();

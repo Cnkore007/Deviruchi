@@ -75,8 +75,7 @@ impl AgentApi {
             .and_then(|v| v.as_str())
             .ok_or("缺少 section 参数")?;
 
-        let config =
-            Config::load(&self.config_path).map_err(|e| format!("加载配置失败: {}", e))?;
+        let config = Config::load(&self.config_path).map_err(|e| format!("加载配置失败: {}", e))?;
 
         let value = match section {
             "server" => serde_json::to_value(&config.server),

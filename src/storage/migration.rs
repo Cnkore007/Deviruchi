@@ -71,11 +71,7 @@ impl MigrationManager {
 
         for (version, migration) in &self.migrations {
             if *version > current {
-                tracing::info!(
-                    "执行迁移 v{}: {}",
-                    version,
-                    migration.description
-                );
+                tracing::info!("执行迁移 v{}: {}", version, migration.description);
 
                 // 将迁移 SQL 和版本记录写入同一个事务，保证原子性
                 let up_sql = migration.up;
@@ -124,11 +120,7 @@ impl MigrationManager {
         for (version, migration) in self.migrations.iter().rev() {
             if *version > target_version && *version <= current {
                 if let Some(down_sql) = migration.down {
-                    tracing::info!(
-                        "回滚迁移 v{}: {}",
-                        version,
-                        migration.description
-                    );
+                    tracing::info!("回滚迁移 v{}: {}", version, migration.description);
 
                     db.execute(down_sql)?;
 

@@ -203,7 +203,9 @@ pub fn apply_item_effect(
         ItemEffect::Produce(item_id) => execute_produce(player, inventory, *item_id),
 
         // 使用技能
-        ItemEffect::UseSkill { skill_id, level } => execute_use_skill(player, None, *skill_id, *level),
+        ItemEffect::UseSkill { skill_id, level } => {
+            execute_use_skill(player, None, *skill_id, *level)
+        }
 
         // 剥离装备
         ItemEffect::StripArmor | ItemEffect::StripWeapon | ItemEffect::StripAccessory => {
@@ -252,7 +254,10 @@ fn execute_teleport(player: &Player, map: &str, x: i32, y: i32) -> ItemUseResult
         player.move_to(save_x, save_y);
         tracing::info!(
             "Player {} teleported to save point {} ({}, {})",
-            player.id, save_map, save_x, save_y
+            player.id,
+            save_map,
+            save_x,
+            save_y
         );
         return ItemUseResult::Success;
     }
@@ -264,12 +269,9 @@ fn execute_teleport(player: &Player, map: &str, x: i32, y: i32) -> ItemUseResult
 
     // 执行传送
     player.move_to(x as u16, y as u16);
-    
-    tracing::info!(
-        "Player {} teleported to {} ({}, {})",
-        player.id, map, x, y
-    );
-    
+
+    tracing::info!("Player {} teleported to {} ({}, {})", player.id, map, x, y);
+
     ItemUseResult::Success
 }
 
@@ -344,7 +346,12 @@ fn execute_produce(player: &Player, inventory: &mut Inventory, item_id: i32) -> 
 ///
 /// 模拟玩家使用指定技能。对应 rAthena 的技能卷轴、技能书等物品效果。
 /// 注意：此函数仅触发技能效果，不消耗 SP。
-fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, level: u8) -> ItemUseResult {
+fn execute_use_skill(
+    player: &Player,
+    target: Option<&Player>,
+    skill_id: u16,
+    level: u8,
+) -> ItemUseResult {
     // 检查玩家是否可以施法
     if !player.can_cast() {
         return ItemUseResult::Failed("当前状态无法施法".to_string());
@@ -363,7 +370,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_heal(heal_amount);
             tracing::info!(
                 "Player {} used Heal skill (level {}) via item, healed {} HP",
-                player.id, level, heal_amount
+                player.id,
+                level,
+                heal_amount
             );
         }
         // 加速术 (AL_INCAGI)
@@ -371,7 +380,8 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_haste(level);
             tracing::info!(
                 "Player {} used Increase AGI skill (level {}) via item",
-                player.id, level
+                player.id,
+                level
             );
         }
         // 天使之击 (AL_ANGELUS) - 防御提升
@@ -385,7 +395,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Angelus skill (level {}), defense buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 祝福术 (AL_BLESSING)
@@ -393,7 +405,8 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_blessing(level);
             tracing::info!(
                 "Player {} used Blessing skill (level {}) via item",
-                player.id, level
+                player.id,
+                level
             );
         }
         // 天使之光 (AL_AGI) - 敏捷提升
@@ -407,7 +420,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Increase AGI skill (level {}), AGI buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_ASPERSIO) - 祝圣（武器附加圣属性）
@@ -421,7 +436,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Aspersio skill (level {}), holy weapon for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_BENEDICTIO) - 祝福
@@ -430,7 +447,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_heal(heal_amount);
             tracing::info!(
                 "Player {} used Benedictio skill (level {}), healed {} HP",
-                player.id, level, heal_amount
+                player.id,
+                level,
+                heal_amount
             );
         }
         // 治愈术 (PR_SANCTUARY) - 圣域
@@ -439,7 +458,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_heal(heal_amount);
             tracing::info!(
                 "Player {} used Sanctuary skill (level {}), healed {} HP",
-                player.id, level, heal_amount
+                player.id,
+                level,
+                heal_amount
             );
         }
         // 治愈术 (PR_STRECOVERY) - 力量恢复（SP 恢复）
@@ -455,7 +476,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.apply_sp_heal(sp_amount);
             tracing::info!(
                 "Player {} used Strength Recovery skill (level {}), restored {} SP",
-                player.id, level, sp_amount
+                player.id,
+                level,
+                sp_amount
             );
         }
         // 治愈术 (PR_MAGNIFICAT) - 赞美诗（SP 恢复速度提升）
@@ -469,7 +492,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Magnificat skill (level {}), SP regen buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_GLORIA) - 荣耀颂（LUK 提升）
@@ -483,7 +508,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Gloria skill (level {}), LUK buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_SUFFRAGIUM) - 祈祷（减少施法时间）
@@ -497,7 +524,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Suffragium skill (level {}), cast time reduction for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_IMPOSITIO) - 奉献（ATK 提升）
@@ -511,7 +540,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Impositio Manus skill (level {}), ATK buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_LAUDAAGNUS) - 赞美诗（VIT 提升）
@@ -525,7 +556,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Lauda Agnus skill (level {}), VIT buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_LAUDARAMUS) - 赞美诗（LUK 提升）
@@ -539,7 +572,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Lauda Ramus skill (level {}), LUK buff for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (PR_LEXDIVINA) - 神圣之言（沉默）
@@ -554,12 +589,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.add_status(effect);
                 tracing::info!(
                     "Player {} used Lex Divina (level {}), silenced target {} for {}s",
-                    player.id, level, t.id, duration
+                    player.id,
+                    level,
+                    t.id,
+                    duration
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Lex Divina (level {}) but no target, effect ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -575,12 +614,15 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.add_status(effect);
                 tracing::info!(
                     "Player {} used Lex Aeterna (level {}), double damage debuff on target {}",
-                    player.id, level, t.id
+                    player.id,
+                    level,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Lex Aeterna (level {}) but no target, effect ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -592,12 +634,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Turn Undead (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Turn Undead (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -613,7 +659,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Kyrie Eleison skill (level {}), shield for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (MG_SRECOVERY) - SP 恢复
@@ -626,7 +674,8 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used SP Recovery skill (level {}), SP regen buff",
-                player.id, level
+                player.id,
+                level
             );
         }
         // 治愈术 (MG_SIGHT) - 透视（检测隐形单位）
@@ -639,7 +688,8 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Sight skill (level {}), detect hidden units",
-                player.id, level
+                player.id,
+                level
             );
         }
         // 治愈术 (MG_NAPALMBEAT) - 火焰弹
@@ -649,12 +699,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Napalm Beat (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Napalm Beat (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -670,7 +724,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Safety Wall skill (level {}), physical shield for {}s",
-                player.id, level, duration
+                player.id,
+                level,
+                duration
             );
         }
         // 治愈术 (MG_SOULSTRIKE) - 灵魂打击
@@ -680,12 +736,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Soul Strike (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Soul Strike (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -697,12 +757,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Cold Bolt (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Cold Bolt (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -719,12 +783,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.add_status(effect);
                 tracing::info!(
                     "Player {} used Frost Diver (level {}), froze target {} for {}s",
-                    player.id, level, t.id, duration
+                    player.id,
+                    level,
+                    t.id,
+                    duration
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Frost Diver (level {}) but no target, effect ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -741,12 +809,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.add_status(effect);
                 tracing::info!(
                     "Player {} used Stone Curse (level {}), petrified target {} for {}s",
-                    player.id, level, t.id, duration
+                    player.id,
+                    level,
+                    t.id,
+                    duration
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Stone Curse (level {}) but no target, effect ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -758,12 +830,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Fire Ball (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Fire Ball (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -778,7 +854,8 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
             player.add_status(effect);
             tracing::info!(
                 "Player {} used Fire Wall skill (level {}), fire damage zone",
-                player.id, level
+                player.id,
+                level
             );
         }
         // 治愈术 (MG_FIREBOLT) - 火箭
@@ -788,12 +865,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Fire Bolt (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Fire Bolt (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -805,12 +886,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.take_damage(damage);
                 tracing::info!(
                     "Player {} used Lightning Bolt (level {}), dealt {} damage to target {}",
-                    player.id, level, damage, t.id
+                    player.id,
+                    level,
+                    damage,
+                    t.id
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Lightning Bolt (level {}) but no target, damage ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -827,12 +912,16 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
                 t.add_status(effect);
                 tracing::info!(
                     "Player {} used Thunder Storm (level {}), stunned target {} for {}s",
-                    player.id, level, t.id, duration
+                    player.id,
+                    level,
+                    t.id,
+                    duration
                 );
             } else {
                 tracing::warn!(
                     "Player {} used Thunder Storm (level {}) but no target, effect ignored",
-                    player.id, level
+                    player.id,
+                    level
                 );
                 return ItemUseResult::Failed("没有目标".to_string());
             }
@@ -840,7 +929,9 @@ fn execute_use_skill(player: &Player, target: Option<&Player>, skill_id: u16, le
         _ => {
             tracing::warn!(
                 "Item skill {} (level {}) not implemented for player {}",
-                skill_id, level, player.id
+                skill_id,
+                level,
+                player.id
             );
             return ItemUseResult::Failed(format!("技能 {} 暂未实现.", skill_id));
         }
@@ -880,7 +971,9 @@ fn execute_strip_equipment(player: &Player, effect: &ItemEffect) -> ItemUseResul
     if let Some(item) = equipment.unequip(slot) {
         tracing::info!(
             "Player {:?} equipment stripped from slot {:?}, item {:?} moved to inventory.",
-            player.id, slot, item.item_id
+            player.id,
+            slot,
+            item.item_id
         );
         // 注意：实际实现需要将 item 放回背包
     }
@@ -924,21 +1017,25 @@ fn execute_endure(
 fn execute_consume_ammo(player: &Player) -> ItemUseResult {
     // 注意：当前版本 EquipSlot 没有 Ammo 槽位
     // 在完整实现中，弹药应该存储在单独的弹药槽或背包中
-    
+
     // 检查左手是否有弹药（如箭矢）
     let equipment = player.equipment.read();
     let left_hand = equipment.get(EquipSlot::LeftHand);
-    
+
     if let Some(ammo) = left_hand {
         tracing::info!(
             "Player {} consumed 1 ammo from left hand (item {})",
-            player.id, ammo.item_id
+            player.id,
+            ammo.item_id
         );
         // 注意：实际实现需要从弹药堆叠中减少数量
         // 当前简化处理：仅记录日志
     } else {
         // 如果没有装备弹药，直接返回成功（某些技能不需要弹药）
-        tracing::debug!("Player {} ammo consumption skipped (no ammo equipped)", player.id);
+        tracing::debug!(
+            "Player {} ammo consumption skipped (no ammo equipped)",
+            player.id
+        );
     }
 
     ItemUseResult::Success
@@ -957,15 +1054,16 @@ fn execute_disguise(player: &Player, mob_id: u16) -> ItemUseResult {
     // 应用伪装状态效果
     let effect = StatusEffect::new(
         StatusChange::Disguise,
-        300000, // 5 分钟默认持续时间
+        300000,                // 5 分钟默认持续时间
         StatusSource::Item(0), // item_id 暂时为 0
     );
-    
+
     player.add_status(effect);
-    
+
     tracing::info!(
         "Player {} disguised as mob {} (duration: 5 min)",
-        player.id, mob_id
+        player.id,
+        mob_id
     );
 
     ItemUseResult::Success

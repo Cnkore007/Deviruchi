@@ -4,8 +4,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::data::{Guild, GuildPermission};
-use crate::storage::guild::GuildStorage;
 use crate::storage::Database;
+use crate::storage::guild::GuildStorage;
 
 /// 公会管理器
 ///
@@ -51,7 +51,11 @@ impl GuildManager {
                     for player_id in guild.members.keys() {
                         player_map.insert(*player_id, guild.id);
                     }
-                    tracing::info!("已加载公会: {} (成员数: {})", guild.name, guild.members.len());
+                    tracing::info!(
+                        "已加载公会: {} (成员数: {})",
+                        guild.name,
+                        guild.members.len()
+                    );
                     guild_map.insert(guild.id, guild);
                 }
                 tracing::info!("公会数据加载完成，共 {} 个公会", guild_map.len());
@@ -84,9 +88,10 @@ impl GuildManager {
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
             if let Some(guild) = guilds.get(&guild_id)
-                && let Err(e) = storage.save_guild(guild) {
-                    tracing::warn!("持久化创建公会失败: {}", e);
-                }
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化创建公会失败: {}", e);
+            }
         }
 
         Some(guild_id)
@@ -107,9 +112,10 @@ impl GuildManager {
 
             // 从数据库删除
             if let Some(ref storage) = self.storage
-                && let Err(e) = storage.delete_guild(guild_id) {
-                    tracing::warn!("持久化删除公会失败: {}", e);
-                }
+                && let Err(e) = storage.delete_guild(guild_id)
+            {
+                tracing::warn!("持久化删除公会失败: {}", e);
+            }
 
             true
         } else {
@@ -169,9 +175,10 @@ impl GuildManager {
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
             if let Some(guild) = guilds.get(&guild_id)
-                && let Err(e) = storage.save_guild(guild) {
-                    tracing::warn!("持久化加入公会失败: {}", e);
-                }
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化加入公会失败: {}", e);
+            }
         }
 
         true
@@ -199,9 +206,10 @@ impl GuildManager {
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
             if let Some(guild) = guilds.get(&guild_id)
-                && let Err(e) = storage.save_guild(guild) {
-                    tracing::warn!("持久化离开公会失败: {}", e);
-                }
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化离开公会失败: {}", e);
+            }
         }
 
         true
@@ -229,9 +237,10 @@ impl GuildManager {
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
             if let Some(guild) = guilds.get(&guild_id)
-                && let Err(e) = storage.save_guild(guild) {
-                    tracing::warn!("持久化踢出成员失败: {}", e);
-                }
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化踢出成员失败: {}", e);
+            }
         }
 
         true
@@ -260,14 +269,14 @@ impl GuildManager {
         drop(guilds);
 
         // 持久化到数据库
-        if result
-            && let Some(ref storage) = self.storage {
-                let guilds = self.guilds.read();
-                if let Some(guild) = guilds.get(&guild_id)
-                    && let Err(e) = storage.save_guild(guild) {
-                        tracing::warn!("持久化变更职位失败: {}", e);
-                    }
+        if result && let Some(ref storage) = self.storage {
+            let guilds = self.guilds.read();
+            if let Some(guild) = guilds.get(&guild_id)
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化变更职位失败: {}", e);
             }
+        }
 
         result
     }
@@ -301,9 +310,10 @@ impl GuildManager {
         if let Some(ref storage) = self.storage {
             let guilds = self.guilds.read();
             if let Some(guild) = guilds.get(guild_id)
-                && let Err(e) = storage.save_guild(guild) {
-                    tracing::warn!("持久化更新公告失败: {}", e);
-                }
+                && let Err(e) = storage.save_guild(guild)
+            {
+                tracing::warn!("持久化更新公告失败: {}", e);
+            }
         }
 
         true
