@@ -8,13 +8,6 @@ pub mod setup_wizard;
 pub mod timer;
 pub mod version;
 
-use crate::game::GameLoop;
-use crate::game::battle::{BattleHandler, ExpDistributor};
-use crate::game::heal;
-use crate::game::map::data::MapDatabase;
-use crate::game::mob::{MobAI, MobSpawnManager};
-use crate::game::status::{StatusTickConfig, StatusTickService};
-
 pub use crate::game::AtCommandHandler;
 pub use config::{Config, HotReloadConfig};
 pub use logging::{LogCategory, LogConfig, LogLevel, LogManager};
@@ -23,8 +16,14 @@ pub use version::VERSION;
 
 use crate::cli::Cli;
 use crate::game::AgentApi;
+use crate::game::GameLoop;
+use crate::game::battle::{BattleHandler, ExpDistributor};
+use crate::game::heal;
+use crate::game::map::data::MapDatabase;
 use crate::game::map::{ChannelBus, DropManager, MapState};
+use crate::game::mob::{MobAI, MobSpawnManager};
 use crate::game::party::PartyManager;
+use crate::game::status::{StatusTickConfig, StatusTickService};
 use crate::game::token::TokenStore;
 use crate::network::{AgentServer, GameServer, PacketHandler, SessionManager};
 use crate::storage::{Database, init_schema};
@@ -85,112 +84,12 @@ impl Core {
             crate::core::VERSION
         );
 
-        // 启动 HP/SP 回复服务
-        self.heal_service.start(self.map_state.clone());
-
-        // 启动状态效果周期处理服务
-        let tick_service = StatusTickService::new(StatusTickConfig::default());
-        tick_service.start(self.map_state.clone());
-
         // 初始化数据库
         let db = Arc::new(Database::open(&self.config.database.path)?);
         init_schema(&db)?;
         self.db = Some(db.clone());
 
-        // 初始化会话管理
-        let session_manager = self.session_manager.clone();
-        let token_store = self.token_store.clone();
-        let map_state = self.map_state.clone();
-        let channel_bus = self.channel_bus.clone();
-        let drop_manager = self.drop_manager.clone();
-        let party_manager = self.party_manager.clone();
-
-        // 创建共享的游戏系统组件
-        let battle_handler = Arc::new(BattleHandler::default());
-        let spawn_manager = Arc::new(MobSpawnManager::new());
-        let guild_manager = Arc::new(crate::game::guild::GuildManager::with_db(db.clone()));
-
-        // 创建 PacketHandler
-        let packet_handler = Arc::new(PacketHandler::new(
-            db.clone(),
-            session_manager.clone(),
-            token_store.clone(),
-            map_state.clone(),
-            channel_bus.clone(),
-            drop_manager.clone(),
-            party_manager.clone(),
-            battle_handler.clone(),
-            spawn_manager.clone(),
-            self.config.game.death_drop_items,
-            guild_manager.clone(),
-        ));
-
         tracing::info!("服务器初始化完成");
-
-        // 启动 Timer 驱动循环（处理 HealService 等定时回调）
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
-            loop {
-                interval.tick().await;
-                crate::core::timer::Timer::process();
-            }
-        });
-
-        // 创建并启动 GameLoop
-        let rng = crate::game::rand::thread_rng();
-        let mob_ai = Arc::new(MobAI::new(
-            spawn_manager.clone(),
-            channel_bus.clone(),
-            drop_manager.clone(),
-            party_manager.clone(),
-            Arc::new(MapDatabase::new()),
-            rng,
-            battle_handler.clone(),
-            Arc::new(crate::game::skill::SkillDatabase::new()),
-        ));
-        let game_loop = Arc::new(
-            GameLoop::new(
-                map_state.clone(),
-                drop_manager.clone(),
-                token_store.clone(),
-                mob_ai,
-                spawn_manager.clone(),
-                Arc::new(crate::game::mob::droptable::DropResolver),
-                channel_bus.clone(),
-                Arc::new(ExpDistributor),
-                self.heal_service.clone(),
-                Arc::new(crate::game::heal::FoodManager::new()),
-                guild_manager.clone(),
-            )
-            .with_db(db.clone()),
-        );
-        game_loop.clone().start();
-        tracing::info!("GameLoop 已启动");
-
-        // 启动数据库定时备份任务
-        {
-            let db_for_backup = db.clone();
-            let backup_interval = self.config.database.auto_backup_interval_hours;
-            let backup_path = self.config.database.path.clone();
-            if backup_interval > 0 {
-                tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-                        backup_interval as u64 * 3600,
-                    ));
-                    interval.tick().await; // 跳过首次立即触发
-                    loop {
-                        interval.tick().await;
-                        let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-                        let dest = format!("{}.bak_{}", backup_path, ts);
-                        match db_for_backup.backup(&dest) {
-                            Ok(()) => tracing::info!("定时备份完成: {}", dest),
-                            Err(e) => tracing::error!("定时备份失败: {}", e),
-                        }
-                    }
-                });
-                tracing::info!("数据库定时备份已启用，间隔 {} 小时", backup_interval);
-            }
-        }
 
         tracing::info!("运行模式: {}", self.cli.mode);
 
@@ -202,55 +101,127 @@ impl Core {
 
         // 使用 Arc 包装以便跨任务共享
         let session_manager = self.session_manager.clone();
-        let packet_handler = packet_handler.clone();
 
         // 收集所有服务器任务
         let mut handles = Vec::new();
 
-        if run_login || run_char || run_map {
-            // Login Server
-            if run_login {
-                let addr = format!("0.0.0.0:{}", self.config.network.login_port);
-                let sm = session_manager.clone();
-                let ph = packet_handler.clone();
-                handles.push(tokio::spawn(async move {
-                    tracing::info!("启动 Login Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph)
-                        .with_initial_stage(crate::network::session::SessionStage::Login);
-                    server.listen().await
-                }));
-            }
+        if run_login {
+            let addr = format!("0.0.0.0:{}", self.config.network.login_port);
+            let sm = session_manager.clone();
+            let db = db.clone();
+            handles.push(tokio::spawn(async move {
+                tracing::info!("启动 Login Server: {}", addr);
+                let packet_handler = Arc::new(PacketHandler::new_login(
+                    db,
+                    sm.clone(),
+                ));
+                let server = GameServer::new(addr, sm, packet_handler)
+                    .with_initial_stage(crate::network::session::SessionStage::Login);
+                server.listen().await
+            }));
+        }
 
-            // Char Server
-            if run_char {
-                let addr = format!("0.0.0.0:{}", self.config.network.char_port);
-                let sm = session_manager.clone();
-                let ph = packet_handler.clone();
-                handles.push(tokio::spawn(async move {
-                    tracing::info!("启动 Char Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph)
-                        .with_initial_stage(crate::network::session::SessionStage::Char);
-                    server.listen().await
-                }));
-            }
+        if run_char {
+            let addr = format!("0.0.0.0:{}", self.config.network.char_port);
+            let sm = session_manager.clone();
+            let db = db.clone();
+            let token_store = self.token_store.clone();
+            handles.push(tokio::spawn(async move {
+                tracing::info!("启动 Char Server: {}", addr);
+                let packet_handler = Arc::new(PacketHandler::new_char(
+                    db,
+                    sm.clone(),
+                    token_store,
+                ));
+                let server = GameServer::new(addr, sm, packet_handler)
+                    .with_initial_stage(crate::network::session::SessionStage::Char);
+                server.listen().await
+            }));
+        }
 
-            // Map Server
-            if run_map {
-                let addr = format!("0.0.0.0:{}", self.config.network.map_port);
-                let sm = session_manager.clone();
-                let ph = packet_handler.clone();
-                handles.push(tokio::spawn(async move {
-                    tracing::info!("启动 Map Server: {}", addr);
-                    let server = GameServer::new(addr, sm, ph)
-                        .with_initial_stage(crate::network::session::SessionStage::Map);
-                    server.listen().await
-                }));
-            }
+        if run_map {
+            // 启动 HP/SP 回复服务
+            self.heal_service.start(self.map_state.clone());
+
+            // 启动状态效果周期处理服务
+            let tick_service = StatusTickService::new(StatusTickConfig::default());
+            tick_service.start(self.map_state.clone());
+
+            // 创建共享的游戏系统组件
+            let battle_handler = Arc::new(BattleHandler::default());
+            let spawn_manager = Arc::new(MobSpawnManager::new());
+            let guild_manager = Arc::new(crate::game::guild::GuildManager::with_db(db.clone()));
+
+            let packet_handler = Arc::new(PacketHandler::new_map(
+                db.clone(),
+                session_manager.clone(),
+                self.token_store.clone(),
+                self.map_state.clone(),
+                self.channel_bus.clone(),
+                self.drop_manager.clone(),
+                self.party_manager.clone(),
+                battle_handler.clone(),
+                spawn_manager.clone(),
+                self.config.game.death_drop_items,
+                guild_manager.clone(),
+            ));
+
+            // 启动 Timer 驱动循环（处理 HealService 等定时回调）
+            tokio::spawn({
+                async move {
+                    let mut interval = tokio::time::interval(std::time::Duration::from_millis(50));
+                    loop {
+                        interval.tick().await;
+                        crate::core::timer::Timer::process();
+                    }
+                }
+            });
+
+            // 创建并启动 GameLoop
+            let rng = crate::game::rand::thread_rng();
+            let mob_ai = Arc::new(MobAI::new(
+                spawn_manager.clone(),
+                self.channel_bus.clone(),
+                self.drop_manager.clone(),
+                self.party_manager.clone(),
+                Arc::new(MapDatabase::new()),
+                rng,
+                battle_handler.clone(),
+                Arc::new(crate::game::skill::SkillDatabase::new()),
+            ));
+            let game_loop = Arc::new(
+                GameLoop::new(
+                    self.map_state.clone(),
+                    self.drop_manager.clone(),
+                    self.token_store.clone(),
+                    mob_ai,
+                    spawn_manager.clone(),
+                    Arc::new(crate::game::mob::droptable::DropResolver),
+                    self.channel_bus.clone(),
+                    Arc::new(ExpDistributor),
+                    self.heal_service.clone(),
+                    Arc::new(crate::game::heal::FoodManager::new()),
+                    guild_manager.clone(),
+                )
+                .with_db(db.clone()),
+            );
+            game_loop.clone().start();
+            tracing::info!("GameLoop 已启动");
+
+            let addr = format!("0.0.0.0:{}", self.config.network.map_port);
+            let sm = session_manager.clone();
+            let ph = packet_handler.clone();
+            handles.push(tokio::spawn(async move {
+                tracing::info!("启动 Map Server: {}", addr);
+                let server = GameServer::new(addr, sm, ph)
+                    .with_initial_stage(crate::network::session::SessionStage::Map);
+                server.listen().await
+            }));
         }
 
         // Agent API 服务器
         if let Some(agent_port) = self.config.network.agent_port {
-            let agent_api = Arc::new(AgentApi::new(self.cli.config.clone(), map_state.clone()));
+            let agent_api = Arc::new(AgentApi::new(self.cli.config.clone(), self.map_state.clone()));
             let agent_addr = format!("127.0.0.1:{}", agent_port);
             let agent_server = AgentServer::new(agent_addr, agent_api);
             handles.push(tokio::spawn(async move {
@@ -264,7 +235,7 @@ impl Core {
         // Web HTTP API 服务器
         if let Some(web_port) = self.config.network.web_port {
             let web_addr = format!("0.0.0.0:{}", web_port);
-            let web_server = crate::web::WebServer::new(web_addr, map_state.clone());
+            let web_server = crate::web::WebServer::new(web_addr, self.map_state.clone());
             handles.push(tokio::spawn(async move {
                 if let Err(e) = web_server.listen().await {
                     tracing::error!("Web API 错误: {}", e);
