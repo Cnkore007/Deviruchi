@@ -11,4 +11,7 @@ pub use server::GameServer;
 pub use session::{Session, SessionManager};
 
 pub mod agent_server;
+pub mod inter_server;
+
 pub use agent_server::AgentServer;
+pub use inter_server::{InterServerTcpServer, TcpInterServerConnector};

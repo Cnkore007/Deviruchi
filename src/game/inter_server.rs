@@ -2,7 +2,6 @@
 //!
 //! 定义Char↔Map、Login↔Char之间的数据包格式
 
-use crate::game::server_registry::ServerInfo;
 use serde::{Deserialize, Serialize};
 
 /// 角色传输数据结构
@@ -68,7 +67,7 @@ pub struct CharacterTransfer {
 }
 
 /// Inter-Server 数据包枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InterServerPacket {
     /// Char → Map: 请求角色进入
     CharToMap {
@@ -95,7 +94,14 @@ pub enum InterServerPacket {
     },
 
     /// 服务器注册
-    ServerRegister { server_info: ServerInfo },
+    ServerRegister {
+        id: u32,
+        name: String,
+        ip: String,
+        port: u16,
+        server_type: ServerTypeProto,
+        max_players: u32,
+    },
 
     /// 服务器注销
     ServerUnregister { server_id: u32 },
