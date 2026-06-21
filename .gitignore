@@ -41,3 +41,4 @@ config/
 
 # 构建产物
 releases/
+.worktrees/
