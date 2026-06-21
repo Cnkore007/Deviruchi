@@ -228,44 +228,101 @@ impl MapServer {
     ) -> Option<Vec<u8>> {
         let req = CZReqStorageMoveItem::from_packet(data)?;
         let char_id = session.char_id?;
+        let player_id = session.player_id?;
 
+        let player = self.map_state.get_player(&player_id)?;
         let storage = self.storage_manager.get_or_create(char_id, 100);
 
         if req.is_to_storage {
-            // Simplified: just add to storage
+            // 从背包取出物品存入仓库
+            let mut inventory = player.inventory.write();
+            let slot_index = inventory.iter().position(|s| s.index == req.from_index as u8)?;
+            if inventory[slot_index].amount < req.amount {
+                return None;
+            }
+
+            let item_id = inventory[slot_index].item_id;
+            let amount = req.amount;
+            let identified = inventory[slot_index].identified;
+            let refine = inventory[slot_index].refine;
+            let cards = inventory[slot_index].cards;
+
+            if inventory[slot_index].amount == req.amount {
+                inventory.remove(slot_index);
+            } else {
+                inventory[slot_index].amount -= req.amount;
+            }
+            drop(inventory);
+
             let mut s = storage.write();
-            if s.add_item(req.from_index, req.amount) {
-                // Find the slot
-                for slot in s.slots() {
-                    if slot.item_id == req.from_index {
-                        return Some(
-                            ZCStorageItemAdd {
-                                index: slot.index,
-                                item_id: slot.item_id,
-                                amount: slot.amount,
-                                identified: slot.identified,
-                            }
-                            .to_packet(),
-                        );
-                    }
+            let index = s.add_item_and_get_index(item_id, amount, identified, refine, cards)?;
+            drop(s);
+
+            MapServer::recalc_inventory_weight(&player, &self.item_db);
+
+            return Some(
+                ZCStorageItemAdd {
+                    index,
+                    item_id,
+                    amount,
+                    identified,
                 }
-            }
-        } else {
-            // From storage
-            let mut s = storage.write();
-            if s.remove_item(req.from_index, req.amount) {
-                // Simplified: just acknowledge
-                return Some(
-                    ZCStorageItemRemove {
-                        index: req.from_index,
-                        amount: req.amount,
-                    }
-                    .to_packet(),
-                );
-            }
+                .to_packet(),
+            );
         }
 
-        None
+        // 从仓库取出物品到背包
+        let mut s = storage.write();
+        let slot = s.slots().get(req.from_index as usize).cloned().filter(|slot| !slot.is_empty() && slot.amount >= req.amount)?;
+        let item_id = slot.item_id;
+        let amount = req.amount;
+        let identified = slot.identified;
+        let refine = slot.refine;
+        let cards = slot.cards;
+
+        if !s.remove_item(req.from_index, req.amount) {
+            return None;
+        }
+        drop(s);
+
+        let mut inventory = player.inventory.write();
+        // 尝试堆叠到现有物品
+        let mut stacked = false;
+            for inv_slot in inventory.iter_mut() {
+                if inv_slot.item_id == item_id
+                    && inv_slot.amount as u32 + amount as u32 <= crate::game::constants::MAX_INVENTORY_STACK as u32
+                    && inv_slot.refine == refine
+                    && inv_slot.cards == cards
+                {
+                    inv_slot.amount += amount;
+                    stacked = true;
+                    break;
+                }
+            }
+        if !stacked {
+            let next_index = (0..=u8::MAX)
+                .find(|i| !inventory.iter().any(|s| s.index == *i))
+                .unwrap_or(inventory.len() as u8);
+            inventory.push(CharacterInventoryData {
+                index: next_index,
+                item_id,
+                amount,
+                identified,
+                refine,
+                cards,
+            });
+        }
+        drop(inventory);
+
+        MapServer::recalc_inventory_weight(&player, &self.item_db);
+
+        Some(
+            ZCStorageItemRemove {
+                index: req.from_index,
+                amount,
+            }
+            .to_packet(),
+        )
     }
 
     /// Handle trade request (0x00E4)

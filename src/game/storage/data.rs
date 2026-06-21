@@ -134,6 +134,46 @@ impl Storage {
         self.add_item_full(item_id, amount, true, 0, [0; 4])
     }
 
+    /// 添加物品到仓库并返回存放的槽位索引
+    ///
+    /// 与 `add_item` 逻辑相同，但成功时返回物品最终所在的 `index`。
+    pub fn add_item_and_get_index(
+        &mut self,
+        item_id: u16,
+        amount: u16,
+        identified: bool,
+        refine: u8,
+        cards: [u16; 4],
+    ) -> Option<u16> {
+        let is_equipment = refine > 0 || cards.iter().any(|&c| c != 0);
+
+        if !is_equipment {
+            for slot in &mut self.slots {
+                if slot.item_id == item_id
+                    && slot.amount + amount <= MAX_STACK_SIZE
+                    && slot.refine == 0
+                    && slot.cards == [0; 4]
+                {
+                    slot.amount += amount;
+                    return Some(slot.index);
+                }
+            }
+        }
+
+        for slot in &mut self.slots {
+            if slot.is_empty() {
+                slot.item_id = item_id;
+                slot.amount = amount;
+                slot.identified = identified;
+                slot.refine = refine;
+                slot.cards = cards;
+                return Some(slot.index);
+            }
+        }
+
+        None
+    }
+
     pub fn remove_item(&mut self, index: u16, amount: u16) -> bool {
         if index >= self.max_size {
             return false;

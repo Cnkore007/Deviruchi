@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+use super::MapState;
+
 /// 地图边缘类型 - 定义触发传送的边界条件
 #[derive(Debug, Clone, PartialEq)]
 pub enum MapEdge {
@@ -304,6 +306,7 @@ pub struct WarpService {
     teleport_manager: Arc<RwLock<TeleportManager>>,
     save_point_manager: Arc<RwLock<SavePointManager>>,
     db: Arc<Database>,
+    map_state: RwLock<Option<Arc<MapState>>>,
 }
 
 impl WarpService {
@@ -317,7 +320,13 @@ impl WarpService {
             teleport_manager,
             save_point_manager,
             db,
+            map_state: RwLock::new(None),
         }
+    }
+
+    /// 设置运行时地图状态（用于真正移动在线玩家）
+    pub fn set_map_state(&self, map_state: Arc<MapState>) {
+        *self.map_state.write() = Some(map_state);
     }
 
     /// 设置角色的存储点
@@ -367,11 +376,19 @@ impl WarpService {
         session: &mut Session,
         action: TeleportAction,
     ) -> Result<(), WarpError> {
-        let _player_id = session.player_id.ok_or(WarpError::PlayerNotFound)?;
+        let player_id = session.player_id.ok_or(WarpError::PlayerNotFound)?;
 
-        // For now, we return success since the actual player reference
-        // would need to be passed from MapState. In a full implementation,
-        // we would update the player's map_name and position here.
+        // 更新运行时玩家位置
+        if let Some(map_state) = self.map_state.read().as_ref()
+            && let Some(mut player) = map_state.get_player(&player_id)
+        {
+            player.move_to(action.to_pos.0, action.to_pos.1);
+            let old_map = player.map_name.clone();
+            if old_map != action.to_map {
+                player.map_name = action.to_map.clone();
+                map_state.update_player_map(&player_id, &old_map, &action.to_map);
+            }
+        }
 
         // Update database with new position (best effort)
         if let Some(char_id) = session.char_id {

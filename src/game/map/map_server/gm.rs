@@ -163,9 +163,18 @@ impl MapServer {
                 }
             }
 
-            // Note: In a full implementation, this would need to communicate
-            // with the target player's session to warp them
-            // For now, return success acknowledgment
+            // 直接移动目标玩家到当前玩家位置
+            let (x, y) = player.get_position();
+            let map_name = player.map_name.clone();
+            if let Some(mut target) = self.map_state.get_player(&target_id) {
+                let old_map = target.map_name.clone();
+                target.move_to(x, y);
+                if old_map != map_name {
+                    target.map_name = map_name.clone();
+                    self.map_state.update_player_map(&target_id, &old_map, &map_name);
+                }
+            }
+
             Some(ZCWarpAck { warp_type: 3 }.to_packet())
         } else {
             Some(

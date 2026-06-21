@@ -63,6 +63,7 @@ pub struct MapServer {
     pub map_server_id: u32,
     pub skill_handler: Arc<SkillHandler>,
     pub item_integration_handler: Arc<ItemIntegrationHandler>,
+    pub item_db: Arc<ItemDatabase>,
     pub npc_handler: Arc<NpcHandler>,
     pub active_dialogues: RwLock<HashMap<Uuid, NpcDialogueState>>,
     pub battle_handler: Arc<BattleHandler>,
@@ -91,7 +92,9 @@ impl MapServer {
         let effect_db = Arc::new(ItemEffectDatabase::new());
         let item_db = Arc::new(ItemDatabase::new());
         let skill_handler = Arc::new(SkillHandler::new(item_db.clone()));
-        let item_integration_handler = Arc::new(ItemIntegrationHandler::new(effect_db, item_db));
+        let item_integration_handler = Arc::new(ItemIntegrationHandler::new(effect_db, item_db.clone()));
+
+        warp_service.set_map_state(map_state.clone());
 
         Self {
             db,
@@ -109,6 +112,7 @@ impl MapServer {
             map_server_id: 1,
             skill_handler,
             item_integration_handler,
+            item_db,
             npc_handler: Arc::new(NpcHandler::new()),
             active_dialogues: RwLock::new(HashMap::new()),
             battle_handler,
