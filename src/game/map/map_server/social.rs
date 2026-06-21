@@ -32,9 +32,12 @@ impl MapServer {
         }
 
         let player = self.map_state.get_player(&player_id)?;
-        let party =
-            self.party_manager
-                .create_party(&pkt.party_name, player_id, player.name.clone());
+        let party = self
+            .party_manager
+            .create_party(&pkt.party_name, player_id, player.name.clone());
+
+        // 同步玩家身上的 party_id
+        self.map_state.set_player_party_id(&player_id, Some(party.id));
 
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
@@ -106,6 +109,9 @@ impl MapServer {
         self.party_manager
             .join_party(&party.id, player_id, player.name.clone())?;
 
+        // 同步玩家身上的 party_id
+        self.map_state.set_player_party_id(&player_id, Some(party.id));
+
         // Subscribe to party channel using session's event sender
         if let Some(tx) = &session.map_event_tx {
             let channel_name = party_channel_name(party.id);
@@ -123,6 +129,7 @@ impl MapServer {
         let party = self.party_manager.get_player_party(&player_id)?;
         let channel_name = party_channel_name(party.id);
         self.party_manager.leave_party(&player_id);
+        self.map_state.set_player_party_id(&player_id, None);
         self.channel_bus.unsubscribe(&channel_name, &player_id);
         None
     }

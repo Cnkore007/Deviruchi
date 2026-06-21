@@ -37,6 +37,7 @@ impl MapServer {
                     .join_guild(guild_id, player_id, player.name.clone());
                 self.guild_manager
                     .set_member_position_direct(&guild_id, &player_id, 0);
+                self.map_state.set_player_guild_id(&player_id, Some(guild_id));
                 Some(
                     ZCGuildCreated {
                         result: 0,
@@ -105,6 +106,7 @@ impl MapServer {
             .guild_manager
             .join_guild(guild_id, player_id, player.name.clone())
         {
+            self.map_state.set_player_guild_id(&player_id, Some(guild_id));
             Some(ZCGuildLeaveResult { result: 0 }.to_packet())
         } else {
             Some(ZCGuildLeaveResult { result: 1 }.to_packet())
@@ -116,6 +118,7 @@ impl MapServer {
         let player_id = session.player_id?;
 
         if self.guild_manager.leave_guild(player_id) {
+            self.map_state.set_player_guild_id(&player_id, None);
             Some(ZCGuildLeaveResult { result: 0 }.to_packet())
         } else {
             Some(ZCGuildLeaveResult { result: 1 }.to_packet())
@@ -137,6 +140,7 @@ impl MapServer {
             .guild_manager
             .expel_member(guild_id, &player_id, &target_id)
         {
+            self.map_state.set_player_guild_id(&target_id, None);
             Some(
                 ZCGuildExpelResult {
                     result: 0,

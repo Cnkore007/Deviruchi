@@ -508,6 +508,8 @@ mod tests {
             status: PlayerStatus::new(Uuid::new_v4()),
             inventory: RwLock::new(Vec::new()),
             hotkeys: RwLock::new(Vec::new()),
+            party_id: parking_lot::RwLock::new(None),
+            guild_id: parking_lot::RwLock::new(None),
         })
     }
 

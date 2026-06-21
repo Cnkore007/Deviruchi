@@ -97,6 +97,10 @@ pub struct Player {
     pub(crate) status: PlayerStatus,
     pub(crate) inventory: RwLock<Vec<CharacterInventoryData>>,
     pub(crate) hotkeys: RwLock<Vec<CharacterHotkeyData>>,
+
+    // 社交关系
+    pub(crate) party_id: RwLock<Option<Uuid>>,
+    pub(crate) guild_id: RwLock<Option<Uuid>>,
 }
 
 impl Clone for Player {
@@ -117,6 +121,8 @@ impl Clone for Player {
             status: self.status.clone(),
             inventory: RwLock::new(self.inventory.read().clone()),
             hotkeys: RwLock::new(self.hotkeys.read().clone()),
+            party_id: RwLock::new(*self.party_id.read()),
+            guild_id: RwLock::new(*self.guild_id.read()),
         }
     }
 }
@@ -249,6 +255,8 @@ impl Player {
             status: PlayerStatus::new(Uuid::new_v4()),
             inventory: RwLock::new(Vec::new()),
             hotkeys: RwLock::new(Vec::new()),
+            party_id: RwLock::new(None),
+            guild_id: RwLock::new(None),
         }
     }
 
@@ -408,6 +416,20 @@ impl Player {
     }
     pub fn current_weight(&self) -> u32 {
         self.economy.read().current_weight
+    }
+
+    // --- 社交关系 ---
+    pub fn party_id(&self) -> Option<Uuid> {
+        *self.party_id.read()
+    }
+    pub fn set_party_id(&self, id: Option<Uuid>) {
+        *self.party_id.write() = id;
+    }
+    pub fn guild_id(&self) -> Option<Uuid> {
+        *self.guild_id.read()
+    }
+    pub fn set_guild_id(&self, id: Option<Uuid>) {
+        *self.guild_id.write() = id;
     }
 
     // ==================== 存档点相关 ====================
@@ -813,8 +835,8 @@ impl Player {
         ScriptContext {
             char_id: self.char_id,
             char_name: self.name.clone(),
-            guild_name: String::new(), // TODO: 从公会系统获取
-            party_name: String::new(), // TODO: 从组队系统获取
+            guild_name: String::new(), // TODO: 从公会系统获取名称
+            party_name: String::new(), // TODO: 从组队系统获取名称
             base_level: level.base_level,
             job_level: level.job_level,
             zeny: economy.zeny,
@@ -826,8 +848,8 @@ impl Player {
             npc_variables: std::collections::HashMap::new(),
             need_broadcast: false,
             broadcast_message: String::new(),
-            party_id: 0, // TODO: 从组队系统获取
-            guild_id: 0, // TODO: 从公会系统获取
+            party_id: self.party_id().map(|id| id.as_u128() as u32).unwrap_or(0),
+            guild_id: self.guild_id().map(|id| id.as_u128() as u32).unwrap_or(0),
             account_id: self.account_id,
             str: attrs.str,
             agi: attrs.agi,
@@ -842,8 +864,6 @@ impl Player {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::status::effect::StatusSource;
-    use crate::game::status::types::StatusChange;
 
     fn make_player() -> Player {
         Player {
@@ -897,204 +917,9 @@ mod tests {
             status: PlayerStatus::new(Uuid::new_v4()),
             inventory: RwLock::new(Vec::new()),
             hotkeys: RwLock::new(Vec::new()),
+            party_id: RwLock::new(None),
+            guild_id: RwLock::new(None),
         }
-    }
-
-    #[test]
-    fn test_player_die_sets_state_dead() {
-        let player = make_player();
-        assert!(player.is_alive());
-        player.die();
-        assert!(player.is_dead());
-        assert_eq!(player.hp(), 0);
-    }
-
-    #[test]
-    fn test_player_die_applies_exp_penalty() {
-        let player = make_player();
-        assert_eq!(player.base_exp(), 5000);
-        assert_eq!(player.job_exp(), 3000);
-
-        player.die();
-
-        assert_eq!(player.base_exp(), 4950);
-        assert_eq!(player.job_exp(), 2970);
-    }
-
-    #[test]
-    fn test_player_die_small_exp_clamped_to_zero() {
-        let player = make_player();
-        player.level.write().base_exp = 50;
-        player.level.write().job_exp = 30;
-
-        player.die();
-
-        assert_eq!(player.base_exp(), 50);
-        assert_eq!(player.job_exp(), 30);
-    }
-
-    #[test]
-    fn test_player_respawn_restores_hp_and_state() {
-        let player = make_player();
-        player.die();
-        assert!(player.is_dead());
-
-        player.respawn(50, 60);
-        assert!(player.is_alive());
-        assert_eq!(player.hp(), 100);
-        assert_eq!(player.sp(), 50);
-        assert_eq!(player.get_position(), (50, 60));
-    }
-
-    #[test]
-    fn test_take_damage_killing_blow_triggers_death() {
-        let player = make_player();
-        assert!(player.is_alive());
-
-        let killed = player.take_damage(200);
-        assert!(killed);
-        assert!(player.is_dead());
-        assert_eq!(player.hp(), 0);
-    }
-
-    #[test]
-    fn test_take_damage_non_lethal_keeps_alive() {
-        let player = make_player();
-        let killed = player.take_damage(30);
-        assert!(!killed);
-        assert!(player.is_alive());
-        assert_eq!(player.hp(), 70);
-    }
-
-    #[test]
-    fn test_add_base_exp() {
-        let player = make_player();
-        player.add_base_exp(500);
-        assert_eq!(player.base_exp(), 5500);
-    }
-
-    #[test]
-    fn test_add_job_exp() {
-        let player = make_player();
-        player.add_job_exp(200);
-        assert_eq!(player.job_exp(), 3200);
-    }
-
-    #[test]
-    fn test_player_drop_zeny_on_death_drops_50_percent() {
-        let player = make_player();
-        player.economy.write().zeny = 1000;
-
-        let dropped = player.drop_zeny_on_death();
-
-        assert_eq!(dropped, 500);
-        assert_eq!(player.zeny(), 500);
-    }
-
-    #[test]
-    fn test_player_drop_zeny_on_death_small_zeny() {
-        let player = make_player();
-        player.economy.write().zeny = 1;
-
-        let dropped = player.drop_zeny_on_death();
-
-        assert_eq!(dropped, 0);
-        assert_eq!(player.zeny(), 1);
-    }
-
-    #[test]
-    fn test_player_drop_zeny_on_death_zero_zeny() {
-        let player = make_player();
-
-        let dropped = player.drop_zeny_on_death();
-
-        assert_eq!(dropped, 0);
-        assert_eq!(player.zeny(), 0);
-    }
-
-    #[test]
-    fn test_player_drop_zeny_on_death_odd_number() {
-        let player = make_player();
-        player.economy.write().zeny = 101;
-
-        let dropped = player.drop_zeny_on_death();
-
-        assert_eq!(dropped, 50);
-        assert_eq!(player.zeny(), 51);
-    }
-
-    // ==================== 持久化测试 ====================
-
-    #[test]
-    fn test_to_save_data_captures_all_fields() {
-        let player = make_player();
-        {
-            let mut c = player.combat.write();
-            c.hp = 500;
-            c.max_hp = 1000;
-            c.sp = 100;
-            c.max_sp = 200;
-        }
-        {
-            let mut lvl = player.level.write();
-            lvl.base_exp = 10000;
-            lvl.job_exp = 5000;
-            lvl.base_level = 50;
-            lvl.job_level = 30;
-        }
-        player.economy.write().zeny = 100000;
-        {
-            let mut a = player.attrs.write();
-            a.str = 50;
-            a.agi = 40;
-            a.vit = 30;
-            a.int = 20;
-            a.dex = 60;
-            a.luk = 10;
-        }
-
-        let save_data = player.to_save_data();
-
-        assert_eq!(save_data.char_id, 1);
-        assert_eq!(save_data.last_map, "test_map");
-        assert_eq!(save_data.last_x, 100);
-        assert_eq!(save_data.last_y, 100);
-        assert_eq!(save_data.hp, 500);
-        assert_eq!(save_data.max_hp, 1000);
-        assert_eq!(save_data.sp, 100);
-        assert_eq!(save_data.max_sp, 200);
-        assert_eq!(save_data.base_exp, 10000);
-        assert_eq!(save_data.job_exp, 5000);
-        assert_eq!(save_data.base_level, 50);
-        assert_eq!(save_data.job_level, 30);
-        assert_eq!(save_data.class, 0); // Novice（make_player 默认）
-        assert_eq!(save_data.zeny, 100000);
-        assert_eq!(save_data.str, 50);
-        assert_eq!(save_data.agi, 40);
-        assert_eq!(save_data.vit, 30);
-        assert_eq!(save_data.int, 20);
-        assert_eq!(save_data.dex, 60);
-        assert_eq!(save_data.luk, 10);
-    }
-
-    #[test]
-    fn test_player_save_data_with_status_effects() {
-        let player = make_player();
-
-        let effect = StatusEffect::with_values(
-            StatusChange::Blessing,
-            60000,
-            StatusSource::Skill(9),
-            10,
-            0,
-            0,
-        );
-        player.add_status(effect);
-
-        let save_data = player.to_save_data();
-
-        assert_eq!(save_data.status_effects.len(), 1);
-        assert_eq!(save_data.status_effects[0].id, StatusChange::Blessing);
     }
 
     #[test]

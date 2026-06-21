@@ -353,6 +353,28 @@ impl MapState {
         }
     }
 
+    /// 设置玩家的组队 ID（原地修改）
+    pub fn set_player_party_id(&self, player_id: &Uuid, party_id: Option<Uuid>) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.set_party_id(party_id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 设置玩家的公会 ID（原地修改）
+    pub fn set_player_guild_id(&self, player_id: &Uuid, guild_id: Option<Uuid>) -> bool {
+        let players = self.players.read();
+        if let Some(player) = players.get(player_id) {
+            player.set_guild_id(guild_id);
+            true
+        } else {
+            false
+        }
+    }
+
     /// 检查位置是否可通行（基于地图 cell 数据的真实碰撞检测）
     pub fn is_walkable(&self, map_name: &str, x: u16, y: u16) -> bool {
         self.map_database
@@ -448,6 +470,8 @@ mod tests {
             status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
             inventory: RwLock::new(Vec::new()),
             hotkeys: RwLock::new(Vec::new()),
+            party_id: parking_lot::RwLock::new(None),
+            guild_id: parking_lot::RwLock::new(None),
         }
     }
 

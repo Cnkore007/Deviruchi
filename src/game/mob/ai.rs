@@ -918,6 +918,8 @@ mod tests {
             status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
             inventory: parking_lot::RwLock::new(Vec::new()),
             hotkeys: parking_lot::RwLock::new(Vec::new()),
+            party_id: parking_lot::RwLock::new(None),
+            guild_id: parking_lot::RwLock::new(None),
         })
     }
 
@@ -1297,6 +1299,8 @@ mod tests {
             status: crate::game::status::PlayerStatus::new(Uuid::new_v4()),
             inventory: parking_lot::RwLock::new(Vec::new()),
             hotkeys: parking_lot::RwLock::new(Vec::new()),
+            party_id: parking_lot::RwLock::new(None),
+            guild_id: parking_lot::RwLock::new(None),
         });
 
         let map_state = create_test_map_state();
