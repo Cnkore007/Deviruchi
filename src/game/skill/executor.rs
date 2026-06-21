@@ -7,7 +7,12 @@ use super::data::{Skill, SkillDatabase, SkillType};
 use super::effect::{SkillEffect, SkillResult};
 use crate::game::battle::element::Element;
 use crate::game::battle::formula::{self, DamageResult};
+use crate::game::item::ItemDatabase;
 use crate::game::map::{MapState, Player};
+use once_cell::sync::Lazy;
+
+/// 执行器内部使用的默认物品数据库（测试与独立调用场景）
+static DEFAULT_ITEM_DB: Lazy<ItemDatabase> = Lazy::new(ItemDatabase::new);
 
 /// 伤害技能执行结果
 #[derive(Debug, Clone)]
@@ -117,10 +122,10 @@ impl SkillExecutor {
         let caster_dex = caster.dex() as i32;
         let caster_base_level = caster.base_level() as i32;
 
-        // 获取目标属性（玩家对玩家战斗，使用默认值）
-        // 注意：玩家元素属性通常为 Neutral，魔法防御来自装备
+        // 获取目标属性（玩家对玩家战斗）
+        // 注意：玩家元素属性通常为 Neutral，魔法防御来自装备与 INT
         let target_element = Element::Neutral;
-        let target_mdef = 0u32; // TODO: 从装备系统获取魔法防御
+        let target_mdef = target.mdef(&DEFAULT_ITEM_DB);
 
         // 技能元素属性（Skill.element 使用 u8 编码，与 Element 枚举一致）
         let skill_element = Element::from_u8(skill.element).unwrap_or(Element::Neutral);
@@ -237,7 +242,7 @@ impl SkillExecutor {
         let max_hp = target.max_hp();
 
         // 使用 SkillEffect 计算治疗量
-        let result = SkillEffect::apply(skill, caster, target, skill_level);
+        let result = SkillEffect::apply(skill, caster, target, skill_level, &DEFAULT_ITEM_DB);
         if let SkillResult::Heal { amount } = result {
             // 应用治疗到目标（Player::apply_heal 内部处理 max_hp 限制）
             target.apply_heal(amount);
@@ -303,7 +308,7 @@ impl SkillExecutor {
         target: &Player,
     ) -> Option<BuffSkillResult> {
         // 调用 SkillEffect::apply 来施加 buff（内部会调用 target.add_status）
-        let result = SkillEffect::apply(skill, caster, target, skill_level);
+        let result = SkillEffect::apply(skill, caster, target, skill_level, &DEFAULT_ITEM_DB);
 
         match result {
             SkillResult::Buff {
@@ -562,10 +567,11 @@ mod tests {
 
         let r = result.unwrap();
         // MATK = 30*2 + 20 = 80
+        // target INT=30 => target_mdef = 30/2 = 15
         // calc_magic_damage: matk=80, level=1, Wind vs Neutral
-        //   multiplier = 100%, base = 80, element = 100%
-        //   damage = 80
-        assert_eq!(r.damage, 80);
+        //   multiplier = 100%, base = 80 - 15/2 = 73, element = 100%
+        //   damage = 73
+        assert_eq!(r.damage, 73);
         assert_eq!(r.element, 4); // Wind
     }
 

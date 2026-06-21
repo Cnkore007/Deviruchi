@@ -90,7 +90,7 @@ impl MapServer {
         // 初始化物品和技能系统
         let effect_db = Arc::new(ItemEffectDatabase::new());
         let item_db = Arc::new(ItemDatabase::new());
-        let skill_handler = Arc::new(SkillHandler::new());
+        let skill_handler = Arc::new(SkillHandler::new(item_db.clone()));
         let item_integration_handler = Arc::new(ItemIntegrationHandler::new(effect_db, item_db));
 
         Self {

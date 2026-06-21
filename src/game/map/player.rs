@@ -1,5 +1,5 @@
 use crate::game::constants;
-use crate::game::item::Equipment;
+use crate::game::item::{Equipment, ItemDatabase};
 use crate::game::script::commands::ScriptContext;
 use crate::game::status::{PlayerStatus, StatusChange, StatusEffect, StatusSource};
 use crate::storage::Character;
@@ -381,6 +381,16 @@ impl Player {
     }
     pub fn luk(&self) -> u16 {
         self.attrs.read().luk
+    }
+
+    /// 计算最终魔法防御（装备 + INT/2 + 状态修正）
+    pub fn mdef(&self, item_db: &ItemDatabase) -> u32 {
+        use crate::game::status::StatusCalculator;
+        let equipment = self.equipment.read();
+        let equipment_mdef = equipment.total_magic_defense(item_db) as i32;
+        let base_mdef = (self.int() as i32) / 2 + equipment_mdef;
+        let modifiers = self.status.modifiers();
+        StatusCalculator::calculate_mdef(base_mdef, &modifiers).max(0) as u32
     }
 
     // --- Economy 字段 ---
@@ -1085,5 +1095,49 @@ mod tests {
 
         assert_eq!(save_data.status_effects.len(), 1);
         assert_eq!(save_data.status_effects[0].id, StatusChange::Blessing);
+    }
+
+    #[test]
+    fn test_mdef_from_int_and_equipment() {
+        use crate::game::item::{EquipSlot, InventorySlot, Item, ItemDatabase, ItemType};
+
+        let player = make_player();
+        // make_player 默认 int=1 => base mdef = 1/2 = 0
+        let item_db = ItemDatabase::new();
+        assert_eq!(player.mdef(&item_db), 0);
+
+        // 设置 INT=10 => base mdef = 10/2 = 5
+        {
+            let mut attrs = player.attrs.write();
+            attrs.int = 10;
+        }
+        assert_eq!(player.mdef(&item_db), 5);
+
+        // 装备 +20 MDEF 的铠甲
+        let mut db = ItemDatabase::new();
+        db.insert(Item {
+            id: 9901,
+            name: "Mage Robe".to_string(),
+            type_: ItemType::Armor,
+            magic_defense: 20,
+            ..Default::default()
+        });
+        {
+            let mut eq = player.equipment.write();
+            eq.equip(
+                EquipSlot::Body,
+                InventorySlot {
+                    index: 0,
+                    item_id: 9901,
+                    amount: 1,
+                    identified: true,
+                    refine: 0,
+                    cards: [0; 4],
+                },
+            );
+        }
+
+        // base = 5 + 20 = 25，无状态修正
+        assert_eq!(player.mdef(&db), 25);
     }
 }

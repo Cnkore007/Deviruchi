@@ -1,5 +1,6 @@
 //! 玩家状态管理器
 
+use super::calculator::{StatModifiers, StatusCalculator};
 use super::effect::{StackingRule, StatusEffect};
 use super::types::StatusChange;
 use parking_lot::RwLock;
@@ -139,6 +140,11 @@ impl PlayerStatus {
     /// 获取所有活跃状态类型
     pub fn get_active_status_types(&self) -> Vec<StatusChange> {
         self.effects.read().keys().copied().collect()
+    }
+
+    /// 计算当前状态效果提供的属性修正
+    pub fn modifiers(&self) -> StatModifiers {
+        StatusCalculator::calculate_from_status(self)
     }
 
     /// 清除所有状态

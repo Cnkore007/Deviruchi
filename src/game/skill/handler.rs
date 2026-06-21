@@ -1,6 +1,7 @@
 use super::PlayerCooldown;
 use super::data::{Skill, SkillDatabase};
 use super::effect::{SkillEffect, SkillResult};
+use crate::game::item::ItemDatabase;
 use crate::game::map::{MapState, Player};
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -10,18 +11,27 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct SkillHandler {
     db: Arc<SkillDatabase>,
+    item_db: Arc<ItemDatabase>,
     // Note: cooldowns is not cloned - each clone shares the same underlying map
     cooldowns: Arc<RwLock<HashMap<Uuid, PlayerCooldown>>>,
 }
 
 impl SkillHandler {
-    pub fn new() -> Self {
+    pub fn new(item_db: Arc<ItemDatabase>) -> Self {
         Self {
             db: Arc::new(SkillDatabase::new()),
+            item_db,
             cooldowns: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
+    /// 创建使用默认物品数据库的处理器（测试与向后兼容）
+    pub fn default_with_item_db() -> Self {
+        Self::new(Arc::new(ItemDatabase::new()))
+    }
+}
+
+impl SkillHandler {
     /// 检查是否能使用技能（完整检查）
     pub fn can_use_skill(
         &self,
@@ -96,9 +106,9 @@ impl SkillHandler {
 
         // 执行效果
         let result = if let Some(ref t) = target {
-            SkillEffect::apply(skill, &caster, t, level)
+            SkillEffect::apply(skill, &caster, t, level, &self.item_db)
         } else {
-            SkillEffect::apply(skill, &caster, &caster, level)
+            SkillEffect::apply(skill, &caster, &caster, level, &self.item_db)
         };
 
         // 应用效果（伤害/治疗/Buff）
@@ -279,7 +289,7 @@ impl SkillHandler {
 
 impl Default for SkillHandler {
     fn default() -> Self {
-        Self::new()
+        Self::default_with_item_db()
     }
 }
 
@@ -342,7 +352,7 @@ mod tests {
 
     #[test]
     fn test_skill_handler_new() {
-        let handler = SkillHandler::new();
+        let handler = SkillHandler::default_with_item_db();
         assert!(handler.get_database().get(1).is_some()); // 默认技能存在
     }
 
@@ -354,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_skill_cooldown_check() {
-        let handler = SkillHandler::new();
+        let handler = SkillHandler::default_with_item_db();
         let player_id = Uuid::new_v4();
 
         // 新技能无冷却
@@ -370,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_skill_cooldown_remaining() {
-        let handler = SkillHandler::new();
+        let handler = SkillHandler::default_with_item_db();
         let player_id = Uuid::new_v4();
 
         assert_eq!(handler.get_cooldown_remaining(player_id, 1), 0);
@@ -382,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_skill_clear_cooldowns() {
-        let handler = SkillHandler::new();
+        let handler = SkillHandler::default_with_item_db();
         let player_id = Uuid::new_v4();
 
         handler.set_cooldown(player_id, 1, 5000);

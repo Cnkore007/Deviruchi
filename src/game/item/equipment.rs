@@ -1,5 +1,6 @@
 //! 装备系统
 
+use super::data::ItemDatabase;
 use super::inventory::InventorySlot;
 use std::collections::HashMap;
 
@@ -121,6 +122,15 @@ impl Equipment {
     /// 清空所有装备
     pub fn clear(&mut self) {
         self.slots.clear();
+    }
+
+    /// 计算装备提供的总魔法防御
+    pub fn total_magic_defense(&self, item_db: &ItemDatabase) -> u16 {
+        self.slots
+            .values()
+            .filter_map(|slot| item_db.get(slot.item_id))
+            .map(|item| item.magic_defense)
+            .sum()
     }
 }
 

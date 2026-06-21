@@ -1,4 +1,5 @@
 use super::data::{Skill, SkillType};
+use crate::game::item::ItemDatabase;
 use crate::game::map::Player;
 use crate::game::status::{StatusChange, StatusEffect, StatusSource};
 
@@ -7,9 +8,15 @@ pub struct SkillEffect;
 
 impl SkillEffect {
     /// 对目标应用技能效果
-    pub fn apply(skill: &Skill, caster: &Player, target: &Player, level: u8) -> SkillResult {
+    pub fn apply(
+        skill: &Skill,
+        caster: &Player,
+        target: &Player,
+        level: u8,
+        item_db: &ItemDatabase,
+    ) -> SkillResult {
         match skill.type_ {
-            SkillType::Attack => Self::apply_attack(skill, caster, target, level),
+            SkillType::Attack => Self::apply_attack(skill, caster, target, level, item_db),
             SkillType::Healing => Self::apply_healing(skill, caster, target, level),
             SkillType::Support => Self::apply_support(skill, caster, target, level),
             SkillType::Debuff => Self::apply_debuff(skill, caster, target, level),
@@ -17,7 +24,7 @@ impl SkillEffect {
         }
     }
 
-    fn apply_attack(skill: &Skill, caster: &Player, _target: &Player, level: u8) -> SkillResult {
+    fn apply_attack(skill: &Skill, caster: &Player, target: &Player, level: u8, item_db: &ItemDatabase) -> SkillResult {
         // 基于施法者属性计算物理/魔法伤害
         let base_level = caster.base_level() as i32;
         let str = caster.str() as i32;
@@ -39,9 +46,10 @@ impl SkillEffect {
             // 物理技能
             base_atk * multiplier / 100
         } else {
-            // 魔法技能：MATK = INT*2 + DEX
+            // 魔法技能：MATK = INT*2 + DEX，目标 MDEF 减伤
             let matk = int * 2 + dex;
-            matk * multiplier / 100
+            let target_mdef = target.mdef(item_db) as i32;
+            (matk * multiplier / 100).saturating_sub(target_mdef / 2)
         };
 
         let damage = raw_damage.max(1);
