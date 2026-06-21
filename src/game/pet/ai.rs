@@ -353,7 +353,7 @@ mod tests {
         let player_id = Uuid::new_v4();
 
         // 创建AI
-        let ai = manager.create_ai(player_id);
+        let _ai = manager.create_ai(player_id);
         assert!(manager.get_ai(player_id).is_some());
 
         // 获取状态

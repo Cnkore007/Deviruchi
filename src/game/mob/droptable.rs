@@ -235,12 +235,11 @@ mod tests {
         fn rand_bp(&self, _chance: u32) -> u32 {
             // basis points: return 0 for always drop, 10001 for never drop
             let idx = unsafe { *self.index.get() };
-            let val = self
-                .values
+
+            self.values
                 .get(idx % self.values.len())
                 .copied()
-                .unwrap_or(0);
-            val
+                .unwrap_or(0)
         }
     }
 

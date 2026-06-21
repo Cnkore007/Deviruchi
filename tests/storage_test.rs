@@ -170,7 +170,7 @@ fn test_storage_manager_save_and_load() {
 
     // 创建并修改仓库
     {
-        let mut mgr = manager.write();
+        let mgr = manager.write();
         let storage = mgr.get_or_create(1, 100);
         storage.write().add_item(501, 10);
         storage.write().add_item(502, 5);

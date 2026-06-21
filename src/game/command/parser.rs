@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_parse_command_uppercase() {
-        let (cmd, args) = parse_command("@WARP prontera");
+        let (cmd, _args) = parse_command("@WARP prontera");
         assert_eq!(cmd, "warp");
     }
 
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_parse_command_with_at_prefix() {
-        let (cmd, args) = parse_command("@@warp prontera");
+        let (cmd, _args) = parse_command("@@warp prontera");
         assert_eq!(cmd, "warp");
     }
 }

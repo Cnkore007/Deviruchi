@@ -293,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_instance_create() {
-        let mut instance = Instance::new(
+        let instance = Instance::new(
             1,
             "Test Dungeon",
             "dungeon01",

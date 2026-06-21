@@ -226,7 +226,7 @@ mod combat_integration_tests {
         // 重生时间未到，不应重生
         *mob.death_time.write() =
             Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64 - 1000));
-        let should_respawn = mob.death_time.read().map_or(false, |death_time| {
+        let should_respawn = mob.death_time.read().is_some_and(|death_time| {
             Instant::now().duration_since(death_time)
                 >= Duration::from_millis(mob.respawn_time as u64)
         });
@@ -235,7 +235,7 @@ mod combat_integration_tests {
         // 重生时间已到
         *mob.death_time.write() =
             Some(Instant::now() - Duration::from_millis(mob.respawn_time as u64));
-        let should_respawn = mob.death_time.read().map_or(false, |death_time| {
+        let should_respawn = mob.death_time.read().is_some_and(|death_time| {
             Instant::now().duration_since(death_time)
                 >= Duration::from_millis(mob.respawn_time as u64)
         });

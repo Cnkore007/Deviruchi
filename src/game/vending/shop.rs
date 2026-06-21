@@ -219,10 +219,8 @@ impl VendingShop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::item::InventorySlot;
-    use crate::game::item::ItemDatabase;
+
     use crate::storage::Character;
-    use std::sync::Arc;
 
     fn create_test_player() -> Player {
         let char = Character {
@@ -258,52 +256,6 @@ mod tests {
             last_y: 50,
             save_map: "new_1-1.gat".to_string(),
             save_x: 50,
-            save_y: 50,
-            delete_timer: 0,
-            status_point: 0,
-            skill_point: 0,
-            created_at: 0,
-            updated_at: 0,
-        };
-        let mut player = Player::from_character(char);
-        player.map_name = "new_1-1.gat".to_string();
-        player
-    }
-
-    fn create_buyer() -> Player {
-        let char = Character {
-            char_id: 2,
-            char_num: 0,
-            name: "Buyer".to_string(),
-            class: 0,
-            base_level: 1,
-            job_level: 1,
-            base_exp: 0,
-            job_exp: 0,
-            zeny: 5000,
-            str: 10,
-            agi: 10,
-            vit: 10,
-            int: 10,
-            dex: 10,
-            luk: 10,
-            hp: 100,
-            max_hp: 100,
-            sp: 50,
-            max_sp: 50,
-            hair: 0,
-            hair_color: 0,
-            clothes_color: 0,
-            weapon: 0,
-            shield: 0,
-            head_top: 0,
-            head_mid: 0,
-            head_bottom: 0,
-            last_map: "new_1-1.gat".to_string(),
-            last_x: 51,
-            last_y: 50,
-            save_map: "new_1-1.gat".to_string(),
-            save_x: 51,
             save_y: 50,
             delete_timer: 0,
             status_point: 0,

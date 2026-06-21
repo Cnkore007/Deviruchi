@@ -144,7 +144,7 @@ mod tests {
         // 验证在范围内
         for _ in 0..100 {
             let val = rng.rand_range(1, 10);
-            assert!(val >= 1 && val <= 10);
+            assert!((1..=10).contains(&val));
         }
     }
 

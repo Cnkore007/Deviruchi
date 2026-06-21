@@ -252,7 +252,7 @@ mod tests {
         // Manually insert an expired drop by overwriting
         {
             let mut drops = manager.drops.write();
-            let drop = drops.get_mut(&id).unwrap();
+            let _drop = drops.get_mut(&id).unwrap();
             // We can't set dropped_at directly (Instant has no setter),
             // so we test that a freshly created drop is NOT cleaned up
         }

@@ -450,11 +450,6 @@ mod tests {
     use std::sync::Arc;
     use uuid::Uuid;
 
-    /// 创建测试用技能数据库（与 SkillDatabase 默认数据一致）
-    fn make_test_db() -> SkillDatabase {
-        SkillDatabase::new()
-    }
-
     /// 创建测试用玩家，可指定元素属性（预留）
     fn make_player(name: &str, x: u16, y: u16) -> Arc<Player> {
         Arc::new(Player {
@@ -798,7 +793,7 @@ mod tests {
         assert!(result.is_some());
         let r = result.unwrap();
         assert_eq!(r.hit_count, 1, "施法者自身不应被命中");
-        assert_eq!(r.damages[0].target_died, false);
+        assert!(!r.damages[0].target_died);
     }
 
     #[test]

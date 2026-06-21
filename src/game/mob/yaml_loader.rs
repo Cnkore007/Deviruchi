@@ -16,7 +16,7 @@ use std::fs;
 
 /// 全局物品名称到 ID 映射（从 item_db YAML 动态加载）
 static ITEM_NAME_TO_ID: once_cell::sync::Lazy<std::collections::HashMap<String, u16>> =
-    once_cell::sync::Lazy::new(|| crate::game::item::yaml_loader::load_item_name_to_id_map());
+    once_cell::sync::Lazy::new(crate::game::item::yaml_loader::load_item_name_to_id_map);
 
 /// 物品名称到 ID 的映射
 ///

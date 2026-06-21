@@ -484,7 +484,7 @@ mod tests {
         let player = Uuid::new_v4();
 
         // 第一次创建成功
-        let duel_id = manager.create_duel(player, 0).unwrap();
+        let _duel_id = manager.create_duel(player, 0).unwrap();
         manager.leave_duel(player);
 
         // 冷却期内应失败

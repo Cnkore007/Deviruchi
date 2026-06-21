@@ -283,7 +283,7 @@ mod tests {
         let player = create_test_player();
 
         // 开店
-        let shop = manager.open_shop(&player, "Test Shop").unwrap();
+        let _shop = manager.open_shop(&player, "Test Shop").unwrap();
         assert!(manager.is_player_shopping(player.id));
         assert_eq!(
             manager.get_player_shop(player.id).unwrap().shop_title,

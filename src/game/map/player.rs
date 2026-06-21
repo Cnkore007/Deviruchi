@@ -1,5 +1,6 @@
 use crate::game::constants;
 use crate::game::item::Equipment;
+use crate::game::script::commands::ScriptContext;
 use crate::game::status::{PlayerStatus, StatusChange, StatusEffect, StatusSource};
 use crate::storage::Character;
 use crate::storage::character::{CharacterHotkeyData, CharacterInventoryData};
@@ -784,6 +785,50 @@ pub struct PlayerSaveData {
     pub(crate) hotkeys: Vec<CharacterHotkeyData>,
 }
 
+impl Player {
+    /// 从玩家数据构建脚本上下文
+    pub fn to_script_context(&self) -> ScriptContext {
+        let combat = self.combat();
+        let level = self.level_stats();
+        let attrs = self.attributes();
+        let economy = self.economy();
+
+        // 构建背包物品映射
+        let inventory = self.inventory.read();
+        let mut inventory_map = std::collections::HashMap::new();
+        for item in inventory.iter() {
+            *inventory_map.entry(item.item_id).or_insert(0) += 1;
+        }
+
+        ScriptContext {
+            char_id: self.char_id,
+            char_name: self.name.clone(),
+            guild_name: String::new(), // TODO: 从公会系统获取
+            party_name: String::new(), // TODO: 从组队系统获取
+            base_level: level.base_level,
+            job_level: level.job_level,
+            zeny: economy.zeny,
+            current_hp: combat.hp,
+            max_hp: combat.max_hp,
+            current_sp: combat.sp,
+            max_sp: combat.max_sp,
+            inventory: inventory_map,
+            npc_variables: std::collections::HashMap::new(),
+            need_broadcast: false,
+            broadcast_message: String::new(),
+            party_id: 0, // TODO: 从组队系统获取
+            guild_id: 0, // TODO: 从公会系统获取
+            account_id: self.account_id,
+            str: attrs.str,
+            agi: attrs.agi,
+            vit: attrs.vit,
+            int_: attrs.int,
+            dex: attrs.dex,
+            luk: attrs.luk,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1040,51 +1085,5 @@ mod tests {
 
         assert_eq!(save_data.status_effects.len(), 1);
         assert_eq!(save_data.status_effects[0].id, StatusChange::Blessing);
-    }
-}
-
-use crate::game::script::commands::ScriptContext;
-
-impl Player {
-    /// 从玩家数据构建脚本上下文
-    pub fn to_script_context(&self) -> ScriptContext {
-        let combat = self.combat();
-        let level = self.level_stats();
-        let attrs = self.attributes();
-        let economy = self.economy();
-
-        // 构建背包物品映射
-        let inventory = self.inventory.read();
-        let mut inventory_map = std::collections::HashMap::new();
-        for item in inventory.iter() {
-            *inventory_map.entry(item.item_id).or_insert(0) += 1;
-        }
-
-        ScriptContext {
-            char_id: self.char_id,
-            char_name: self.name.clone(),
-            guild_name: String::new(), // TODO: 从公会系统获取
-            party_name: String::new(), // TODO: 从组队系统获取
-            base_level: level.base_level,
-            job_level: level.job_level,
-            zeny: economy.zeny,
-            current_hp: combat.hp,
-            max_hp: combat.max_hp,
-            current_sp: combat.sp,
-            max_sp: combat.max_sp,
-            inventory: inventory_map,
-            npc_variables: std::collections::HashMap::new(),
-            need_broadcast: false,
-            broadcast_message: String::new(),
-            party_id: 0, // TODO: 从组队系统获取
-            guild_id: 0, // TODO: 从公会系统获取
-            account_id: self.account_id,
-            str: attrs.str,
-            agi: attrs.agi,
-            vit: attrs.vit,
-            int_: attrs.int,
-            dex: attrs.dex,
-            luk: attrs.luk,
-        }
     }
 }

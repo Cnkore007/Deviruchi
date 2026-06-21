@@ -1233,7 +1233,7 @@ mod tests {
         assert!(matches!(resp, DialogueResponse::Continue));
         let value = state.get_variable("@rand_result").unwrap();
         assert!(
-            value >= 1 && value <= 100,
+            (1..=100).contains(&value),
             "随机数 {} 不在 [1, 100] 范围内",
             value
         );

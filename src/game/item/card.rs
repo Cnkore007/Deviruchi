@@ -341,7 +341,7 @@ mod tests {
         slot.cards = [4001, 4002, 4003, 4004];
 
         // 所有槽位已满，应该无法插入
-        let has_empty = slot.cards.iter().any(|&c| c == 0);
+        let has_empty = slot.cards.contains(&0);
         assert!(!has_empty);
     }
 

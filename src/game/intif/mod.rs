@@ -537,7 +537,7 @@ mod tests {
     #[test]
     fn test_process_messages() {
         let manager = InterServerManager::new(1);
-        let mut received = false;
+        let _received = false;
 
         manager.register_handler(InterMessageType::Broadcast, move |_msg| {
             // 处理消息

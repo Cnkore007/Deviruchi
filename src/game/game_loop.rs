@@ -442,7 +442,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(150));
 
         // 5. Call check_respawn again (should respawn now)
-        let respawned = game_loop
+        let _respawned = game_loop
             .mob_spawn_manager
             .check_respawn(game_loop.channel_bus.as_ref());
         // Note: check_respawn removes death time but doesn't re-register mob
@@ -450,7 +450,7 @@ mod tests {
 
         // 6. Verify drop_manager cleanup works
         let drop_manager = game_loop.drop_manager.as_ref();
-        let drop_id = drop_manager.add(501, 1, 100, 100, "prontera");
+        let _drop_id = drop_manager.add(501, 1, 100, 100, "prontera");
         let drops = drop_manager.get_drops_for_map("prontera");
         assert_eq!(drops.len(), 1);
 

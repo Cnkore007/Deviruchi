@@ -771,7 +771,7 @@ mod tests {
     use crate::game::mob::data::{
         MobPathManager, MobPosition, MobSkill, MobSkillCondition, MobSkillTarget,
     };
-    use crate::game::rand::{GameRng, MockRng};
+    use crate::game::rand::MockRng;
 
     fn create_test_mob_ai(values: Vec<u32>) -> MobAI {
         MobAI::new(

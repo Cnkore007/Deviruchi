@@ -444,7 +444,7 @@ mod tests {
         assert_eq!(msg.content, "你好世界");
 
         let channel = manager.get_channel(id).unwrap();
-        let messages = channel.get_messages(10);
+        let _messages = channel.get_messages(10);
     }
 
     #[test]

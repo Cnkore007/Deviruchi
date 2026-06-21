@@ -625,7 +625,7 @@ mod tests {
         );
         // 基础伤害 30，方差 90%-110%（27-33）
         assert!(
-            damage >= 27 && damage <= 33,
+            (27..=33).contains(&damage),
             "damage {} not in range 27-33",
             damage
         );
@@ -653,7 +653,7 @@ mod tests {
         );
         // 基础伤害 22，方差 90%-110%（19-24）
         assert!(
-            damage >= 19 && damage <= 24,
+            (19..=24).contains(&damage),
             "damage {} not in range 19-24",
             damage
         );
@@ -677,7 +677,7 @@ mod tests {
         );
         // 基础伤害 45，方差 90%-110%（40-49）
         assert!(
-            damage >= 40 && damage <= 49,
+            (40..=49).contains(&damage),
             "damage {} not in range 40-49",
             damage
         );
@@ -734,7 +734,7 @@ mod tests {
         // magic_defense = 5
         // Damage = ((50 - 5).max(1) * 100) / 100 = 45, 方差 90%-110%（40-49）
         assert!(
-            damage >= 40 && damage <= 49,
+            (40..=49).contains(&damage),
             "damage {} not in range 40-49",
             damage
         );
@@ -840,7 +840,6 @@ mod tests {
 
 #[cfg(test)]
 mod level_penalty_tests {
-    use super::*;
 
     // Level penalty calculation is done in ExpDistributor, but we test the logic here
     // by testing the expected values
@@ -852,13 +851,13 @@ mod level_penalty_tests {
 
         // Case 1: diff <= 10 -> 100% exp
         let (player_level, mob_level) = (50, 40); // diff = 10
-        let level_diff = player_level as i32 - mob_level as i32;
+        let level_diff = player_level - mob_level;
         let penalty = if level_diff <= 10 { 1.0 } else { 0.0 };
         assert_eq!(penalty, 1.0);
 
         // Case 2: diff <= 15 -> 75% exp
         let (player_level, mob_level) = (50, 36); // diff = 14
-        let level_diff = player_level as i32 - mob_level as i32;
+        let level_diff = player_level - mob_level;
         let penalty = if level_diff <= 10 {
             1.0
         } else if level_diff <= 15 {
@@ -870,7 +869,7 @@ mod level_penalty_tests {
 
         // Case 3: diff <= 20 -> 50% exp
         let (player_level, mob_level) = (50, 31); // diff = 19
-        let level_diff = player_level as i32 - mob_level as i32;
+        let level_diff = player_level - mob_level;
         let penalty = if level_diff <= 10 {
             1.0
         } else if level_diff <= 15 {
@@ -884,7 +883,7 @@ mod level_penalty_tests {
 
         // Case 4: diff <= 25 -> 25% exp
         let (player_level, mob_level) = (50, 26); // diff = 24
-        let level_diff = player_level as i32 - mob_level as i32;
+        let level_diff = player_level - mob_level;
         let penalty = if level_diff <= 10 {
             1.0
         } else if level_diff <= 15 {
@@ -900,7 +899,7 @@ mod level_penalty_tests {
 
         // Case 5: diff > 25 -> 10% exp
         let (player_level, mob_level) = (50, 20); // diff = 30
-        let level_diff = player_level as i32 - mob_level as i32;
+        let level_diff = player_level - mob_level;
         let penalty = if level_diff <= 10 {
             1.0
         } else if level_diff <= 15 {
@@ -1179,7 +1178,7 @@ mod magic_damage_tests {
         for _ in 0..100 {
             let result = calc_matk_variance(50, 100);
             assert!(
-                result >= 50 && result <= 100,
+                (50..=100).contains(&result),
                 "结果 {} 不在 [50, 100] 范围内",
                 result
             );

@@ -260,7 +260,10 @@ mod tests {
             .execute("CREATE TABLE test (id INTEGER, val REAL)")
             .unwrap();
         backend
-            .execute_params("INSERT INTO test VALUES (?, ?)", &[&42i32, &3.14f64])
+            .execute_params(
+                "INSERT INTO test VALUES (?, ?)",
+                &[&42i32, &std::f64::consts::PI],
+            )
             .unwrap();
 
         let rows = backend
@@ -268,7 +271,7 @@ mod tests {
             .unwrap();
         assert_eq!(rows.len(), 1);
         let val = rows[0].get_f64(0).unwrap();
-        assert!((val - 3.14).abs() < 0.001);
+        assert!((val - std::f64::consts::PI).abs() < 0.001);
     }
 
     #[test]

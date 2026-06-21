@@ -159,7 +159,7 @@ pub enum MobAttackResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::rand::{GameRng, MockRng};
+    use crate::game::rand::MockRng;
 
     fn create_test_handler(values: Vec<u32>) -> BattleHandler {
         BattleHandler::new(Arc::new(MockRng::new(values)))

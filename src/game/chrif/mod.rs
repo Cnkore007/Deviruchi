@@ -327,7 +327,7 @@ mod tests {
         let manager = CharServerManager::new();
 
         let id1 = manager.register_connection("127.0.0.1".to_string(), 6000);
-        let id2 = manager.register_connection("127.0.0.2".to_string(), 6001);
+        let _id2 = manager.register_connection("127.0.0.2".to_string(), 6001);
 
         assert_eq!(manager.get_connections().len(), 2);
 
@@ -340,7 +340,7 @@ mod tests {
         let manager = CharServerManager::new();
         let id = manager.register_connection("127.0.0.1".to_string(), 6000);
 
-        let initial_status = manager.get_connection_status(id);
+        let _initial_status = manager.get_connection_status(id);
         assert!(manager.update_heartbeat(id));
     }
 }

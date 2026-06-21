@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn test_cannot_insert_wrong_slot() {
         let manager = CardManager::new();
-        let player_id = Uuid::new_v4();
+        let _player_id = Uuid::new_v4();
 
         // Hydra Card (4035) only for Weapon
         assert!(manager.can_insert(4035, EquipSlotForCard::Weapon));

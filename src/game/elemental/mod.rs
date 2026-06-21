@@ -348,7 +348,7 @@ mod tests {
         let manager = ElementalManager::new();
         let owner = Uuid::new_v4();
 
-        let id = manager.summon(
+        let _id = manager.summon(
             2114,
             ElementalElement::Fire,
             owner,

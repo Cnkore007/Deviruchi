@@ -753,7 +753,7 @@ mod tests {
         assert_eq!(result, Some(1));
 
         // 所有槽位已满时，应该返回 None
-        let mut full_chars: Vec<Character> = (0..9)
+        let full_chars: Vec<Character> = (0..9)
             .map(|i| Character {
                 char_id: i as u32 + 1,
                 char_num: i as u8,
@@ -874,7 +874,7 @@ mod tests {
     #[test]
     fn test_handle_delete_char_wrong_account() {
         let server = create_test_server();
-        let mut session = create_session_with_account(1);
+        let _session = create_session_with_account(1);
 
         // 创建角色属于 account 1
         let char_id = server

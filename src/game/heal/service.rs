@@ -283,7 +283,6 @@ impl HealService {
 mod tests {
     use super::*;
     use crate::storage::Character;
-    use uuid::Uuid;
 
     fn create_test_player() -> Player {
         let char = Character {

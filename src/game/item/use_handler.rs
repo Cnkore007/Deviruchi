@@ -1076,7 +1076,7 @@ mod tests {
     #[test]
     fn test_validator_initial_state() {
         let tracker = Arc::new(ItemDelayTracker::new());
-        let validator = ItemUseValidator::new(tracker);
+        let _validator = ItemUseValidator::new(tracker);
 
         // 初始状态应该允许使用
         // (需要模拟玩家和物品来完整测试)

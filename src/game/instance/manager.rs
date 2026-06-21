@@ -566,7 +566,7 @@ mod tests {
     use super::*;
 
     fn create_test_manager() -> InstanceManager {
-        let mut manager = InstanceManager::new();
+        let manager = InstanceManager::new();
         manager.load_default_templates();
         manager
     }
@@ -615,7 +615,7 @@ mod tests {
     fn test_player_already_in_instance() {
         let manager = create_test_manager();
 
-        let instance1 = manager.create_instance(1, 100).unwrap();
+        let _instance1 = manager.create_instance(1, 100).unwrap();
         let instance2 = manager.create_instance(2, 101).unwrap();
 
         // Player 100 is in instance 1
@@ -741,7 +741,7 @@ mod tests {
 
     #[test]
     fn test_instance_full() {
-        let mut manager = create_test_manager();
+        let manager = create_test_manager();
 
         // Register a template with max 2 players
         manager.register_template(

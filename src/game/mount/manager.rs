@@ -225,7 +225,6 @@ mod tests {
     use crate::game::constants;
     use crate::game::map::player::PlayerState;
     use parking_lot::RwLock;
-    use std::sync::Arc;
 
     fn create_test_player(level: u16) -> Player {
         Player {

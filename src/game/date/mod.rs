@@ -325,6 +325,6 @@ mod tests {
         // star 每 5 天一次
         let star = GameDate::is_day_of_star();
         let doy = GameDate::day_of_year();
-        assert_eq!(star, (doy + 1) % 5 == 0);
+        assert_eq!(star, (doy + 1).is_multiple_of(5));
     }
 }
