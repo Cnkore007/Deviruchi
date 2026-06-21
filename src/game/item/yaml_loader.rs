@@ -48,6 +48,20 @@ struct ItemRathenaEntry {
     attack: u16,
     #[serde(rename = "MagicAttack", default)]
     magic_attack: u16,
+    #[serde(rename = "MagicDefense", default)]
+    magic_defense: u16,
+    #[serde(rename = "Str", default)]
+    str_bonus: i16,
+    #[serde(rename = "Agi", default)]
+    agi_bonus: i16,
+    #[serde(rename = "Vit", default)]
+    vit_bonus: i16,
+    #[serde(rename = "Int", default)]
+    int_bonus: i16,
+    #[serde(rename = "Dex", default)]
+    dex_bonus: i16,
+    #[serde(rename = "Luk", default)]
+    luk_bonus: i16,
     #[serde(rename = "Defense", default)]
     defense: u16,
     #[serde(rename = "Range", default)]
@@ -154,13 +168,13 @@ impl ItemRathenaEntry {
             atk: self.attack,
             matk: self.magic_attack,
             defense: self.defense,
-            magic_defense: 0,
-            str_bonus: 0,
-            agi_bonus: 0,
-            vit_bonus: 0,
-            int_bonus: 0,
-            dex_bonus: 0,
-            luk_bonus: 0,
+            magic_defense: self.magic_defense,
+            str_bonus: self.str_bonus,
+            agi_bonus: self.agi_bonus,
+            vit_bonus: self.vit_bonus,
+            int_bonus: self.int_bonus,
+            dex_bonus: self.dex_bonus,
+            luk_bonus: self.luk_bonus,
         }
     }
 }
