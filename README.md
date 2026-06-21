@@ -2,7 +2,7 @@
 
 高性能 Ragnarok Online 服务端，用 Rust 语言，基于 rAthena 重构而来，简单、高效、稳定、易扩展。
 
-> **v0.0.3** — 功能追平 rAthena 95%
+> **v0.0.4** — 完成 P0-P3 重构，支持三进程分离、跨服务器 TCP 通信、装备 MDEF、仓库闭环、NPC 脚本真实化，协议包扩展至银行/邮件/任务/成就/好友系统。
 
 ## 目标
 
@@ -12,21 +12,22 @@ Deviruchi 是 rAthena 服务端的 Rust 实现，目标是：
 - **语言级安全** — Rust 快速重构
 - **微秒级延迟** — 内存 channel 直连通信，公会战多人 boss 战依然流畅
 - **无缝升级** — 自动数据库迁移，SQLite 到 MySQL 一行配置
-- **智能助手** — DeviAgent 服务端运维助手，REPL 交互 + 知识库检索
+- **三进程分离** — 支持 `login`/`char`/`map` 独立进程运行，通过 TCP 互连
+- **现代客户端** — 与 R-Rangar（原 korangar）开源客户端适配
 
 ## 核心特性
 
 | 特性 | 说明 |
 |------|------|
-| 简单部署 | 单可执行文件包含 Login/Char/Map 全部服务 |
+| 简单部署 | 单可执行文件包含 Login/Char/Map 全部服务，也支持三进程分离部署 |
 | 开箱即用 | 无需安装 MySQL 数据库或配置连接参数 |
 | 统一日志 | 统一的日志及崩溃报告，方便调试 |
 | 极低延迟 | 模块间内存 channel 通信，延迟微秒级 |
 | 无忧升级 | 自动数据库迁移，支持 SQLite → MySQL |
 | rAthena 兼容 | 完全兼容 rAthena 原生客户端（TCP 二进制协议） |
+| 三进程分离 | `mode = "login"|"char"|"map"` 独立启动，跨进程 TCP 互联 |
 | Renewal/Pre-Renewal | 双公式系统，支持新旧两套伤害/状态公式 |
 | DB Import Overlay | db/import/ 覆盖层，自定义数据不修改原文件 |
-| DeviAgent CLI | `deviruchi agent` 子命令一键启动 AI 助手 |
 
 ## 架构
 
@@ -36,15 +37,24 @@ Deviruchi (服务端)
 ├── Char Server   : 6000
 └── Map Server    : 6121
 
-DeviAgent (智能助手)
-├── REPL 交互: 命令行实时查询服务端状态
-├── 知识库: YAML 文档索引 + 全文检索
-└── 通信: TCP 直连服务端
+Inter-Server TCP
+├── login_inter_port : 16900
+├── char_inter_port  : 16000
+└── map_inter_port   : 16121
 ```
 
 ## 当前进度
 
-> **85,000+ 行** Rust 代码，220+ 个源文件，1,400 测试（全部通过），覆盖 63 个服务端模块。
+> **85,000+ 行** Rust 代码，220+ 个源文件，1,400+ 测试（全部通过），覆盖 63 个服务端模块。
+
+### 近期更新 (v0.0.4)
+
+| 方向 | 内容 |
+|------|------|
+| P0 代码质量 | 移除 devi-agent，修复全部 clippy 警告，统一 cargo fmt |
+| P1 核心玩法 | 装备 MDEF 接入魔法伤害、仓库/Kafra 传送闭环、公会/组队 ID 真实集成、NPC 脚本 getitem/heal 真实化 |
+| P2 架构对齐 | 数据库 Schema 扩展（party/guild/char_reg/pet/homun 等字段）、item_db 加载器对齐 rAthena（MagicDefense + stat bonus）、三进程 mode-aware 启动 |
+| P3 通信扩展 | inter-server TCP 数据包 + 注册/心跳/CharToMap 角色传输、银行/邮件/任务/成就/好友协议包定义 |
 
 ### 项目统计
 
@@ -52,7 +62,6 @@ DeviAgent (智能助手)
 |------|------|------|
 | 服务端模块 | 63 个 | 覆盖 rAthena 所有核心功能 |
 | 包处理器 | 91 个 | 支持 rAthena 原生客户端 |
-| 智能助手代码 | 1,536 行 | REPL + 知识库 + 6 个工具 |
 | 总代码行数 | 85,000+ 行 | 包含测试和文档 |
 | 脚本命令 | 580 个 | rAthena 兼容 95% |
 | 技能数量 | 1,635 个 | 完全复用 rAthena 数据 |
@@ -127,7 +136,7 @@ DeviAgent (智能助手)
 | 模块 | 代码量 | 说明 |
 |------|--------|------|
 | **network** | 815 行 | Legacy TCP 服务器、Session 管理 |
-| **protocol** | 2,155 行 | ~80 种包定义（map/guild/teleport/trade/party/char/storage/login） |
+| **protocol** | 2,155 行 | ~80 种基础包 + 银行/邮件/任务/成就/好友扩展包定义 |
 | **storage** | 3,500+ 行 | Backend 抽象层（SQLite/MySQL 双后端）、14 张表、仓库同步管理器、UPSERT 持久化、迁移框架（v5）、125+ 测试 |
 | **game_loop** | 331 行 | 100ms tick 主循环：掉落物清理→Token 清理→怪物重生→AI 更新→玩家回复 |
 | **login** | 339 行 | 登录认证（Argon2）、封禁过期检查、重复登录检测 |
@@ -418,6 +427,68 @@ max_message_length = 200     # 最大消息长度
 rate_limit_per_second = 5    # 每秒消息限制
 ```
 
+### [inter_server] 服务器间通信配置
+
+```toml
+[inter_server]
+login_inter_port = 16900     # Login Server inter-server 端口
+char_inter_port = 16000      # Char Server inter-server 端口
+map_inter_port = 16121       # Map Server inter-server 端口
+heartbeat_interval_secs = 30 # 心跳间隔（秒）
+server_timeout_secs = 120    # 服务器超时（秒）
+
+# 已知服务器列表（多进程部署时填写）
+[[inter_server.known_servers]]
+id = 1
+type = "login"
+ip = "127.0.0.1"
+port = 16900
+
+[[inter_server.known_servers]]
+id = 2
+type = "char"
+ip = "127.0.0.1"
+port = 16000
+```
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `login_inter_port` | u16 | 16900 | Login Server 的 inter-server 监听端口 |
+| `char_inter_port` | u16 | 16000 | Char Server 的 inter-server 监听端口 |
+| `map_inter_port` | u16 | 16121 | Map Server 的 inter-server 监听端口 |
+| `heartbeat_interval_secs` | u64 | 30 | 向已知服务器发送心跳的间隔 |
+| `server_timeout_secs` | u64 | 120 | 服务器多久未心跳视为离线 |
+| `known_servers` | array | [] | 多进程模式下需要连接的其他服务器 |
+
+---
+
+## 运行模式
+
+Deviruchi 支持两种运行方式：
+
+### 单进程模式（默认）
+
+```bash
+# 同时启动 Login/Char/Map 三个服务
+./target/release/deviruchi
+```
+
+### 三进程分离模式
+
+```bash
+# 启动 Login Server
+./target/release/deviruchi --mode login
+
+# 启动 Char Server
+./target/release/deviruchi --mode char
+
+# 启动 Map Server
+./target/release/deviruchi --mode map
+```
+
+多进程模式下，需要在 `deviruchi.toml` 的 `[inter_server]` 段配置 `known_servers`，
+让 Char/Map 进程能找到其他服务。
+
 ---
 
 ## 客户端连接
@@ -460,7 +531,7 @@ rate_limit_per_second = 5    # 每秒消息限制
 | 6900 | Login Server | 客户端首先连接的端口 |
 | 6000 | Char Server | 角色选择界面 |
 | 6121 | Map Server | 游戏世界 |
-| 16400 | Agent API | DeviAgent 连接端口 |
+| 16400 | Agent API | 已弃用（DeviAgent 已移除） |
 
 ---
 
@@ -671,9 +742,9 @@ pvp_damage_rate = 1.0
 | 组件 | 技术 |
 |------|------|
 | 服务端 | Rust, Tokio, SQLite, MySQL（可选） |
-| 智能助手 | Rust, Tokio, SQLite |
 | 协议 | rAthena 二进制包（兼容） |
 | 构建 | Cargo Workspace |
+| 客户端 | R-Rangar（Rust + wgpu，原 korangar） |
 
 ## License
 
