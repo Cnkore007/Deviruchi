@@ -146,16 +146,6 @@ Inter-Server TCP
 | **gat** | 386 行 | .gat 文件解析器（rAthena 格式 v1-5）、MapState 真实碰撞检测 |
 | **migration** | 420 行 | 数据库迁移框架（schema_version 版本追踪、事务保护、幂等执行） |
 
-### 智能助手 (DeviAgent) — 1,536 行，16 个源文件
-
-| 模块 | 说明 |
-|------|------|
-| REPL 交互 | 命令行实时查询服务端状态 |
-| 知识库 | YAML 文档索引 + 全文检索 |
-| TCP 通信 | 直连服务端，支持 Windows 跨平台 |
-| LLM 集成 | 支持 OpenAI 兼容 API |
-| 6 个工具 | server_status, config, player, database, log, script |
-
 ---
 
 ## 快速开始
@@ -177,12 +167,8 @@ cd Deviruchi
 # 2. 编译服务端（Release 模式）
 cargo build --release
 
-# 3. 编译智能助手
-cargo build --release -p devi-agent
-
-# 4. 编译完成后，可执行文件位于：
+# 3. 编译完成后，可执行文件位于：
 #    ./target/release/deviruchi      (服务端)
-#    ./target/release/devi-agent     (智能助手)
 ```
 
 ### 首次运行
@@ -268,7 +254,6 @@ tcp_nodelay = true           # TCP 无延迟（降低延迟）
 keepalive = true             # TCP 保活
 read_buffer_size = 8192      # 读缓冲区大小
 write_buffer_size = 8192     # 写缓冲区大小
-agent_port = 16400           # Agent API 端口（可选，不设置则禁用）
 ```
 
 | 参数 | 类型 | 默认值 | 说明 |
@@ -281,7 +266,6 @@ agent_port = 16400           # Agent API 端口（可选，不设置则禁用）
 | `keepalive` | bool | true | TCP 保活检测 |
 | `read_buffer_size` | usize | 8192 | 读缓冲区大小（字节） |
 | `write_buffer_size` | usize | 8192 | 写缓冲区大小（字节） |
-| `agent_port` | u16 | None | Agent API 端口（不设置则禁用 Agent 服务） |
 
 ### [game] 游戏配置
 
@@ -531,66 +515,33 @@ Deviruchi 支持两种运行方式：
 | 6900 | Login Server | 客户端首先连接的端口 |
 | 6000 | Char Server | 角色选择界面 |
 | 6121 | Map Server | 游戏世界 |
-| 16400 | Agent API | 已弃用（DeviAgent 已移除） |
+| 16900 | Login inter-server | 多进程模式下的服务器间通信 |
+| 16000 | Char inter-server | 多进程模式下的服务器间通信 |
+| 16121 | Map inter-server | 多进程模式下的服务器间通信 |
 
 ---
 
-## DeviAgent 智能助手
+## 客户端连接
 
-### 启动 DeviAgent
+### 使用 R-Rangar 客户端
 
-```bash
-# 启动智能助手
-./target/release/devi-agent
-```
+1. **克隆 R-Rangar 客户端**
+   ```bash
+   git clone https://github.com/your-repo/R-Rangar.git
+   cd R-Rangar
+   ```
 
-### 配置 LLM
+2. **编译客户端**
+   ```bash
+   cargo build --release
+   ```
 
-编辑 `devi-agent/config.toml`：
+3. **启动客户端并指定资源目录**
+   ```bash
+   ./target/release/r-rangar --game-dir /path/to/20250416Ragnarok_en
+   ```
 
-```toml
-[llm]
-api_key = "your-api-key"     # OpenAI API Key
-model = "gpt-4"              # 模型名称
-base_url = "https://api.openai.com/v1"  # API 地址
-```
-
-### 命令列表
-
-| 命令 | 说明 |
-|------|------|
-| `/help` | 显示帮助信息 |
-| `/connect` | 连接游戏服务器 |
-| `/status` | 查看服务器状态 |
-| `/players` | 查看在线玩家 |
-| `/quit` | 退出 |
-
-### 自然语言交互
-
-直接输入自然语言与 AI 对话：
-
-```
-> 查看当前在线玩家
-> 修改经验倍率为 2.0
-> 查询物品 ID 501 的信息
-> 搜索最近的错误日志
-> 验证这个脚本是否正确: mes "Hello"; next;
-```
-
-### 工具说明
-
-| 工具 | 功能 |
-|------|------|
-| `server_status` | 查看服务器运行状态（运行时间、在线人数） |
-| `config` | 读取/修改服务器配置 |
-| `player` | 查询在线玩家信息 |
-| `database` | 查询/修改游戏数据库 |
-| `log` | 搜索/查看服务器日志 |
-| `script` | NPC 脚本帮助/验证/重载 |
-
----
-
-## GM 命令
+### 使用 rAthena 原生客户端
 
 ### 基础命令
 
