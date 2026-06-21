@@ -63,6 +63,15 @@ pub fn init_schema(db: &Database) -> Result<()> {
             status_point INTEGER DEFAULT 0,
             skill_point INTEGER DEFAULT 0,
             delete_timer INTEGER DEFAULT 0,
+            party_id INTEGER DEFAULT 0,
+            guild_id INTEGER DEFAULT 0,
+            pet_id INTEGER DEFAULT 0,
+            homun_id INTEGER DEFAULT 0,
+            elemental_id INTEGER DEFAULT 0,
+            robe INTEGER DEFAULT 0,
+            fame INTEGER DEFAULT 0,
+            rename INTEGER DEFAULT 0,
+            slotchange INTEGER DEFAULT 0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL,
             FOREIGN KEY (account_id) REFERENCES accounts(account_id)
@@ -273,6 +282,60 @@ pub fn init_schema(db: &Database) -> Result<()> {
             item_or_skill_id INTEGER NOT NULL,
             PRIMARY KEY (char_id, hotkey_id),
             FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 角色数字变量表（脚本变量持久化）
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS char_reg_num (
+            char_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
+            value INTEGER DEFAULT 0,
+            PRIMARY KEY (char_id, key),
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 角色字符串变量表（脚本变量持久化）
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS char_reg_str (
+            char_id INTEGER NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (char_id, key),
+            FOREIGN KEY (char_id) REFERENCES characters(char_id) ON DELETE CASCADE
+        )",
+    )?;
+
+    // 组队表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS parties (
+            party_id INTEGER PRIMARY KEY,
+            party_uuid TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            leader_char_id INTEGER NOT NULL,
+            leader_account_id INTEGER NOT NULL,
+            exp_mode INTEGER DEFAULT 0,
+            item_mode INTEGER DEFAULT 0,
+            member_count INTEGER DEFAULT 1,
+            max_members INTEGER DEFAULT 12,
+            created_at INTEGER NOT NULL
+        )",
+    )?;
+
+    // 组队成员表
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS party_members (
+            party_id INTEGER NOT NULL,
+            char_id INTEGER NOT NULL,
+            account_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            map_name TEXT DEFAULT '',
+            position INTEGER DEFAULT 0,
+            online INTEGER DEFAULT 1,
+            joined_at INTEGER NOT NULL,
+            PRIMARY KEY (party_id, char_id),
+            FOREIGN KEY (party_id) REFERENCES parties(party_id) ON DELETE CASCADE
         )",
     )?;
 
