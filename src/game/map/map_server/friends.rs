@@ -2,7 +2,7 @@
 
 use super::MapServer;
 use crate::network::session::Session;
-use crate::protocol::map_packets::{CzFriendsListAdd, CzFriendsListRemove, CzFriendsListReply};
+use crate::protocol::friend_packets::{CzFriendsListAdd, CzFriendsListRemove, CzFriendsListReply};
 
 impl MapServer {
     /// 处理添加好友请求 (0x0201)

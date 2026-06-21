@@ -53,6 +53,7 @@ impl PacketHandler {
         db: Arc<Database>,
         session_manager: Arc<SessionManager>,
         token_store: Arc<TokenStore>,
+        _inter_comm: Arc<crate::game::inter_server::InterServerComm>,
     ) -> Self {
         Self {
             mode: ServerMode::Char,
@@ -80,6 +81,7 @@ impl PacketHandler {
         spawn_manager: Arc<MobSpawnManager>,
         death_drop_items: bool,
         guild_manager: Arc<GuildManager>,
+        inter_comm: Arc<crate::game::inter_server::InterServerComm>,
     ) -> Self {
         let storage_manager = Arc::new(StorageManager::new());
         let trade_manager = Arc::new(TradeManager::new());
@@ -107,7 +109,7 @@ impl PacketHandler {
             death_drop_items,
             battle_handler,
             spawn_manager,
-        ));
+        ).with_inter_comm(inter_comm));
 
         Self {
             mode: ServerMode::Map,

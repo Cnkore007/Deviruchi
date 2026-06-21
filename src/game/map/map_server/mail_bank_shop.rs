@@ -2,7 +2,9 @@
 
 use super::MapServer;
 use crate::network::session::Session;
-use crate::protocol::map_packets::{CzBankDeposit, CzBankWithdraw, CzCashShopBuy, CzMailSend};
+use crate::protocol::bank_packets::{CzBankDeposit, CzBankWithdraw};
+use crate::protocol::mail_packets::CzMailSend;
+use crate::protocol::map_packets::CzCashShopBuy;
 
 impl MapServer {
     /// 处理打开邮箱请求 (0x0260)

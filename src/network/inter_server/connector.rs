@@ -134,6 +134,40 @@ impl InterServerConnector for TcpInterServerConnector {
         Ok(())
     }
 
+    fn recv_packet(&self) -> Result<Option<InterServerPacket>, String> {
+        let mut stream = self.stream.lock().map_err(|e| format!("锁中毒: {}", e))?;
+
+        // 读取 4 字节长度前缀（大端）
+        let mut len_buf = [0u8; 4];
+        match stream.read_exact(&mut len_buf) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                self.connected.store(false, Ordering::SeqCst);
+                return Ok(None);
+            }
+            Err(e) => {
+                self.connected.store(false, Ordering::SeqCst);
+                return Err(format!("读取长度前缀失败: {}", e));
+            }
+        }
+
+        let len = u32::from_be_bytes(len_buf) as usize;
+        if len > 8 * 1024 * 1024 {
+            return Err(format!("数据包过大: {} bytes", len));
+        }
+
+        let mut payload = vec![0u8; len];
+        stream
+            .read_exact(&mut payload)
+            .map_err(|e| format!("读取 payload 失败: {}", e))?;
+
+        let packet: InterServerPacket = bincode::deserialize(&payload)
+            .map_err(|e| format!("反序列化失败: {}", e))?;
+
+        *self.last_recv.lock().unwrap() = Instant::now();
+        Ok(Some(packet))
+    }
+
     fn is_connected(&self) -> bool {
         self.connected.load(Ordering::SeqCst)
     }

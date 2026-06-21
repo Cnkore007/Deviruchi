@@ -62,6 +62,9 @@ impl Core {
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
+        use crate::game::inter_server::InterServerComm;
+        let inter_server_comm = Arc::new(InterServerComm::new());
+
         // 初始化日志系统
         let log_config = logging::LogConfig {
             enabled: self.config.logging.enabled,
@@ -126,12 +129,14 @@ impl Core {
             let sm = session_manager.clone();
             let db = db.clone();
             let token_store = self.token_store.clone();
+            let inter_comm = inter_server_comm.clone();
             handles.push(tokio::spawn(async move {
                 tracing::info!("启动 Char Server: {}", addr);
                 let packet_handler = Arc::new(PacketHandler::new_char(
                     db,
                     sm.clone(),
                     token_store,
+                    inter_comm,
                 ));
                 let server = GameServer::new(addr, sm, packet_handler)
                     .with_initial_stage(crate::network::session::SessionStage::Char);
@@ -164,6 +169,7 @@ impl Core {
                 spawn_manager.clone(),
                 self.config.game.death_drop_items,
                 guild_manager.clone(),
+                inter_server_comm.clone(),
             ));
 
             // 启动 Timer 驱动循环（处理 HealService 等定时回调）

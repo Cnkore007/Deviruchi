@@ -68,6 +68,7 @@ pub struct MapServer {
     pub active_dialogues: RwLock<HashMap<Uuid, NpcDialogueState>>,
     pub battle_handler: Arc<BattleHandler>,
     pub spawn_manager: Arc<MobSpawnManager>,
+    pub inter_comm: Option<Arc<crate::game::inter_server::InterServerComm>>,
 }
 
 impl MapServer {
@@ -117,12 +118,19 @@ impl MapServer {
             active_dialogues: RwLock::new(HashMap::new()),
             battle_handler,
             spawn_manager,
+            inter_comm: None,
         }
     }
 
     /// 设置 Map Server ID
     pub fn with_server_id(mut self, server_id: u32) -> Self {
         self.map_server_id = server_id;
+        self
+    }
+
+    /// 设置 InterServerComm
+    pub fn with_inter_comm(mut self, inter_comm: Arc<crate::game::inter_server::InterServerComm>) -> Self {
+        self.inter_comm = Some(inter_comm);
         self
     }
 

@@ -182,6 +182,9 @@ pub trait InterServerConnector: Send + Sync {
     /// 发送数据包
     fn send_packet(&self, packet: &InterServerPacket) -> Result<(), String>;
 
+    /// 读取并反序列化一个数据包（阻塞）
+    fn recv_packet(&self) -> Result<Option<InterServerPacket>, String>;
+
     /// 获取连接状态
     fn is_connected(&self) -> bool;
 
@@ -225,6 +228,11 @@ impl InterServerComm {
         Self {
             connections: RwLock::new(HashMap::new()),
         }
+    }
+
+    /// Register a connector for a given server ID
+    pub fn register_connector(&self, id: u32, connector: Box<dyn InterServerConnector>) {
+        self.connections.write().insert(id, connector);
     }
 }
 

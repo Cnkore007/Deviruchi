@@ -55,6 +55,7 @@ impl InterServerTcpServer {
         };
 
         let server_id = self.server_id;
+        let _comm = self.comm.clone();
 
         thread::spawn(move || {
             for incoming in listener.incoming() {
@@ -67,7 +68,15 @@ impl InterServerTcpServer {
                                     "Inter-server 连接接入 (server_id={})",
                                     server_id
                                 );
-                                on_accept(0, connector);
+                                // 尝试读取第一个包以识别对方 server_id
+                                if let Ok(Some(
+                                    _packet @ crate::game::inter_server::InterServerPacket::ServerRegister { id, server_type, .. }
+                                )) = connector.recv_packet() {
+                                    info!("Inter-server peer registered: server_id={}, type={:?}", id, server_type);
+                                    on_accept(id, connector);
+                                } else {
+                                    on_accept(0, connector);
+                                }
                             }
                             Err(e) => warn!("配置 inter-server 连接失败: {}", e),
                         }

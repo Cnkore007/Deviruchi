@@ -260,6 +260,68 @@ impl Player {
         }
     }
 
+    /// 从 CharacterTransfer 创建 Player（用于跨进程 CharToMap 传输）
+    pub fn from_character_transfer(transfer: &crate::game::inter_server::CharacterTransfer) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            char_id: transfer.char_id,
+            account_id: transfer.account_id,
+            name: transfer.name.clone(),
+            map_name: transfer.map_name.clone(),
+            combat: RwLock::new(CombatStats {
+                hp: transfer.hp,
+                max_hp: transfer.max_hp,
+                sp: transfer.sp,
+                max_sp: transfer.max_sp,
+                state: PlayerState::Alive,
+                in_combat: false,
+                is_sitting: false,
+                walk_speed: constants::DEFAULT_WALK_SPEED,
+                direction: 0,
+            }),
+            pos: RwLock::new(Position {
+                x: transfer.pos_x,
+                y: transfer.pos_y,
+            }),
+            level: RwLock::new(LevelStats {
+                base_level: transfer.level,
+                job_level: 1,
+                base_exp: 0,
+                job_exp: 0,
+                status_point: 0,
+                skill_point: 0,
+            }),
+            attrs: RwLock::new(Attributes {
+                str: transfer.str as u16,
+                agi: transfer.agi as u16,
+                vit: transfer.vit as u16,
+                int: transfer.int as u16,
+                dex: transfer.dex as u16,
+                luk: transfer.luk as u16,
+            }),
+            economy: RwLock::new(Economy {
+                zeny: transfer.zeny,
+                current_weight: 0,
+                max_weight: constants::BASE_MAX_WEIGHT
+                    + (transfer.str as u32) * constants::WEIGHT_PER_STR,
+                job: transfer.job,
+                shop_id: None,
+                group_id: 0,
+            }),
+            save_point: RwLock::new(SavePoint {
+                map: transfer.save_map.clone(),
+                x: transfer.save_x,
+                y: transfer.save_y,
+            }),
+            equipment: RwLock::new(Equipment::new()),
+            status: PlayerStatus::new(Uuid::new_v4()),
+            inventory: RwLock::new(Vec::new()),
+            hotkeys: RwLock::new(Vec::new()),
+            party_id: RwLock::new(None),
+            guild_id: RwLock::new(None),
+        }
+    }
+
     // ==================== 分组锁访问器 ====================
 
     /// 获取战斗状态读锁
