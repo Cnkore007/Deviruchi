@@ -9,6 +9,7 @@ use crate::protocol::map_packets::{
     ZcSayDialog, ZcWaitDialog,
 };
 use crate::protocol::packet_builder::Packed;
+use std::sync::Arc;
 use uuid::Uuid;
 
 impl MapServer {
@@ -33,13 +34,13 @@ impl MapServer {
         if let Some(script_text) = &npc.script {
             let script_node = parse_script(script_text);
             // 获取玩家数据并构建脚本上下文
-            let context = if let Some(player) = self.map_state.get_player(&player_id) {
-                player.to_script_context()
+            let dialogue = if let Some(player) = self.map_state.get_player(&player_id) {
+                NpcDialogueState::with_player(player_id, npc.id, script_node, Arc::new(player))
             } else {
                 tracing::warn!("Player {} not found for NPC dialogue", player_id);
-                crate::game::script::commands::ScriptContext::default()
+                let context = crate::game::script::commands::ScriptContext::default();
+                NpcDialogueState::with_context(player_id, npc.id, script_node, context)
             };
-            let dialogue = NpcDialogueState::with_context(player_id, npc.id, script_node, context);
             self.active_dialogues.write().insert(player_id, dialogue);
             return self.advance_dialogue(player_id, npc.id);
         }

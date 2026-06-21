@@ -1,7 +1,9 @@
+use crate::game::map::Player;
 use crate::game::script::commands::{
     CallFrame, ExprValue, LoopContext, ScriptCommand, ScriptContext, ScriptNode,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 /// NPC 对话状态
@@ -21,8 +23,10 @@ pub struct NpcDialogueState {
     call_stack: Vec<CallFrame>,
     /// 循环上下文栈（支持嵌套循环）
     loop_stack: Vec<LoopContext>,
-    /// 玩家上下文信息（stub，未来将连接到真实玩家数据）
+    /// 玩家上下文信息
     pub context: ScriptContext,
+    /// 关联的真实玩家（可选，用于修改真实数据）
+    player: Option<Arc<Player>>,
     /// 标记对话是否因 close2 而暂停（不清除状态）
     paused_by_close2: bool,
 }
@@ -41,11 +45,37 @@ impl NpcDialogueState {
             call_stack: Vec::new(),
             loop_stack: Vec::new(),
             context: ScriptContext::default(),
+            player: None,
             paused_by_close2: false,
         }
     }
 
-    /// 创建带有玩家上下文的 NPC 对话状态
+    /// 创建带有真实玩家关联的 NPC 对话状态
+    pub fn with_player(
+        player_id: Uuid,
+        npc_id: u32,
+        script: ScriptNode,
+        player: Arc<Player>,
+    ) -> Self {
+        let context = player.to_script_context();
+        Self {
+            player_id,
+            npc_id,
+            script,
+            current_index: 0,
+            pending_next: false,
+            variables: HashMap::new(),
+            string_variables: HashMap::new(),
+            last_select: 0,
+            call_stack: Vec::new(),
+            loop_stack: Vec::new(),
+            context,
+            player: Some(player),
+            paused_by_close2: false,
+        }
+    }
+
+    /// 创建带有玩家上下文的 NPC 对话状态（向后兼容）
     pub fn with_context(
         player_id: Uuid,
         npc_id: u32,
@@ -64,6 +94,7 @@ impl NpcDialogueState {
             call_stack: Vec::new(),
             loop_stack: Vec::new(),
             context,
+            player: None,
             paused_by_close2: false,
         }
     }
@@ -355,57 +386,85 @@ impl NpcDialogueState {
             // 物品操作
             // ============================================================
             ScriptCommand::GetItem(item_id, amount) => {
-                // 添加物品到背包
-                let current = self.context.inventory.entry(*item_id).or_insert(0);
-                *current = current.saturating_add(*amount);
+                let amount = *amount;
+                if let Some(player) = self.player.as_ref() {
+                    let mut inventory = player.inventory.write();
+                    let mut added = false;
+                    for slot in inventory.iter_mut() {
+                        if slot.item_id == *item_id
+                            && slot.amount as u32 + amount as u32
+                                <= crate::game::constants::MAX_INVENTORY_STACK as u32
+                            && slot.refine == 0
+                            && slot.cards == [0; 4]
+                        {
+                            slot.amount += amount;
+                            added = true;
+                            break;
+                        }
+                    }
+                    if !added {
+                        let next_index = (0..=u8::MAX)
+                            .find(|i| !inventory.iter().any(|s| s.index == *i))
+                            .unwrap_or(inventory.len() as u8);
+                        inventory.push(crate::storage::character::CharacterInventoryData {
+                            index: next_index,
+                            item_id: *item_id,
+                            amount,
+                            identified: true,
+                            refine: 0,
+                            cards: [0; 4],
+                        });
+                    }
+                    drop(inventory);
+                    self.context = player.to_script_context();
+                } else {
+                    let current = self.context.inventory.entry(*item_id).or_insert(0);
+                    *current = current.saturating_add(amount);
+                }
                 tracing::info!(
-                    "NPC {} 给予玩家 {} 个物品 {}，当前数量: {}",
+                    "NPC {} 给予玩家 {} 个物品 {}",
                     self.npc_id,
                     amount,
-                    item_id,
-                    current
+                    item_id
                 );
                 self.current_index += 1;
                 DialogueResponse::Continue
             }
 
             ScriptCommand::DelItem(item_id, amount) => {
-                // 从背包删除物品
-                let mut should_remove = false;
-                let remaining;
-                if let Some(current) = self.context.inventory.get_mut(item_id) {
-                    if *current >= *amount {
-                        *current -= *amount;
-                        remaining = *current;
-                        if *current == 0 {
-                            should_remove = true;
+                let amount = *amount;
+                if let Some(player) = self.player.as_ref() {
+                    let mut inventory = player.inventory.write();
+                    if let Some(pos) = inventory
+                        .iter()
+                        .position(|s| s.item_id == *item_id && s.amount >= amount)
+                    {
+                        if inventory[pos].amount == amount {
+                            inventory.remove(pos);
+                        } else {
+                            inventory[pos].amount -= amount;
                         }
-                        tracing::info!(
-                            "NPC {} 从玩家背包删除 {} 个物品 {}，剩余: {}",
-                            self.npc_id,
-                            amount,
-                            item_id,
-                            remaining
-                        );
-                    } else {
-                        tracing::warn!(
-                            "NPC {} 尝试删除 {} 个物品 {}，但玩家只有 {} 个",
-                            self.npc_id,
-                            amount,
-                            item_id,
-                            current
-                        );
                     }
+                    drop(inventory);
+                    self.context = player.to_script_context();
                 } else {
-                    tracing::warn!(
-                        "NPC {} 尝试删除物品 {}，但玩家没有该物品",
-                        self.npc_id,
-                        item_id
-                    );
+                    if let Some(current) = self.context.inventory.get_mut(item_id)
+                        && *current >= amount
+                    {
+                        if *current == amount {
+                            self.context.inventory.remove(item_id);
+                        } else {
+                            *current -= amount;
+                        }
+                    }
                 }
-                if should_remove {
-                    self.context.inventory.remove(item_id);
-                }
+                tracing::info!(
+                    "NPC {} 从玩家背包删除 {} 个物品 {}",
+                    self.npc_id,
+                    amount,
+                    item_id
+                );
+                self.current_index += 1;
                 DialogueResponse::Continue
             }
 
@@ -413,8 +472,17 @@ impl NpcDialogueState {
             // 信息查询（函数式语法）
             // ============================================================
             ScriptCommand::CountItem(item_id, result_var) => {
-                // 从玩家背包查询物品数量
-                let count: i64 = self.context.inventory.get(item_id).copied().unwrap_or(0) as i64;
+                let count: i64 = if let Some(player) = self.player.as_ref() {
+                    player
+                        .inventory
+                        .read()
+                        .iter()
+                        .filter(|s| s.item_id == *item_id)
+                        .map(|s| s.amount as i64)
+                        .sum()
+                } else {
+                    self.context.inventory.get(item_id).copied().unwrap_or(0) as i64
+                };
                 tracing::debug!("countitem({}) = {}", item_id, count);
                 self.variables.insert(result_var.clone(), count);
                 self.current_index += 1;
@@ -511,9 +579,21 @@ impl NpcDialogueState {
             // 状态操作
             // ============================================================
             ScriptCommand::Heal(hp, sp) => {
-                // 恢复 HP/SP
-                self.context.current_hp = (self.context.current_hp + hp).min(self.context.max_hp);
-                self.context.current_sp = (self.context.current_sp + sp).min(self.context.max_sp);
+                let hp = *hp;
+                let sp = *sp;
+                if let Some(player) = self.player.as_ref() {
+                    {
+                        let mut combat = player.combat.write();
+                        combat.hp = (combat.hp + hp).min(combat.max_hp);
+                        combat.sp = (combat.sp + sp).min(combat.max_sp);
+                    }
+                    self.context = player.to_script_context();
+                } else {
+                    self.context.current_hp =
+                        (self.context.current_hp + hp).min(self.context.max_hp);
+                    self.context.current_sp =
+                        (self.context.current_sp + sp).min(self.context.max_sp);
+                }
                 tracing::info!(
                     "NPC {} 恢复玩家 HP+{} SP+{}，当前 HP: {}/{}, SP: {}/{}",
                     self.npc_id,
