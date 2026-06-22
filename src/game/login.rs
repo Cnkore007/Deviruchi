@@ -5,7 +5,9 @@ use tracing::{error, info, warn};
 
 use crate::game::ipban::IpBanManager;
 use crate::network::session::{Session, SessionManager};
-use crate::protocol::login_packets::{ACAceptLogin, ACRefuseLogin, CALogin};
+use crate::protocol::login_packets::{
+    ACAceptLogin20220406, ACRefuseLogin, CALogin, CharacterServerEntry,
+};
 use crate::protocol::packet_builder::Packed;
 use crate::storage::Database;
 
@@ -165,16 +167,31 @@ impl LoginServer {
         );
 
         // 返回成功响应（包含 char server 地址）
+        // 默认使用 PACKETVER 20220406 格式 (0x0AC4)
+        let mut name = [0u8; 24];
+        let name_bytes = self.char_server.name.as_bytes();
+        let copy_len = name_bytes.len().min(24);
+        name[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
+
+        let char_ip = self.char_server.ip.to_be_bytes();
         Some(
-            ACAceptLogin {
-                account_id: account.account_id,
+            ACAceptLogin20220406 {
                 login_id1,
+                account_id: account.account_id,
                 login_id2,
+                ip_address: 0,
+                name,
+                unknown: 0,
                 sex: account.sex,
-                char_ip: self.char_server.ip,
-                char_port: self.char_server.port,
-                server_name: self.char_server.name.clone(),
-                user_count: 0,
+                auth_token: [0u8; 17],
+                servers: vec![CharacterServerEntry {
+                    ip: char_ip,
+                    port: self.char_server.port,
+                    name: self.char_server.name.clone(),
+                    user_count: 0,
+                    server_type: 0,
+                    display_new: 0,
+                }],
             }
             .to_packet(),
         )
@@ -220,11 +237,11 @@ mod tests {
         assert!(result.is_some(), "成功登录应返回响应包");
 
         let response = result.unwrap();
-        // ACAceptLogin: header(4) + account_id(4) + login_id1(4) + login_id2(4) + sex(1) + pad(1)
-        //             + char_ip(4) + char_port(2) + server_name(20) + user_count(2) + type(1) + new(2) = 49
-        assert_eq!(response.len(), 49, "ACAceptLogin 包长度应为 49 字节");
+        // PACKETVER 20220406 使用 0x0AC4，含固定头 + 1 个 char server 条目
+        // len(2) + id(2) + login_id1(4) + account_id(4) + login_id2(4) + ip(4) + name(24) + unknown(2) + sex(1) + auth_token(17) + server(156)
+        assert_eq!(response.len(), 224, "ACAceptLogin20220406 包长度应为 224 字节");
         let packet_id = u16::from_le_bytes([response[2], response[3]]);
-        assert_eq!(packet_id, 0x0069, "应返回 ACAceptLogin (0x0069)");
+        assert_eq!(packet_id, 0x0AC4, "应返回 ACAceptLogin20220406 (0x0AC4)");
 
         // 验证 session 已更新
         assert!(session.authenticated, "登录成功后 session 应标记为已认证");
@@ -346,8 +363,8 @@ mod tests {
         let mut session = Session::new();
 
         let result = server.handle_ca_login(&packet[4..], &mut session).unwrap();
-        // ACAceptLogin 结构: [len:2LE][id:2LE][account_id:4LE][login_id1:4LE][login_id2:4LE][sex:1]
-        let login_id1 = u32::from_le_bytes([result[8], result[9], result[10], result[11]]);
+        // ACAceptLogin20220406 结构: [len:2LE][id:2LE][login_id1:4LE][account_id:4LE][login_id2:4LE]...
+        let login_id1 = u32::from_le_bytes([result[4], result[5], result[6], result[7]]);
         let login_id2 = u32::from_le_bytes([result[12], result[13], result[14], result[15]]);
         // 验证 login_id 被正确设置到 session 中，且与响应包一致
         assert_eq!(
@@ -389,7 +406,7 @@ mod tests {
 
         let response = result.unwrap();
         let packet_id = u16::from_le_bytes([response[2], response[3]]);
-        assert_eq!(packet_id, 0x0069, "封禁已过期应返回 ACAceptLogin");
+        assert_eq!(packet_id, 0x0AC4, "封禁已过期应返回 ACAceptLogin20220406");
         assert!(session.authenticated, "封禁过期后应认证成功");
     }
 

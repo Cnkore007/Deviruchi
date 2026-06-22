@@ -33,6 +33,79 @@ impl Packed for CALogin {
     }
 }
 
+/// Character server 信息条目（用于 0x0AC4）
+#[derive(Debug, Clone)]
+pub struct CharacterServerEntry {
+    pub ip: [u8; 4],
+    pub port: u16,
+    pub name: String,
+    pub user_count: u16,
+    pub server_type: u16,
+    pub display_new: u16,
+}
+
+impl CharacterServerEntry {
+    fn serialized_size(&self) -> usize {
+        4 + 2 + 20 + 2 + 2 + 2 + 128
+    }
+}
+
+/// 服务器接受登录 (0x0AC4) — PACKETVER 20220406
+///
+/// rAthena 新格式，包含 auth_token 和 character server 列表。
+#[derive(Debug, Clone)]
+pub struct ACAceptLogin20220406 {
+    pub login_id1: u32,
+    pub account_id: u32,
+    pub login_id2: u32,
+    pub ip_address: u32,
+    pub name: [u8; 24],
+    pub unknown: u16,
+    pub sex: u8,
+    pub auth_token: [u8; 17],
+    pub servers: Vec<CharacterServerEntry>,
+}
+
+impl Packed for ACAceptLogin20220406 {
+    fn to_packet(&self) -> Vec<u8> {
+        // 2 byte length prefix + 2 byte packet id + fixed header + per-server entry
+        let server_size: usize = self.servers.iter().map(|s| s.serialized_size()).sum();
+        let total_len = 4 + 4 + 4 + 4 + 4 + 24 + 2 + 1 + 17 + server_size;
+        let mut packet = Vec::with_capacity(total_len + 4);
+
+        packet.extend_from_slice(&(total_len as u16).to_le_bytes());
+        packet.extend_from_slice(&0x0AC4u16.to_le_bytes());
+        packet.extend_from_slice(&self.login_id1.to_le_bytes());
+        packet.extend_from_slice(&self.account_id.to_le_bytes());
+        packet.extend_from_slice(&self.login_id2.to_le_bytes());
+        packet.extend_from_slice(&self.ip_address.to_le_bytes());
+        packet.extend_from_slice(&self.name);
+        packet.extend_from_slice(&self.unknown.to_le_bytes());
+        packet.push(self.sex);
+        packet.extend_from_slice(&self.auth_token);
+
+        for server in &self.servers {
+            packet.extend_from_slice(&server.ip);
+            packet.extend_from_slice(&server.port.to_le_bytes());
+            let mut name_bytes = [0u8; 20];
+            let name_src = server.name.as_bytes();
+            let len = name_src.len().min(20);
+            name_bytes[..len].copy_from_slice(&name_src[..len]);
+            packet.extend_from_slice(&name_bytes);
+            packet.extend_from_slice(&server.user_count.to_le_bytes());
+            packet.extend_from_slice(&server.server_type.to_le_bytes());
+            packet.extend_from_slice(&server.display_new.to_le_bytes());
+            packet.extend_from_slice(&[0u8; 128]);
+        }
+
+        packet
+    }
+
+    fn from_slice(_slice: &[u8]) -> Option<Self> {
+        None // 服务器包，不解析
+    }
+}
+
 /// 服务器接受登录 (0x0069)
 ///
 /// rAthena 格式包含 char server 地址列表。
