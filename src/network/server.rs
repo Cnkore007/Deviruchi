@@ -44,7 +44,7 @@ impl GameServer {
     pub async fn listen(&self) -> anyhow::Result<()> {
         // 使用 std::net 绑定端口，绕过 tokio reactor 在 macOS 26.5 上的兼容问题
         let std_listener = std::net::TcpListener::bind(&self.addr)?;
-        std_listener.set_nonblocking(false)?;
+        std_listener.set_nonblocking(true)?;
         info!("Server listening on {}", self.addr);
 
         let session_manager = self.session_manager.clone();
