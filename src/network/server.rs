@@ -73,28 +73,36 @@ impl GameServer {
         let max_conn = self.max_connections;
 
         // 在 tokio 任务中处理连接
-        while let Some((std_stream, addr)) = rx.recv().await {
-            // 连接数限制检查：超过阈值时拒绝新连接
-            if session_manager.count() >= max_conn {
-                warn!(
-                    "连接数已满 ({}/{}), 拒绝新连接: {}",
-                    session_manager.count(),
-                    max_conn,
-                    addr
-                );
-                drop(std_stream);
-                continue;
-            }
+        loop {
+            match rx.recv().await {
+                Some((std_stream, addr)) => {
+                    // 连接数限制检查：超过阈值时拒绝新连接
+                    if session_manager.count() >= max_conn {
+                        warn!(
+                            "连接数已满 ({}/{}), 拒绝新连接: {}",
+                            session_manager.count(),
+                            max_conn,
+                            addr
+                        );
+                        drop(std_stream);
+                        continue;
+                    }
 
-            let stream = TcpStream::from_std(std_stream)?;
-            let sm = session_manager.clone();
-            let ph = packet_handler.clone();
-            let stage = initial_stage.clone();
-            tokio::spawn(async move {
-                if let Err(e) = Self::handle_connection(stream, addr, sm, ph, stage).await {
-                    error!("Connection error: {}", e);
+                    let stream = TcpStream::from_std(std_stream)?;
+                    let sm = session_manager.clone();
+                    let ph = packet_handler.clone();
+                    let stage = initial_stage.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = Self::handle_connection(stream, addr, sm, ph, stage).await {
+                            error!("Connection error: {}", e);
+                        }
+                    });
                 }
-            });
+                None => {
+                    info!("Accept channel closed, stopping server on {}", self.addr);
+                    break;
+                }
+            }
         }
 
         Ok(())
