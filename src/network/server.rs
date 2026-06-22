@@ -42,41 +42,19 @@ impl GameServer {
     }
 
     pub async fn listen(&self) -> anyhow::Result<()> {
-        // 使用 std::net 绑定端口，绕过 tokio reactor 在 macOS 26.5 上的兼容问题
-        let std_listener = std::net::TcpListener::bind(&self.addr)?;
-        std_listener.set_nonblocking(true)?;
+        // 使用 tokio TcpListener 直接监听
+        let listener = tokio::net::TcpListener::bind(&self.addr).await?;
         info!("Server listening on {}", self.addr);
 
         let session_manager = self.session_manager.clone();
         let packet_handler = self.packet_handler.clone();
         let initial_stage = self.initial_stage.clone();
-
-        // 在阻塞线程中运行 accept 循环，通过 channel 将连接传给 tokio 任务
-        let (tx, mut rx) = mpsc::unbounded_channel::<(std::net::TcpStream, std::net::SocketAddr)>();
-
-        std::thread::spawn(move || {
-            loop {
-                match std_listener.accept() {
-                    Ok((stream, addr)) => {
-                        info!("[ACCEPT] 接受到新连接: {}", addr);
-                        if tx.send((stream, addr)).is_err() {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        error!("[ACCEPT] 错误: {}", e);
-                    }
-                }
-            }
-        });
-
         let max_conn = self.max_connections;
 
-        // 在 tokio 任务中处理连接
         loop {
-            match rx.recv().await {
-                Some((std_stream, addr)) => {
-                    // 连接数限制检查：超过阈值时拒绝新连接
+            match listener.accept().await {
+                Ok((stream, addr)) => {
+                    info!("[ACCEPT] 接受到新连接: {}", addr);
                     if session_manager.count() >= max_conn {
                         warn!(
                             "连接数已满 ({}/{}), 拒绝新连接: {}",
@@ -84,11 +62,10 @@ impl GameServer {
                             max_conn,
                             addr
                         );
-                        drop(std_stream);
+                        drop(stream);
                         continue;
                     }
 
-                    let stream = TcpStream::from_std(std_stream)?;
                     let sm = session_manager.clone();
                     let ph = packet_handler.clone();
                     let stage = initial_stage.clone();
@@ -98,14 +75,11 @@ impl GameServer {
                         }
                     });
                 }
-                None => {
-                    info!("Accept channel closed, stopping server on {}", self.addr);
-                    break;
+                Err(e) => {
+                    error!("[ACCEPT] 错误: {}", e);
                 }
             }
         }
-
-        Ok(())
     }
 
     /// 空闲连接超时时间（秒），超过此时间未收到数据包则断开
